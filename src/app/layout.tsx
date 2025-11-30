@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { getUser, getProfile } from "@/lib/auth/actions";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -13,17 +14,24 @@ export const metadata: Metadata = {
   description: "Hyper-focused CRM for recruiters making 100+ calls per day",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = await getUser();
+  const profile = user ? await getProfile() : null;
+
+  // Check if we're on an auth page (login/register)
+  // These pages don't need the sidebar
+  const isAuthPage = false; // We'll handle this differently
+
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
         <div className="flex h-screen">
-          <Sidebar />
-          <main className="flex-1 overflow-hidden">
+          {user && <Sidebar user={user} profile={profile} />}
+          <main className={user ? "flex-1 overflow-hidden" : "flex-1"}>
             {children}
           </main>
         </div>

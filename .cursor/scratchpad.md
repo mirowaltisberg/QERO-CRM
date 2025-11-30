@@ -228,10 +228,11 @@
 
 ## Project Status Board
 
-### Current Phase: Phase 3 - Dashboard & Polish
+### Current Phase: Phase 4 - Authentication & User Management
 
 ### Todo
-- [ ] Task 9: Command Palette & Final Polish
+- [ ] Task 10: Authentication System (Supabase Auth)
+- [ ] Task 11: Account Settings Dashboard
 
 ### In Progress
 - (none)
@@ -245,9 +246,131 @@
 - [x] Task 6: Table View ✅
 - [x] Task 7: Dashboard ✅
 - [x] Task 8: Canton Tags + Apple-like Polish ✅
+- [x] Task 9: Supabase + Vercel Deployment ✅
 
 ### Blocked
 - (none)
+
+---
+
+## Phase 4: Authentication & User Management
+
+### Task 10: Authentication System (Supabase Auth)
+
+**Requirements:**
+- Registration with: Full Name, Swiss Phone Number, @qero.ch email only
+- Email confirmation link required
+- Login via email/password
+- Protected routes (redirect to login if not authenticated)
+
+**Technical Approach:**
+1. **Use Supabase Auth** (not Vercel Auth - Supabase Auth is already integrated and more suitable)
+   - Supabase Auth supports email confirmation, custom email templates, and integrates with our existing Supabase setup
+   - No additional setup needed - just enable email auth in Supabase dashboard
+
+2. **Registration Validation:**
+   - Email must end with `@qero.ch`
+   - Swiss phone format validation (+41 or 0xx xxx xx xx)
+   - Full name required (min 2 characters)
+
+3. **Database Schema Addition:**
+   ```sql
+   -- profiles table (extends auth.users)
+   CREATE TABLE profiles (
+     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+     full_name TEXT NOT NULL,
+     phone TEXT NOT NULL,
+     avatar_url TEXT,
+     created_at TIMESTAMPTZ DEFAULT NOW(),
+     updated_at TIMESTAMPTZ DEFAULT NOW()
+   );
+   
+   -- Enable RLS
+   ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+   
+   -- Users can only read/update their own profile
+   CREATE POLICY "Users can view own profile" ON profiles
+     FOR SELECT USING (auth.uid() = id);
+   CREATE POLICY "Users can update own profile" ON profiles
+     FOR UPDATE USING (auth.uid() = id);
+   ```
+
+4. **File Structure:**
+   ```
+   src/app/
+   ├── (auth)/
+   │   ├── login/page.tsx
+   │   ├── register/page.tsx
+   │   └── confirm/page.tsx      # Email confirmation landing
+   ├── (protected)/
+   │   ├── layout.tsx            # Auth guard wrapper
+   │   ├── calling/page.tsx
+   │   ├── contacts/page.tsx
+   │   ├── dashboard/page.tsx
+   │   └── settings/
+   │       └── page.tsx          # Account settings
+   src/lib/
+   ├── auth/
+   │   ├── middleware.ts         # Auth middleware
+   │   └── actions.ts            # Server actions for auth
+   ```
+
+5. **Implementation Steps:**
+   - [ ] Add profiles table to Supabase
+   - [ ] Create login page with email/password form
+   - [ ] Create registration page with validation (@qero.ch, Swiss phone)
+   - [ ] Set up email confirmation flow
+   - [ ] Create auth middleware to protect routes
+   - [ ] Update layout to show user info in sidebar
+   - [ ] Add logout functionality
+
+**Success Criteria:**
+- Only @qero.ch emails can register
+- Email confirmation required before access
+- Protected routes redirect to login
+- User session persists across page refreshes
+
+---
+
+### Task 11: Account Settings Dashboard
+
+**Requirements:**
+- Profile picture upload (stored in Supabase Storage)
+- Edit full name
+- View/edit phone number
+- Change password
+- View email (read-only)
+
+**UI Design:**
+- Minimalistic settings page matching existing aesthetic
+- Avatar with upload overlay on hover
+- Form fields with autosave (like notes in calling view)
+- Success/error toast notifications
+
+**File Structure:**
+```
+src/app/(protected)/settings/
+├── page.tsx                    # Settings page
+src/components/settings/
+├── ProfileForm.tsx             # Name, phone, avatar
+├── AvatarUpload.tsx            # Image upload component
+├── PasswordChange.tsx          # Change password form
+```
+
+**Implementation Steps:**
+- [ ] Create Supabase Storage bucket for avatars
+- [ ] Build AvatarUpload component with drag-drop
+- [ ] Build ProfileForm with autosave
+- [ ] Build PasswordChange form
+- [ ] Create settings page layout
+- [ ] Add settings link to sidebar
+- [ ] Test full flow
+
+**Success Criteria:**
+- Can upload/change profile picture
+- Can edit name and phone
+- Can change password
+- Changes persist and reflect across app
 
 ---
 
