@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { CantonTag } from "@/components/ui/CantonTag";
 import type { Contact } from "@/lib/types";
-import { memo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { memo, useCallback, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 interface ContactListProps {
   contacts: Contact[];
@@ -19,6 +19,74 @@ interface ContactListProps {
   availableCantons?: string[];
 }
 
+// Memoized list item to prevent re-renders
+const ContactListItem = memo(function ContactListItem({
+  contact,
+  isActive,
+  onSelect,
+  onFilterByCanton,
+  onClearCantonFilter,
+  activeCantonFilter,
+}: {
+  contact: Contact;
+  isActive: boolean;
+  onSelect: (id: string) => void;
+  onFilterByCanton?: (canton: string | null) => void;
+  onClearCantonFilter?: () => void;
+  activeCantonFilter?: string | null;
+}) {
+  const handleClick = useCallback(() => {
+    onSelect(contact.id);
+  }, [onSelect, contact.id]);
+
+  const handleCantonClick = useCallback(
+    (value: string) => {
+      if (activeCantonFilter === value) {
+        onClearCantonFilter?.();
+      } else {
+        onFilterByCanton?.(value);
+      }
+    },
+    [activeCantonFilter, onClearCantonFilter, onFilterByCanton]
+  );
+
+  return (
+    <button
+      onClick={handleClick}
+      className={[
+        "w-full rounded-xl border px-3 py-2 text-left transition-colors duration-100",
+        isActive
+          ? "bg-white border-gray-200 shadow-sm"
+          : "border-transparent hover:bg-white/60",
+      ].join(" ")}
+    >
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-gray-900 truncate">
+          {contact.company_name}
+        </p>
+        <Tag status={contact.status} className="text-[10px] px-2 py-0.5 flex-shrink-0" />
+      </div>
+      <div className="mt-1 flex items-center justify-between">
+        <p className="text-xs text-gray-500 truncate">
+          {contact.contact_name ?? "Hiring Team"}
+        </p>
+        <CantonTag
+          canton={contact.canton}
+          size="sm"
+          onClick={handleCantonClick}
+        />
+      </div>
+      <p className="mt-1 text-xs text-gray-400">
+        {contact.last_call
+          ? `Last call ${formatDate(contact.last_call)}`
+          : "Never logged"}
+      </p>
+    </button>
+  );
+});
+
+const ITEM_HEIGHT = 88; // Approximate height of each contact item
+
 export const ContactList = memo(function ContactList({
   contacts,
   activeContactId,
@@ -31,6 +99,27 @@ export const ContactList = memo(function ContactList({
   availableCantons = [],
 }: ContactListProps) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: contacts.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ITEM_HEIGHT,
+    overscan: 5,
+  });
+
+  const handleClearFilter = useCallback(() => {
+    onClearCantonFilter?.();
+    setIsPickerOpen(false);
+  }, [onClearCantonFilter]);
+
+  const handleSelectCanton = useCallback(
+    (value: string) => {
+      onFilterByCanton?.(value);
+      setIsPickerOpen(false);
+    },
+    [onFilterByCanton]
+  );
 
   return (
     <aside className="flex h-full w-80 flex-col border-r border-gray-200 bg-gray-50">
@@ -43,10 +132,7 @@ export const ContactList = memo(function ContactList({
           {activeCantonFilter && (
             <button
               className="mt-1 text-xs text-blue-600"
-              onClick={() => {
-                onClearCantonFilter?.();
-                setIsPickerOpen(false);
-              }}
+              onClick={handleClearFilter}
             >
               Clear canton ({activeCantonFilter})
             </button>
@@ -78,10 +164,7 @@ export const ContactList = memo(function ContactList({
             <Button
               size="sm"
               variant={activeCantonFilter ? "secondary" : "primary"}
-              onClick={() => {
-                onClearCantonFilter?.();
-                setIsPickerOpen(false);
-              }}
+              onClick={handleClearFilter}
             >
               All Cantons
             </Button>
@@ -90,78 +173,54 @@ export const ContactList = memo(function ContactList({
                 key={canton}
                 canton={canton}
                 size="sm"
-                onClick={(value) => {
-                  onFilterByCanton?.(value);
-                  setIsPickerOpen(false);
-                }}
+                onClick={handleSelectCanton}
               />
             ))}
           </div>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
+      <div ref={parentRef} className="flex-1 overflow-y-auto">
         {contacts.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center px-4 text-center text-sm text-gray-500">
             <p>No contacts available.</p>
             <p className="text-xs text-gray-400">Add contacts to start calling.</p>
           </div>
         ) : (
-          <ul className="space-y-1 p-2">
-            <AnimatePresence initial={false}>
-              {contacts.map((contact) => {
-                const isActive = contact.id === activeContactId;
-                return (
-                  <motion.li
-                    key={contact.id}
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  >
-                    <button
-                      onClick={() => onSelect(contact.id)}
-                      className={[
-                        "w-full rounded-2xl border border-transparent px-3 py-2 text-left transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-white hover:-translate-y-0.5",
-                        isActive
-                          ? "bg-white shadow-lg border-gray-200"
-                          : "text-gray-600",
-                      ].join(" ")}
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-900">
-                          {contact.company_name}
-                        </p>
-                        <Tag status={contact.status} className="text-[10px] px-2 py-0.5" />
-                      </div>
-                      <div className="mt-1 flex items-center justify-between">
-                        <p className="text-xs text-gray-500">
-                          {contact.contact_name ?? "Hiring Team"}
-                        </p>
-                        <CantonTag
-                          canton={contact.canton}
-                          size="sm"
-                          onClick={(value) => {
-                            if (activeCantonFilter === value) {
-                              onClearCantonFilter?.();
-                            } else {
-                              onFilterByCanton?.(value);
-                            }
-                          }}
-                        />
-                      </div>
-                      <p className="mt-1 text-xs text-gray-400">
-                        {contact.last_call
-                          ? `Last call ${formatDate(contact.last_call)}`
-                          : "Never logged"}
-                      </p>
-                    </button>
-                  </motion.li>
-                );
-              })}
-            </AnimatePresence>
-          </ul>
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: "100%",
+              position: "relative",
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const contact = contacts[virtualItem.index];
+              return (
+                <div
+                  key={contact.id}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: `${virtualItem.size}px`,
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                  className="px-2 py-0.5"
+                >
+                  <ContactListItem
+                    contact={contact}
+                    isActive={contact.id === activeContactId}
+                    onSelect={onSelect}
+                    onFilterByCanton={onFilterByCanton}
+                    onClearCantonFilter={onClearCantonFilter}
+                    activeCantonFilter={activeCantonFilter}
+                  />
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </aside>
@@ -178,4 +237,3 @@ function formatDate(value: string) {
     return value;
   }
 }
-

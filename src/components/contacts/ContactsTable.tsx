@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Contact } from "@/lib/types";
 import type { ContactStatus } from "@/lib/utils/constants";
 import { CONTACT_STATUS_LABELS } from "@/lib/utils/constants";
@@ -11,17 +12,80 @@ import { useContactsTable } from "@/lib/hooks/useContactsTable";
 import { TableToolbar } from "./TableToolbar";
 import { CantonTag } from "@/components/ui/CantonTag";
 import { cn } from "@/lib/utils/cn";
-import { AnimatePresence, motion } from "framer-motion";
 import { ContactsImporter } from "./ContactsImporter";
 
 interface ContactsTableProps {
   initialContacts: Contact[];
 }
 
+const ROW_HEIGHT = 52; // Approximate height of each table row
+
+// Memoized table row to prevent re-renders
+const ContactTableRow = memo(function ContactTableRow({
+  contact,
+  isSelected,
+  onToggleSelection,
+  onFilterByCanton,
+}: {
+  contact: Contact;
+  isSelected: boolean;
+  onToggleSelection: (id: string) => void;
+  onFilterByCanton: (canton: string) => void;
+}) {
+  const handleCheckboxChange = useCallback(() => {
+    onToggleSelection(contact.id);
+  }, [onToggleSelection, contact.id]);
+
+  const handleCantonClick = useCallback(
+    (value: string) => {
+      onFilterByCanton(value);
+    },
+    [onFilterByCanton]
+  );
+
+  return (
+    <tr className={cn(isSelected ? "bg-gray-50" : "", "hover:bg-gray-50/50")}>
+      <td className="px-4 py-3 w-10">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={handleCheckboxChange}
+        />
+      </td>
+      <td className="px-4 py-3 font-medium text-gray-900">{contact.company_name}</td>
+      <td className="px-4 py-3">{contact.contact_name ?? "Hiring Team"}</td>
+      <td className="px-4 py-3">
+        <CantonTag canton={contact.canton} onClick={handleCantonClick} />
+      </td>
+      <td className="px-4 py-3">
+        <Tag status={contact.status} />
+      </td>
+      <td className="px-4 py-3 text-gray-500">
+        {contact.last_call
+          ? new Intl.DateTimeFormat("en-US", {
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "numeric",
+            }).format(new Date(contact.last_call))
+          : "—"}
+      </td>
+      <td className="px-4 py-3">
+        {contact.notes ? (
+          <span className="line-clamp-1 text-gray-500">{contact.notes}</span>
+        ) : (
+          <span className="text-gray-300">Add note</span>
+        )}
+      </td>
+    </tr>
+  );
+});
+
 export function ContactsTable({ initialContacts }: ContactsTableProps) {
   const router = useRouter();
   const [clientContacts, setClientContacts] = useState(initialContacts);
   const [bulkModal, setBulkModal] = useState<"status" | "list" | null>(null);
+  const parentRef = useRef<HTMLDivElement>(null);
   
   const {
     contacts,
@@ -41,6 +105,13 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
     runBulkAction,
   } = useContactsTable({ contacts: clientContacts, lists: [] });
 
+  const virtualizer = useVirtualizer({
+    count: contacts.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  });
+
   const availableCantons = useMemo(
     () =>
       Array.from(
@@ -58,21 +129,31 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
     return contacts.every((contact) => selectedIds.includes(contact.id));
   }, [contacts, selectedIds]);
 
-  const handleBulkStatus = async (status: ContactStatus) => {
-    await runBulkAction({ type: "status", payload: status });
-    setBulkModal(null);
-  };
+  const handleBulkStatus = useCallback(
+    async (status: ContactStatus) => {
+      await runBulkAction({ type: "status", payload: status });
+      setBulkModal(null);
+    },
+    [runBulkAction]
+  );
 
-  const handleFilterByCanton = (canton: string) => {
-    applyFilters({
-      canton: filters.canton === canton ? "all" : canton,
-    });
-  };
+  const handleFilterByCanton = useCallback(
+    (canton: string) => {
+      applyFilters({
+        canton: filters.canton === canton ? "all" : canton,
+      });
+    },
+    [applyFilters, filters.canton]
+  );
 
-  const handleImportComplete = () => {
-    // Refresh the page to get updated contacts from server
+  const handleImportComplete = useCallback(() => {
     router.refresh();
-  };
+  }, [router]);
+
+  const handleOpenBulkStatus = useCallback(() => setBulkModal("status"), []);
+  const handleOpenBulkList = useCallback(() => setBulkModal("list"), []);
+  const handleBulkDelete = useCallback(() => runBulkAction({ type: "delete" }), [runBulkAction]);
+  const handleCloseBulkModal = useCallback(() => setBulkModal(null), []);
 
   return (
     <section className="flex h-full flex-col">
@@ -82,9 +163,9 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
           totalCount={clientContacts.length}
           selectedCount={selectedIds.length}
           onFilterChange={applyFilters}
-          onOpenBulkStatus={() => setBulkModal("status")}
-          onOpenBulkList={() => setBulkModal("list")}
-          onBulkDelete={() => runBulkAction({ type: "delete" })}
+          onOpenBulkStatus={handleOpenBulkStatus}
+          onOpenBulkList={handleOpenBulkList}
+          onBulkDelete={handleBulkDelete}
           groupByCanton={groupByCanton}
           onToggleGroupByCanton={toggleGroupByCanton}
           availableCantons={availableCantons}
@@ -93,12 +174,12 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
       </div>
 
       {error && (
-        <div className="border-b border-red-200 bg-red-50 px 6 py-2 text-sm text-red-700">
+        <div className="border-b border-red-200 bg-red-50 px-6 py-2 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      <div className="flex-1 overflow-auto">
+      <div ref={parentRef} className="flex-1 overflow-auto">
         <table className="min-w-full">
           <thead className="sticky top-0 z-10 bg-white text-left text-xs uppercase tracking-wide text-gray-400">
             <tr>
@@ -138,13 +219,13 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
-            <AnimatePresence initial={false}>
-              {contacts.map((contact, index) => {
+            {groupByCanton ? (
+              // Non-virtualized when grouping by canton (for section headers)
+              contacts.map((contact, index) => {
                 const isSelected = selectedIds.includes(contact.id);
                 const currentCanton = contact.canton ?? "Unknown Canton";
                 const previousCanton = index > 0 ? contacts[index - 1].canton ?? "Unknown Canton" : null;
-                const showHeader =
-                  groupByCanton && (index === 0 || previousCanton !== currentCanton);
+                const showHeader = index === 0 || previousCanton !== currentCanton;
                 return (
                   <Fragment key={contact.id}>
                     {showHeader && (
@@ -154,54 +235,35 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
                         </td>
                       </tr>
                     )}
-                    <motion.tr
-                      layout
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                      className={cn(
-                        isSelected ? "bg-gray-50" : "",
-                        "hover:bg-white hover:shadow-sm"
-                      )}
-                    >
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelection(contact.id)}
-                        />
-                      </td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{contact.company_name}</td>
-                      <td className="px-4 py-3">{contact.contact_name ?? "Hiring Team"}</td>
-                      <td className="px-4 py-3">
-                        <CantonTag canton={contact.canton} onClick={handleFilterByCanton} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <Tag status={contact.status} />
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">
-                        {contact.last_call
-                          ? new Intl.DateTimeFormat("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              hour: "numeric",
-                              minute: "numeric",
-                            }).format(new Date(contact.last_call))
-                          : "—"}
-                      </td>
-                      <td className="px-4 py-3">
-                        {contact.notes ? (
-                          <span className="line-clamp-1 text-gray-500">{contact.notes}</span>
-                        ) : (
-                          <span className="text-gray-300">Add note</span>
-                        )}
-                      </td>
-                    </motion.tr>
+                    <ContactTableRow
+                      contact={contact}
+                      isSelected={isSelected}
+                      onToggleSelection={toggleSelection}
+                      onFilterByCanton={handleFilterByCanton}
+                    />
                   </Fragment>
                 );
-              })}
-            </AnimatePresence>
+              })
+            ) : (
+              // Virtualized rows when not grouping
+              <>
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const contact = contacts[virtualRow.index];
+                  const isSelected = selectedIds.includes(contact.id);
+                  return (
+                    <ContactTableRow
+                      key={contact.id}
+                      contact={contact}
+                      isSelected={isSelected}
+                      onToggleSelection={toggleSelection}
+                      onFilterByCanton={handleFilterByCanton}
+                    />
+                  );
+                })}
+                {/* Spacer to maintain scroll height */}
+                <tr style={{ height: virtualizer.getTotalSize() - (virtualizer.getVirtualItems().length * ROW_HEIGHT) }} />
+              </>
+            )}
           </tbody>
         </table>
 
@@ -222,13 +284,13 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
             <Button variant="ghost" size="sm" onClick={clearSelection}>
               Clear
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setBulkModal("status")}>
+            <Button variant="secondary" size="sm" onClick={handleOpenBulkStatus}>
               Update Status
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setBulkModal("list")}>
+            <Button variant="secondary" size="sm" onClick={handleOpenBulkList}>
               Assign List
             </Button>
-            <Button variant="danger" size="sm" onClick={() => runBulkAction({ type: "delete" })}>
+            <Button variant="danger" size="sm" onClick={handleBulkDelete}>
               Delete
             </Button>
           </div>
@@ -255,7 +317,7 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
                   </Button>
                 ))}
               </div>
-              <Button variant="ghost" className="mt-4 w-full" onClick={() => setBulkModal(null)}>
+              <Button variant="ghost" className="mt-4 w-full" onClick={handleCloseBulkModal}>
                 Cancel
               </Button>
             </div>
@@ -266,7 +328,7 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
   );
 }
 
-function SortableHeader({
+const SortableHeader = memo(function SortableHeader({
   label,
   column,
   sortBy,
@@ -280,10 +342,14 @@ function SortableHeader({
   onSort: (column: keyof Contact) => void;
 }) {
   const isActive = sortBy === column;
+  const handleClick = useCallback(() => {
+    onSort(column);
+  }, [onSort, column]);
+
   return (
     <th
       className="px-4 py-2 cursor-pointer select-none text-gray-500 hover:text-gray-900"
-      onClick={() => onSort(column)}
+      onClick={handleClick}
     >
       <div className="flex items-center gap-1">
         {label}
@@ -291,4 +357,4 @@ function SortableHeader({
       </div>
     </th>
   );
-}
+});

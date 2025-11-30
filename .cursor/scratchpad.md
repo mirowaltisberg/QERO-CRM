@@ -14,6 +14,7 @@
 1. Select contact → Call → Log outcome → Move to next (in seconds)
 2. Manage large contact lists efficiently
 3. Track performance metrics
+4. Run reliably on modest client hardware (e.g., Intel i5-8500T, 8 GB RAM, Intel UHD 630) with a native-app feel
 
 **Tech Stack:**
 - Frontend: React + TypeScript + Tailwind CSS
@@ -52,6 +53,15 @@
   - Global keyboard shortcuts (J/K/E/C/L/Q)
   - Command palette for quick actions
   - Focus management for seamless navigation
+
+### Challenge 5: Native-App Performance on Modest Hardware
+- **Problem:** Users on i5-8500T / 8 GB RAM experience sluggish UI, delayed button responses, multiple clicks required to trigger actions.
+- **Solution Hypotheses:**
+  - Profile interaction latency (React Profiler, Performance tab) to identify expensive re-renders or blocking async work.
+  - Reduce bundle weight & unnecessary client components; prefer server components + streaming where possible.
+  - Virtualize large lists (contact table, calling list) and memoize derived data to lower DOM/React workload.
+  - Offload heavy fetches to background prefetch / cache layers; debounce user-triggered mutations.
+  - Audit animations/transitions for GPU-friendliness; avoid layout thrash (prefer transform/opacity).
 
 ---
 
@@ -224,17 +234,53 @@
 - [ ] Error handling with toast notifications
 - **Success Criteria:** App fully keyboard navigable, accessible, production-ready
 
+## Phase 5: Performance & Native Feel
+
+**Task 14: Profiling & Baseline Metrics**
+- [ ] Capture React Profiler + Chrome Performance traces for /calling & /contacts.
+- [ ] Measure interaction latency (button click → UI update), render counts, bundle size (`next build --analyze`).
+- [ ] Document top CPU/paint bottlenecks and set target budgets (e.g., <200 ms contact switch).
+- **Success Criteria:** Written profiling report with quantified hotspots & baseline numbers.
+
+**Task 15: Interaction Responsiveness**
+- [ ] Optimize button handlers (call, outcomes, bulk actions) to remove redundant async work and state churn.
+- [ ] Add optimistic UI / `useTransition` where needed so feedback appears instantly.
+- [ ] Ensure focus/pressed states show within 100 ms on target hardware; eliminate double-click necessity.
+- **Success Criteria:** Manual timing/profiler shows <100 ms from click to visual feedback across core actions.
+
+**Task 16: List Rendering Optimization**
+- [ ] Virtualize large lists/tables (ContactList, ContactsTable) via `@tanstack/react-virtual` or similar.
+- [ ] Memoize heavy selectors & avoid re-sorting/filtering on every render; split ContactDetail into memoized subcomponents.
+- [ ] Reduce DOM weight (only render visible rows) and ensure scroll remains 60 fps with 1.3k+ rows.
+- **Success Criteria:** Main thread frames stay under 16 ms during scroll/selection; profiler shows drastic render count drop.
+
+**Task 17: Data Fetching & Caching**
+- [ ] Ensure Supabase queries use pagination/keyset to avoid multi-thousand row payloads per interaction.
+- [ ] Introduce client-side cache (SWR/React Query/custom store) so UI reuses fetched contacts instead of refetching.
+- [ ] Prefetch neighboring contacts/call logs to make navigation instantaneous.
+- **Success Criteria:** No duplicate fetches in Network tab during normal flow; contact switch does not trigger full reload.
+
+**Task 18: Animation & Bundle Polish**
+- [ ] Audit Framer Motion usage; keep essential transitions ≤200 ms, prefer CSS transforms.
+- [ ] Lazy-load non-critical routes/components and drop unused dependencies.
+- [ ] Re-run Lighthouse/Next build stats to confirm meaningful bundle & TTI improvements.
+- **Success Criteria:** Production bundle shrinks ≥15%, Lighthouse Interaction to Next Paint in green, app “feels native” on i5-8500T/8 GB.
+
 ---
 
 ## Project Status Board
 
-### Current Phase: ✅ All Core Tasks Complete!
+### Current Phase: Phase 5 – Performance & Native Feel
 
 ### Todo
-- (none)
+- [ ] Task 14: Profiling & Baseline Metrics
+- [ ] Task 15: Interaction Responsiveness
+- [ ] Task 16: List Rendering Optimization
+- [ ] Task 17: Data Fetching & Caching
+- [ ] Task 18: Animation & Bundle Polish
 
 ### In Progress
-- (none)
+- (pending user approval to begin Task 14)
 
 ### Completed
 - [x] Task 1: Project Setup & File Structure ✅
@@ -256,6 +302,7 @@
 
 ## Current Status / Progress Tracking
 - Task 13 completed: Notes autosave indicator now debounced + subtle “Saving/Synced” states, preventing flicker spam.
+- Awaiting kickoff of Task 14 (profiling) to gather concrete performance metrics prior to code changes.
 
 ---
 
@@ -398,6 +445,7 @@ Reviewed original requirements against plan. Changes made:
 - Plan approved, beginning Task 1
 - **Nov 26:** User requested visible canton tags + smoother Apple-like animations across the product
 - **Nov 26 (PM):** User requested deeper animation polish, canton-specific color coding (e.g., Zürich blue, Thurgau green), canton-based listing controls, and company-only contacts
+- **Nov 30 (PM):** User prioritized native-feel performance on i5-8500T / 8 GB RAM setups → Phase 5 plan (Tasks 14-18) added.
 
 ### Task 2 Completion Notes
 - Strongly typed entities in `src/lib/types.ts` mirroring Supabase schema

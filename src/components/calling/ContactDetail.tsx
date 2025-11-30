@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { Tag } from "@/components/ui/tag";
@@ -22,7 +21,7 @@ interface ContactDetailProps {
   actionType?: "logging" | "saving" | null;
 }
 
-export function ContactDetail({
+export const ContactDetail = memo(function ContactDetail({
   contact,
   onCall,
   onOutcome,
@@ -34,20 +33,35 @@ export function ContactDetail({
 }: ContactDetailProps) {
   const [notesValue, setNotesValue] = useState(contact?.notes ?? "");
 
+  // Sync notes when contact changes
+  useEffect(() => {
+    setNotesValue(contact?.notes ?? "");
+  }, [contact?.id, contact?.notes]);
+
   const displayPhone = useMemo(() => contact?.phone ?? "No phone number", [contact?.phone]);
   const displayEmail = useMemo(() => contact?.email ?? "No email", [contact?.email]);
 
+  const handleNotesChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNotesValue(event.target.value);
+  }, []);
+
+  const handleAutoSave = useCallback(
+    async (value: string) => {
+      await onSaveNotes(value.trim().length ? value : null);
+    },
+    [onSaveNotes]
+  );
+
+  if (!contact) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
+        Select a company to start calling.
+      </div>
+    );
+  }
+
   return (
-    <AnimatePresence mode="wait">
-      {contact ? (
-        <motion.section
-          key={contact.id}
-          className="flex flex-1 flex-col gap-4 p-6"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -10 }}
-          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        >
+    <section className="flex flex-1 flex-col gap-4 p-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-400">Now calling</p>
@@ -62,7 +76,7 @@ export function ContactDetail({
         description="Press C to call instantly"
         actions={
           <Button onClick={onCall} size="lg">
-            Call {contact.contact_name.split(" ")[0] ?? ""}
+            Call {contact.contact_name?.split(" ")[0] ?? ""}
           </Button>
         }
       >
@@ -83,10 +97,8 @@ export function ContactDetail({
         <Textarea
           ref={notesRef}
           value={notesValue}
-          onChange={(event) => setNotesValue(event.target.value)}
-          onAutoSave={async (value) => {
-            await onSaveNotes(value.trim().length ? value : null);
-          }}
+          onChange={handleNotesChange}
+          onAutoSave={handleAutoSave}
           autosaveDelay={800}
           placeholder="Add context, objections, next steps..."
         />
@@ -100,23 +112,11 @@ export function ContactDetail({
           Next Company ↵
         </Button>
       </div>
-    </motion.section>
-      ) : (
-        <motion.div
-          key="empty"
-          className="flex flex-1 items-center justify-center text-sm text-gray-500"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          Select a company to start calling.
-        </motion.div>
-      )}
-    </AnimatePresence>
+    </section>
   );
-}
+});
 
-function InfoBlock({
+const InfoBlock = memo(function InfoBlock({
   label,
   value,
   children,
@@ -126,10 +126,9 @@ function InfoBlock({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="transition-all duration-300">
+    <div>
       <p className="text-xs uppercase tracking-wide text-gray-400">{label}</p>
       {children ? <div className="mt-1">{children}</div> : <p className="text-sm text-gray-900">{value}</p>}
     </div>
   );
-}
-
+});
