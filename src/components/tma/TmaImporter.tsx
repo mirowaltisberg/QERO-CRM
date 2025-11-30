@@ -112,6 +112,11 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
     row["Funktion"] ||
     row["Role"] ||
     row["Titel"];
+  const shortProfile =
+    row["Short Profile"] ||
+    row["Short-Profile"] ||
+    row["Kurzprofil"] ||
+    row["Profil"];
 
   return {
     first_name: firstName,
@@ -120,6 +125,7 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
     email: (row["Email"] || row["E-Mail"] || "").trim() || null,
     canton: formatCanton(cantonSource),
     position_title: position?.trim() || null,
+    short_profile_url: shortProfile?.trim() || null,
     status,
     notes: (row["Notizen"] || row["Notes"] || "").trim() || null,
   };

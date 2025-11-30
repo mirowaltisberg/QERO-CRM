@@ -37,6 +37,7 @@ export interface TmaCandidate {
   follow_up_note: string | null;
   cv_url: string | null;
   references_url: string | null;
+  short_profile_url: string | null;
   created_at: string;
 }
 

@@ -58,6 +58,7 @@ CREATE TABLE tma_candidates (
   follow_up_note TEXT,
   cv_url TEXT,
   references_url TEXT,
+  short_profile_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

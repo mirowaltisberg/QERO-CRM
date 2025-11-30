@@ -19,7 +19,9 @@ interface Props {
   onClearStatus: () => Promise<void> | void;
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
   onUpdateNotes: (value: string | null) => Promise<void>;
-  onUpdateDocuments: (payload: { cv_url?: string | null; references_url?: string | null }) => Promise<void>;
+  onUpdateDocuments: (
+    payload: { cv_url?: string | null; references_url?: string | null; short_profile_url?: string | null }
+  ) => Promise<void>;
   onUpdatePosition: (value: string | null) => Promise<void> | void;
 }
 
@@ -42,7 +44,7 @@ export function TmaDetail({
     initialFollowUpDate ? initialFollowUpDate.toISOString().slice(11, 16) : "09:00"
   );
   const [followUpNote, setFollowUpNote] = useState(candidate?.follow_up_note ?? "");
-  const [uploading, setUploading] = useState<"cv" | "references" | null>(null);
+  const [uploading, setUploading] = useState<"cv" | "references" | "short_profile" | null>(null);
   const [position, setPosition] = useState(candidate?.position_title ?? "");
   const handlePositionBlur = useCallback(async () => {
     if (!candidate) return;
@@ -69,7 +71,7 @@ export function TmaDetail({
   };
 
   const handleUpload = useCallback(
-    async (file: File, type: "cv" | "references") => {
+    async (file: File, type: "cv" | "references" | "short_profile") => {
       if (!candidate) return;
       const supabase = createClient();
       const bucket = "tma-docs";
@@ -85,6 +87,7 @@ export function TmaDetail({
       await onUpdateDocuments({
         cv_url: type === "cv" ? data.publicUrl : candidate.cv_url,
         references_url: type === "references" ? data.publicUrl : candidate.references_url,
+        short_profile_url: type === "short_profile" ? data.publicUrl : candidate.short_profile_url,
       });
       setUploading(null);
     },
@@ -125,7 +128,7 @@ export function TmaDetail({
                 Call {candidate.phone}
               </button>
             )}
-            {candidate.canton && <CantonTag canton={candidate.canton} size="sm" />}
+            {candidate.canton && <CantonTag canton={candidate.canton} size="md" />}
           </div>
           <div className="mt-3 max-w-sm">
             <label className="text-xs uppercase text-gray-400">Role / Position</label>
@@ -236,6 +239,12 @@ export function TmaDetail({
                 url={candidate.references_url}
                 uploading={uploading === "references"}
                 onUpload={(file) => handleUpload(file, "references")}
+              />
+              <DocumentCard
+                title="Short Profile"
+                url={candidate.short_profile_url}
+                uploading={uploading === "short_profile"}
+                onUpload={(file) => handleUpload(file, "short_profile")}
               />
             </div>
           </Panel>

@@ -3,6 +3,7 @@
 import { memo } from "react";
 import type { TmaCandidate } from "@/lib/types";
 import { Tag } from "@/components/ui/tag";
+import { CantonTag } from "@/components/ui/CantonTag";
 import { TMA_STATUS_LABELS, TMA_STATUS_STYLES, type TmaStatus } from "@/lib/utils/constants";
 
 interface Props {
@@ -50,9 +51,10 @@ export const TmaList = memo(function TmaList({ candidates, activeId, onSelect }:
                   {candidate.status ? TMA_STATUS_LABELS[candidate.status as TmaStatus] : "Set status"}
                 </Tag>
               </div>
-              <p className="text-xs text-gray-500">
-                {candidate.email ?? "No email"} {candidate.canton && `• ${candidate.canton}`}
-              </p>
+              <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
+                <p>{candidate.email ?? "No email"}</p>
+                <CantonTag canton={candidate.canton} size="md" />
+              </div>
               {candidate.follow_up_at && (
                 <p className="text-xs text-amber-600">Follow-up {new Date(candidate.follow_up_at).toLocaleDateString()}</p>
               )}

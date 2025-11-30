@@ -137,7 +137,9 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   );
 
   const updateDocuments = useCallback(
-    async (payload: Partial<Pick<TmaCandidate, "cv_url" | "references_url">>) => {
+    async (
+      payload: Partial<Pick<TmaCandidate, "cv_url" | "references_url" | "short_profile_url">>
+    ) => {
       if (!activeCandidate) return;
       const response = await fetch(`/api/tma/${activeCandidate.id}`, {
         method: "PATCH",

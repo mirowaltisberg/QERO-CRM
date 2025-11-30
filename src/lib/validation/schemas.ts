@@ -77,6 +77,7 @@ const tmaBaseSchema = z.object({
   follow_up_note: optionalTextSchema,
   cv_url: z.string().url().optional().nullable(),
   references_url: z.string().url().optional().nullable(),
+  short_profile_url: z.string().url().optional().nullable(),
 });
 
 export const TmaCreateSchema = tmaBaseSchema.extend({
