@@ -14,6 +14,8 @@ function buildFilters(request: NextRequest) {
     canton: params.get('canton') || undefined,
     search: params.get('search') || undefined,
     list_id: params.get('list_id') || undefined,
+    page: params.get('page') ? parseInt(params.get('page')!, 10) : undefined,
+    pageSize: params.get('pageSize') ? parseInt(params.get('pageSize')!, 10) : undefined,
   };
   return ContactFilterSchema.safeParse(raw);
 }
@@ -25,8 +27,25 @@ export async function GET(request: NextRequest) {
       return respondError(formatZodError(filtersResult.error), 400);
     }
 
-    // TODO: Replace contactService with Supabase queries when backend is connected
-    const contacts = await contactService.getAll(filtersResult.data);
+    const filters = filtersResult.data;
+    
+    // If pagination params provided, use paginated endpoint
+    if (filters.page || filters.pageSize) {
+      const result = await contactService.getPaginated(filters);
+      return respondSuccess(result.data, {
+        status: 200,
+        meta: {
+          count: result.data.length,
+          total: result.total,
+          page: result.page,
+          pageSize: result.pageSize,
+          totalPages: result.totalPages,
+        },
+      });
+    }
+
+    // Otherwise return all (for backwards compatibility)
+    const contacts = await contactService.getAll(filters);
     return respondSuccess(contacts, {
       status: 200,
       meta: { count: contacts.length },
@@ -48,7 +67,6 @@ export async function POST(request: NextRequest) {
       return respondError(formatZodError(parsed.error), 400);
     }
 
-    // TODO: Replace contactService with Supabase mutations when backend is connected
     const contact = await contactService.create(sanitizeContactPayload(parsed.data));
     return respondSuccess(contact, { status: 201 });
   } catch (error) {
@@ -56,4 +74,3 @@ export async function POST(request: NextRequest) {
     return respondError('Failed to create contact', 500);
   }
 }
-

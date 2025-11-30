@@ -47,6 +47,8 @@ export const ContactFilterSchema = z.object({
   canton: z.enum(SWISS_CANTONS).optional(),
   search: z.string().trim().min(1).optional(),
   list_id: z.string().trim().min(1).optional(),
+  page: z.number().int().min(1).optional(),
+  pageSize: z.number().int().min(1).max(1000).optional(),
 });
 
 export const CallLogCreateSchema = z.object({

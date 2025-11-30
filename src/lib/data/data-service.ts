@@ -3,38 +3,66 @@
  * Uses Supabase for all data operations
  */
 
-import type { Contact, CallLog, List, ContactFilters, DashboardStats } from "../types";
+import type { Contact, CallLog, List, ContactFilters, DashboardStats, PaginatedContacts } from "../types";
 import type { CallOutcome, ContactStatus } from "../utils/constants";
 import { createClient } from "../supabase/client";
+
+// Default page size - can handle up to 10k+ with pagination
+const DEFAULT_PAGE_SIZE = 100;
+const MAX_PAGE_SIZE = 1000;
 
 /**
  * Contact Operations
  */
 export const contactService = {
   /**
-   * Get all contacts with optional filters
+   * Get contacts with pagination and optional filters
+   * Supports up to 10k+ records with efficient pagination
    */
   async getAll(filters?: ContactFilters): Promise<Contact[]> {
+    // For backwards compatibility, fetch all (up to 10k)
+    const result = await this.getPaginated({ ...filters, pageSize: MAX_PAGE_SIZE * 10 });
+    return result.data;
+  },
+
+  /**
+   * Get paginated contacts with filters
+   */
+  async getPaginated(filters?: ContactFilters): Promise<PaginatedContacts> {
     const supabase = createClient();
     
-    let query = supabase
+    const page = filters?.page ?? 1;
+    const pageSize = Math.min(filters?.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+    const offset = (page - 1) * pageSize;
+
+    // Build the base query for counting
+    let countQuery = supabase
+      .from("contacts")
+      .select("*", { count: "exact", head: true });
+
+    // Build the data query
+    let dataQuery = supabase
       .from("contacts")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + pageSize - 1);
 
+    // Apply filters to both queries
     if (filters?.status) {
-      query = query.eq("status", filters.status);
+      countQuery = countQuery.eq("status", filters.status);
+      dataQuery = dataQuery.eq("status", filters.status);
     }
 
     if (filters?.canton) {
-      query = query.eq("canton", filters.canton);
+      countQuery = countQuery.eq("canton", filters.canton);
+      dataQuery = dataQuery.eq("canton", filters.canton);
     }
 
     if (filters?.search) {
       const search = filters.search.toLowerCase();
-      query = query.or(
-        `company_name.ilike.%${search}%,contact_name.ilike.%${search}%,email.ilike.%${search}%`
-      );
+      const searchFilter = `company_name.ilike.%${search}%,contact_name.ilike.%${search}%,email.ilike.%${search}%`;
+      countQuery = countQuery.or(searchFilter);
+      dataQuery = dataQuery.or(searchFilter);
     }
 
     if (filters?.list_id) {
@@ -46,20 +74,34 @@ export const contactService = {
       
       const contactIds = members?.map((m) => m.contact_id) || [];
       if (contactIds.length > 0) {
-        query = query.in("id", contactIds);
+        countQuery = countQuery.in("id", contactIds);
+        dataQuery = dataQuery.in("id", contactIds);
       } else {
-        return [];
+        return { data: [], total: 0, page, pageSize, totalPages: 0 };
       }
     }
 
-    const { data, error } = await query;
+    // Execute both queries in parallel
+    const [countResult, dataResult] = await Promise.all([
+      countQuery,
+      dataQuery,
+    ]);
 
-    if (error) {
-      console.error("Error fetching contacts:", error);
-      return [];
+    if (dataResult.error) {
+      console.error("Error fetching contacts:", dataResult.error);
+      return { data: [], total: 0, page, pageSize, totalPages: 0 };
     }
 
-    return data || [];
+    const total = countResult.count ?? 0;
+    const totalPages = Math.ceil(total / pageSize);
+
+    return {
+      data: dataResult.data || [],
+      total,
+      page,
+      pageSize,
+      totalPages,
+    };
   },
 
   /**

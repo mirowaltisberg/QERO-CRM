@@ -81,6 +81,19 @@ export interface ContactFilters {
   canton?: string;
   search?: string;
   list_id?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+/**
+ * Paginated contacts result
+ */
+export interface PaginatedContacts {
+  data: Contact[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 /**
