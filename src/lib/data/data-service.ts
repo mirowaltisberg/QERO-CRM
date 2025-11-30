@@ -16,13 +16,57 @@ const MAX_PAGE_SIZE = 1000;
  */
 export const contactService = {
   /**
-   * Get contacts with pagination and optional filters
-   * Supports up to 10k+ records with efficient pagination
+   * Get all contacts (up to 10k) - for backwards compatibility
+   * For large datasets, use getPaginated instead
    */
   async getAll(filters?: ContactFilters): Promise<Contact[]> {
-    // For backwards compatibility, fetch all (up to 10k)
-    const result = await this.getPaginated({ ...filters, pageSize: MAX_PAGE_SIZE * 10 });
-    return result.data;
+    const supabase = createClient();
+    
+    // Fetch all contacts without pagination limit (Supabase default is 1000)
+    // We need to explicitly set a higher limit
+    let query = supabase
+      .from("contacts")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10000); // Allow up to 10k contacts
+
+    if (filters?.status) {
+      query = query.eq("status", filters.status);
+    }
+
+    if (filters?.canton) {
+      query = query.eq("canton", filters.canton);
+    }
+
+    if (filters?.search) {
+      const search = filters.search.toLowerCase();
+      query = query.or(
+        `company_name.ilike.%${search}%,contact_name.ilike.%${search}%,email.ilike.%${search}%`
+      );
+    }
+
+    if (filters?.list_id) {
+      const { data: members } = await supabase
+        .from("list_members")
+        .select("contact_id")
+        .eq("list_id", filters.list_id);
+      
+      const contactIds = members?.map((m) => m.contact_id) || [];
+      if (contactIds.length > 0) {
+        query = query.in("id", contactIds);
+      } else {
+        return [];
+      }
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Error fetching contacts:", error);
+      return [];
+    }
+
+    return data || [];
   },
 
   /**
