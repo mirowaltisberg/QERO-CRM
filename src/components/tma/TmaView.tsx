@@ -27,6 +27,10 @@ export function TmaView({ initialCandidates }: Props) {
     clearStatus,
     setStatusFilter,
     statusFilter,
+    setCantonFilter,
+    clearCantonFilter,
+    availableCantons,
+    cantonFilter,
   } = useTmaCandidates({ initialCandidates });
 
   const countByStatus = useMemo(() => {
@@ -45,7 +49,7 @@ export function TmaView({ initialCandidates }: Props) {
     <div className="flex h-full">
       <TmaList candidates={candidates} activeId={activeCandidate?.id ?? null} onSelect={selectCandidate} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between border-b border-gray-200 px-6 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-3">
           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
             <Button
               variant={statusFilter === "all" ? "secondary" : "ghost"}
@@ -77,6 +81,33 @@ export function TmaView({ initialCandidates }: Props) {
             </Button>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500">
+            <label className="flex items-center gap-2">
+              <span className="text-gray-500">Canton</span>
+              <select
+                className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
+                value={cantonFilter ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (!value) {
+                    clearCantonFilter();
+                  } else {
+                    setCantonFilter(value);
+                  }
+                }}
+              >
+                <option value="">All</option>
+                {availableCantons.map((canton) => (
+                  <option key={canton} value={canton}>
+                    {canton}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {cantonFilter && (
+              <Button variant="ghost" size="sm" onClick={clearCantonFilter}>
+                Clear
+              </Button>
+            )}
             {actionState.type && <span>{actionState.message}</span>}
             <Button variant="ghost" size="sm" onClick={refreshCandidates}>
               Refresh
@@ -95,7 +126,9 @@ export function TmaView({ initialCandidates }: Props) {
               onUpdateNotes={updateNotes}
               onUpdateDocuments={updateDocuments}
             />
-            <TmaImporter onImportComplete={refreshCandidates} />
+            <div className="flex flex-col items-end">
+              <TmaImporter onImportComplete={refreshCandidates} />
+            </div>
           </div>
         </div>
       </div>

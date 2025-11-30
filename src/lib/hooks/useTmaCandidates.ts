@@ -29,6 +29,16 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     });
   }, [candidates, cantonFilter, statusFilter]);
 
+  const availableCantons = useMemo(() => {
+    return Array.from(
+      new Set(
+        candidates
+          .map((candidate) => candidate.canton)
+          .filter((canton): canton is string => Boolean(canton))
+      )
+    ).sort();
+  }, [candidates]);
+
   const activeCandidate = useMemo(() => {
     if (!activeId) return filteredCandidates[0] ?? null;
     return filteredCandidates.find((c) => c.id === activeId) ?? filteredCandidates[0] ?? null;
@@ -175,7 +185,9 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     updateDocuments,
     clearStatus,
     setCantonFilter,
+    clearCantonFilter: () => setCantonFilter(null),
     setStatusFilter,
+    availableCantons,
   };
 }
 

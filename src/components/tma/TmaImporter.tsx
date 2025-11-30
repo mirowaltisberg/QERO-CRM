@@ -65,10 +65,10 @@ export function TmaImporter({ onImportComplete }: Props) {
   };
 
   return (
-    <div className="rounded-2xl border border-dashed border-gray-300 p-4 text-sm">
-      <p className="font-medium text-gray-900">Import CSV</p>
-      <p className="text-xs text-gray-500">Headers: Vorname, Nachname, Telefon, Email, Kanton, Status (A/B/C), Notizen</p>
-      <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-xs font-medium text-white">
+    <div className="w-full max-w-xs rounded-2xl border border-dashed border-gray-200 p-4 text-xs text-gray-600 shadow-sm">
+      <p className="text-sm font-semibold text-gray-900">Import CSV</p>
+      <p className="mt-1 text-[11px] text-gray-500">Drag a CSV to quickly add candidates. Headers can match Companies export.</p>
+      <label className="mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-xs font-medium text-white">
         <input
           type="file"
           accept=".csv"
@@ -81,7 +81,7 @@ export function TmaImporter({ onImportComplete }: Props) {
         />
         {uploading ? "Uploading…" : "Upload CSV"}
       </label>
-      {message && <p className="mt-2 text-xs text-gray-500">{message}</p>}
+      {message && <p className="mt-2 text-[11px] text-gray-500">{message}</p>}
     </div>
   );
 }
