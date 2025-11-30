@@ -15,6 +15,7 @@
 2. Manage large contact lists efficiently
 3. Track performance metrics
 4. Run reliably on modest client hardware (e.g., Intel i5-8500T, 8 GB RAM, Intel UHD 630) with a native-app feel
+5. Track lead heat (Hot/Working/Follow Up) and schedule follow-ups inside the CRM
 
 **Tech Stack:**
 - Frontend: React + TypeScript + Tailwind CSS
@@ -62,6 +63,13 @@
   - Virtualize large lists (contact table, calling list) and memoize derived data to lower DOM/React workload.
   - Offload heavy fetches to background prefetch / cache layers; debounce user-triggered mutations.
   - Audit animations/transitions for GPU-friendliness; avoid layout thrash (prefer transform/opacity).
+
+### Challenge 6: Lead Heat Tracking & Follow-up Scheduling
+- **Problem:** Current “NEW” badge is noisy and doesn’t reflect recruiter workflow; no way to schedule or monitor follow-ups.
+- **Solution Hypotheses:**
+  - Replace legacy statuses with streamlined lead-heat tags (Hot, Working, Follow Up) and show lightweight badges.
+  - Provide one-click follow-up scheduling (next day 9 AM) plus custom datetime picker, persisting to Supabase.
+  - Surface upcoming follow-ups on dashboard metrics/cards for quick action.
 
 ---
 
@@ -266,6 +274,44 @@
 - [ ] Re-run Lighthouse/Next build stats to confirm meaningful bundle & TTI improvements.
 - **Success Criteria:** Production bundle shrinks ≥15%, Lighthouse Interaction to Next Paint in green, app “feels native” on i5-8500T/8 GB.
 
+**Task 19: Status Model Overhaul & Follow-up Scheduling**
+
+**Requirements**
+- Replace legacy status pill (“NEW”) with new categories: **Hot**, **Working**, **Follow Up**.
+- Status should update when contact is opened/acted upon (e.g., default to Working after first view unless already Hot/Follow Up).
+- Provide follow-up controls in Calling view:
+  - Quick button: “Follow Up tomorrow 09:00”
+  - Custom scheduling (date + time picker) with ability to add note.
+  - Store follow-up timestamp + note in Supabase (likely `contacts.follow_up_at` + `follow_up_note` columns).
+- Dashboard must highlight upcoming follow-ups (count + list) and show conversions by status.
+
+**Implementation Plan**
+1. **Data Model**
+   - Add columns to Supabase: `lead_status` (enum: hot/working/follow_up), `follow_up_at` (timestamptz), `follow_up_note` (text).
+   - Create migration SQL + update `supabase/schema.sql`; ensure RLS allows owner updates.
+2. **API & Services**
+   - Extend Zod schemas/types to include new fields.
+   - Update contact service (client & server) to read/write `lead_status` and follow-up info.
+3. **UI Updates**
+   - Replace Tag usage across Calling/Contacts/Dashboard to show new statuses (color-coded, subtle).
+   - Add follow-up CTA in `ContactDetail` (buttons for quick + custom modal).
+   - In Contacts table, add columns/filtering for lead status & follow-up date.
+4. **Dashboard**
+   - Show “Follow-ups due today/tomorrow” metric.
+   - Add list of upcoming follow-ups (sorted by `follow_up_at`) with link to open contact.
+5. **Automation**
+   - When contact opened from Calling view:
+     - If status empty → set to Working.
+     - If follow-up was due and action taken, optionally clear after completion.
+6. **Testing**
+   - Manual flow: set statuses, schedule follow-ups, verify persistence + dashboard counts.
+   - Ensure migrations run on Supabase instance before deploy.
+
+**Success Criteria**
+- Recruiter can tag contact Hot/Working/Follow Up from calling/table views.
+- Follow-up quick actions persist to Supabase and appear on dashboard list.
+- Default status transitions don’t feel intrusive; UI no longer shows redundant “NEW” pill.
+
 ---
 
 ## Project Status Board
@@ -278,6 +324,7 @@
 - [ ] Task 16: List Rendering Optimization
 - [ ] Task 17: Data Fetching & Caching
 - [ ] Task 18: Animation & Bundle Polish
+- [ ] Task 19: Status Model Overhaul & Follow-up Scheduling
 
 ### In Progress
 - (pending user approval to begin Task 14)
@@ -303,6 +350,7 @@
 ## Current Status / Progress Tracking
 - Task 13 completed: Notes autosave indicator now debounced + subtle “Saving/Synced” states, preventing flicker spam.
 - Awaiting kickoff of Task 14 (profiling) to gather concrete performance metrics prior to code changes.
+- Task 19 (status overhaul + follow-ups) planned — awaiting user approval to begin implementation.
 
 ---
 
@@ -446,6 +494,7 @@ Reviewed original requirements against plan. Changes made:
 - **Nov 26:** User requested visible canton tags + smoother Apple-like animations across the product
 - **Nov 26 (PM):** User requested deeper animation polish, canton-specific color coding (e.g., Zürich blue, Thurgau green), canton-based listing controls, and company-only contacts
 - **Nov 30 (PM):** User prioritized native-feel performance on i5-8500T / 8 GB RAM setups → Phase 5 plan (Tasks 14-18) added.
+- **Dec 01:** User requested removal of “NEW” badge, introduction of Hot/Working/Follow Up statuses, follow-up scheduling (quick + custom), and dashboard surfacing → Task 19 added.
 
 ### Task 2 Completion Notes
 - Strongly typed entities in `src/lib/types.ts` mirroring Supabase schema

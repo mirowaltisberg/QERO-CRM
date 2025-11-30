@@ -44,6 +44,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const cleaned = removeUndefined(parsed.data);
+
+    if (cleaned.status && cleaned.status !== "follow_up") {
+      cleaned.follow_up_at = null;
+      cleaned.follow_up_note = null;
+    }
+
+    if (cleaned.follow_up_at && !cleaned.status) {
+      cleaned.status = "follow_up";
+    }
     const updated = await contactService.update(id, cleaned);
 
     if (!updated) {

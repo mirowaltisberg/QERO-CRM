@@ -8,6 +8,8 @@ export function sanitizeContactPayload(payload: ContactCreateInput) {
     email: payload.email ?? null,
     canton: payload.canton ?? null,
     status: payload.status,
+    follow_up_at: payload.follow_up_at ?? null,
+    follow_up_note: payload.follow_up_note ?? null,
     last_call: payload.last_call ?? null,
     notes: payload.notes ?? null,
   };

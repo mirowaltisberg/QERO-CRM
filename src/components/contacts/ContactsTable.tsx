@@ -18,7 +18,7 @@ interface ContactsTableProps {
   initialContacts: Contact[];
 }
 
-const ROW_HEIGHT = 52; // Approximate height of each table row
+const ROW_HEIGHT = 64; // Approximate height of each table row
 
 // Memoized table row to prevent re-renders
 const ContactTableRow = memo(function ContactTableRow({
@@ -61,6 +61,9 @@ const ContactTableRow = memo(function ContactTableRow({
         <Tag status={contact.status} />
       </td>
       <td className="px-4 py-3 text-gray-500">
+        {contact.follow_up_at ? formatFollowUp(contact.follow_up_at) : "—"}
+      </td>
+      <td className="px-4 py-3 text-gray-500">
         {contact.last_call
           ? new Intl.DateTimeFormat("en-US", {
               month: "short",
@@ -83,9 +86,9 @@ const ContactTableRow = memo(function ContactTableRow({
 
 export function ContactsTable({ initialContacts }: ContactsTableProps) {
   const router = useRouter();
-  const [clientContacts, setClientContacts] = useState(initialContacts);
   const [bulkModal, setBulkModal] = useState<"status" | "list" | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
+  const clientContacts = initialContacts;
   
   const {
     contacts,
@@ -208,6 +211,7 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
                 onSort={applySort}
               />
               <th className="px-4 py-2">Status</th>
+              <th className="px-4 py-2">Follow-up</th>
               <SortableHeader
                 label="Last Call"
                 column="last_call"
@@ -230,7 +234,7 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
                   <Fragment key={contact.id}>
                     {showHeader && (
                       <tr className="bg-gray-50">
-                        <td colSpan={7} className="px-4 py-2 text-xs font-semibold text-gray-500">
+                        <td colSpan={8} className="px-4 py-2 text-xs font-semibold text-gray-500">
                           {currentCanton}
                         </td>
                       </tr>
@@ -247,21 +251,41 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
             ) : (
               // Virtualized rows when not grouping
               <>
-                {virtualizer.getVirtualItems().map((virtualRow) => {
-                  const contact = contacts[virtualRow.index];
-                  const isSelected = selectedIds.includes(contact.id);
+                {(() => {
+                  const virtualRows = virtualizer.getVirtualItems();
+                  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+                  const paddingBottom =
+                    virtualRows.length > 0
+                      ? virtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+                      : 0;
                   return (
-                    <ContactTableRow
-                      key={contact.id}
-                      contact={contact}
-                      isSelected={isSelected}
-                      onToggleSelection={toggleSelection}
-                      onFilterByCanton={handleFilterByCanton}
-                    />
+                    <>
+                      {paddingTop > 0 && (
+                        <tr>
+                          <td colSpan={8} style={{ height: `${paddingTop}px` }} />
+                        </tr>
+                      )}
+                      {virtualRows.map((virtualRow) => {
+                        const contact = contacts[virtualRow.index];
+                        const isSelected = selectedIds.includes(contact.id);
+                        return (
+                          <ContactTableRow
+                            key={contact.id}
+                            contact={contact}
+                            isSelected={isSelected}
+                            onToggleSelection={toggleSelection}
+                            onFilterByCanton={handleFilterByCanton}
+                          />
+                        );
+                      })}
+                      {paddingBottom > 0 && (
+                        <tr>
+                          <td colSpan={8} style={{ height: `${paddingBottom}px` }} />
+                        </tr>
+                      )}
+                    </>
                   );
-                })}
-                {/* Spacer to maintain scroll height */}
-                <tr style={{ height: virtualizer.getTotalSize() - (virtualizer.getVirtualItems().length * ROW_HEIGHT) }} />
+                })()}
               </>
             )}
           </tbody>
@@ -358,3 +382,15 @@ const SortableHeader = memo(function SortableHeader({
     </th>
   );
 });
+
+function formatFollowUp(value: string) {
+  const date = new Date(value);
+  const formatted = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+  const isPast = date < new Date();
+  return isPast ? `${formatted} • due` : formatted;
+}

@@ -29,11 +29,13 @@ const baseContactSchema = z.object({
   email: emailSchema,
   canton: z.enum(SWISS_CANTONS).optional().nullable(),
   last_call: z.string().datetime().optional().nullable(),
+  follow_up_at: z.string().datetime().optional().nullable(),
+  follow_up_note: optionalTextSchema,
   notes: optionalTextSchema,
 });
 
 export const ContactCreateSchema = baseContactSchema.extend({
-  status: statusSchema.default(CONTACT_STATUS.NEW),
+  status: statusSchema.default(CONTACT_STATUS.WORKING),
 });
 
 export const ContactUpdateSchema = baseContactSchema

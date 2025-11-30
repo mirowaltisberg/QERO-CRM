@@ -4,7 +4,7 @@
  */
 
 import type { Contact, CallLog, List, ContactFilters, DashboardStats, PaginatedContacts } from "../types";
-import type { CallOutcome, ContactStatus } from "../utils/constants";
+import type { CallOutcome } from "../utils/constants";
 import { createClient } from "../supabase/client";
 
 // Default page size - can handle up to 10k+ with pagination
@@ -233,15 +233,20 @@ export const contactService = {
    */
   async bulkUpdate(
     ids: string[],
-    data: Partial<Pick<Contact, "status">>
+    data: Partial<Pick<Contact, "status" | "follow_up_at" | "follow_up_note">>
   ): Promise<number> {
     const supabase = createClient();
     let updated = 0;
+    const payload: Partial<Contact> = { ...data };
+    if (payload.status && payload.status !== "follow_up") {
+      payload.follow_up_at = null;
+      payload.follow_up_note = null;
+    }
 
     for (const id of ids) {
       const { error } = await supabase
         .from("contacts")
-        .update(data)
+        .update(payload)
         .eq("id", id);
 
       if (!error) {
@@ -323,23 +328,14 @@ export const callLogService = {
       throw new Error(error.message);
     }
 
-    // Update contact's last_call and status
-    const statusMap: Record<CallOutcome, ContactStatus> = {
-      no_answer: "called",
-      not_interested: "not_interested",
-      interested: "interested",
-      follow_up: "follow_up",
-      meeting_set: "interested",
-      wrong_number: "wrong_number",
+    const contactUpdates: Partial<Contact> = {
+      last_call: newLog.timestamp,
+      ...(data.notes && { notes: data.notes }),
     };
 
     await supabase
       .from("contacts")
-      .update({
-        last_call: newLog.timestamp,
-        status: statusMap[data.outcome],
-        ...(data.notes && { notes: data.notes }),
-      })
+      .update(contactUpdates)
       .eq("id", data.contact_id);
 
     return newLog;
@@ -519,11 +515,14 @@ export const statsService = {
       (log) => new Date(log.timestamp) >= weekStart
     ).length;
 
-    // Get follow-ups count
+    const nowIso = new Date().toISOString();
+
+    // Get follow-ups count (due now or overdue)
     const { count: followUpsDue } = await supabase
       .from("contacts")
       .select("*", { count: "exact", head: true })
-      .eq("status", "follow_up");
+      .eq("status", "follow_up")
+      .or(`follow_up_at.is.null,follow_up_at.lte.${nowIso}`);
 
     // Conversion rate
     const successfulOutcomes = logs.filter(
@@ -579,7 +578,7 @@ export const statsService = {
       .from("contacts")
       .select("*")
       .eq("status", "follow_up")
-      .order("last_call", { ascending: false })
+      .order("follow_up_at", { ascending: true, nullsFirst: true })
       .limit(5);
 
     return {

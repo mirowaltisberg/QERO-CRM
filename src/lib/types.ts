@@ -16,6 +16,8 @@ export interface Contact {
   email: string | null;
   canton: string | null;
   status: ContactStatus;
+  follow_up_at: string | null;
+  follow_up_note: string | null;
   last_call: string | null; // ISO timestamp
   notes: string | null;
   created_at: string; // ISO timestamp

@@ -17,14 +17,13 @@ CREATE TABLE contacts (
   phone TEXT,
   email TEXT,
   canton TEXT,
-  status TEXT DEFAULT 'new' CHECK (status IN (
-    'new', 
-    'called', 
-    'interested', 
-    'not_interested', 
-    'follow_up', 
-    'wrong_number'
+  status TEXT DEFAULT 'working' CHECK (status IN (
+    'hot',
+    'working',
+    'follow_up'
   )),
+  follow_up_at TIMESTAMPTZ,
+  follow_up_note TEXT,
   last_call TIMESTAMPTZ,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -35,6 +34,7 @@ CREATE INDEX idx_contacts_status ON contacts(status);
 CREATE INDEX idx_contacts_canton ON contacts(canton);
 CREATE INDEX idx_contacts_created_at ON contacts(created_at DESC);
 CREATE INDEX idx_contacts_last_call ON contacts(last_call DESC);
+CREATE INDEX idx_contacts_follow_up_at ON contacts(follow_up_at);
 
 -- Full-text search index for company and contact names
 CREATE INDEX idx_contacts_search ON contacts 
@@ -156,6 +156,10 @@ BEGIN
     'follow_ups_due', (
       SELECT COUNT(*) FROM contacts 
       WHERE status = 'follow_up'
+        AND (
+          follow_up_at IS NULL
+          OR follow_up_at <= NOW()
+        )
     ),
     'total_contacts', (
       SELECT COUNT(*) FROM contacts

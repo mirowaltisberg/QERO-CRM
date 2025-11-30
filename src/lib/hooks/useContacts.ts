@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Contact } from '@/lib/types';
-import type { CallOutcome } from '@/lib/utils/constants';
+import type { CallOutcome, ContactStatus } from '@/lib/utils/constants';
 
 interface UseContactsOptions {
   initialContacts?: Contact[];
@@ -163,6 +163,86 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
     [activeContact, updateContactLocally]
   );
 
+  const updateStatus = useCallback(
+    async (status: ContactStatus) => {
+      if (!activeContact || activeContact.status === status) return;
+      setActionState({ type: "saving", message: "Updating status..." });
+      setError(null);
+      try {
+        const response = await fetch(`/api/contacts/${activeContact.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        const json = await response.json();
+        if (!response.ok) {
+          throw new Error(json.error || "Failed to update status");
+        }
+        updateContactLocally(json.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update status");
+      } finally {
+        setActionState({ type: null });
+      }
+    },
+    [activeContact, updateContactLocally]
+  );
+
+  const scheduleFollowUp = useCallback(
+    async ({ date, note }: { date: Date; note?: string }) => {
+      if (!activeContact) return;
+      setActionState({ type: "saving", message: "Scheduling follow-up..." });
+      setError(null);
+      try {
+        const response = await fetch(`/api/contacts/${activeContact.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: "follow_up",
+            follow_up_at: date.toISOString(),
+            follow_up_note: note ?? null,
+          }),
+        });
+        const json = await response.json();
+        if (!response.ok) {
+          throw new Error(json.error || "Failed to schedule follow-up");
+        }
+        updateContactLocally(json.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to schedule follow-up");
+      } finally {
+        setActionState({ type: null });
+      }
+    },
+    [activeContact, updateContactLocally]
+  );
+
+  const clearFollowUp = useCallback(async () => {
+    if (!activeContact) return;
+    setActionState({ type: "saving", message: "Clearing follow-up..." });
+    setError(null);
+    try {
+      const response = await fetch(`/api/contacts/${activeContact.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "working",
+          follow_up_at: null,
+          follow_up_note: null,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || "Failed to clear follow-up");
+      }
+      updateContactLocally(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear follow-up");
+    } finally {
+      setActionState({ type: null });
+    }
+  }, [activeContact, updateContactLocally]);
+
   const goToNextContact = useCallback(() => {
     selectContactByIndex(1);
   }, [selectContactByIndex]);
@@ -185,6 +265,9 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
     refreshContacts,
     logCallOutcome,
     updateNotes,
+    updateStatus,
+    scheduleFollowUp,
+    clearFollowUp,
     setCantonFilter,
     clearCantonFilter: () => setCantonFilter(null),
   };

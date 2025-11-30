@@ -2,41 +2,29 @@
  * Contact Status Options
  */
 export const CONTACT_STATUS = {
-  NEW: "new",
-  CALLED: "called",
-  INTERESTED: "interested",
-  NOT_INTERESTED: "not_interested",
+  HOT: "hot",
+  WORKING: "working",
   FOLLOW_UP: "follow_up",
-  WRONG_NUMBER: "wrong_number",
 } as const;
 
 export type ContactStatus = (typeof CONTACT_STATUS)[keyof typeof CONTACT_STATUS];
 
 export const CONTACT_STATUS_LIST = [
-  CONTACT_STATUS.NEW,
-  CONTACT_STATUS.CALLED,
-  CONTACT_STATUS.INTERESTED,
-  CONTACT_STATUS.NOT_INTERESTED,
+  CONTACT_STATUS.HOT,
+  CONTACT_STATUS.WORKING,
   CONTACT_STATUS.FOLLOW_UP,
-  CONTACT_STATUS.WRONG_NUMBER,
 ] as const;
 
 export const CONTACT_STATUS_LABELS: Record<ContactStatus, string> = {
-  new: "New",
-  called: "Called",
-  interested: "Interested",
-  not_interested: "Not Interested",
-  follow_up: "Follow-up",
-  wrong_number: "Wrong Number",
+  hot: "Hot",
+  working: "Working",
+  follow_up: "Follow Up",
 };
 
 export const CONTACT_STATUS_COLORS: Record<ContactStatus, string> = {
-  new: "bg-blue-100 text-blue-700 border-blue-200",
-  called: "bg-gray-100 text-gray-700 border-gray-200",
-  interested: "bg-green-100 text-green-700 border-green-200",
-  not_interested: "bg-red-100 text-red-700 border-red-200",
-  follow_up: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  wrong_number: "bg-gray-100 text-gray-500 border-gray-200",
+  hot: "bg-rose-100 text-rose-700 border-rose-200",
+  working: "bg-gray-100 text-gray-700 border-gray-200",
+  follow_up: "bg-amber-100 text-amber-700 border-amber-200",
 };
 
 /**
