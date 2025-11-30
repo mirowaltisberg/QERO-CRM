@@ -15,13 +15,22 @@ const toneClasses: Record<TagTone, string> = {
 };
 
 export interface TagProps extends HTMLAttributes<HTMLSpanElement> {
-  status?: ContactStatus;
+  status?: ContactStatus | null;
   tone?: TagTone;
   icon?: ReactNode;
+  fallbackLabel?: string;
 }
 
-export function Tag({ status, tone = 'default', children, className, icon, ...props }: TagProps) {
-  const content = status ? CONTACT_STATUS_LABELS[status] : children;
+export function Tag({
+  status,
+  tone = 'default',
+  children,
+  className,
+  icon,
+  fallbackLabel = 'Not set',
+  ...props
+}: TagProps) {
+  const content = status ? CONTACT_STATUS_LABELS[status] : children ?? fallbackLabel;
   const statusClasses = status ? CONTACT_STATUS_COLORS[status] : toneClasses[tone];
 
   return (

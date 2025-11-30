@@ -226,7 +226,7 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          status: "working",
+          status: null,
           follow_up_at: null,
           follow_up_note: null,
         }),
@@ -238,6 +238,28 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
       updateContactLocally(json.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to clear follow-up");
+    } finally {
+      setActionState({ type: null });
+    }
+  }, [activeContact, updateContactLocally]);
+
+  const clearStatus = useCallback(async () => {
+    if (!activeContact || activeContact.status === null) return;
+    setActionState({ type: "saving", message: "Clearing status..." });
+    setError(null);
+    try {
+      const response = await fetch(`/api/contacts/${activeContact.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: null }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || "Failed to clear status");
+      }
+      updateContactLocally(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear status");
     } finally {
       setActionState({ type: null });
     }
@@ -268,6 +290,7 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
     updateStatus,
     scheduleFollowUp,
     clearFollowUp,
+    clearStatus,
     setCantonFilter,
     clearCantonFilter: () => setCantonFilter(null),
   };

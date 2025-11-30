@@ -15,7 +15,7 @@ export interface Contact {
   phone: string | null;
   email: string | null;
   canton: string | null;
-  status: ContactStatus;
+  status: ContactStatus | null;
   follow_up_at: string | null;
   follow_up_note: string | null;
   last_call: string | null; // ISO timestamp
@@ -30,7 +30,7 @@ export interface TmaCandidate {
   phone: string | null;
   email: string | null;
   canton: string | null;
-  status: TmaStatus;
+  status: TmaStatus | null;
   notes: string | null;
   follow_up_at: string | null;
   follow_up_note: string | null;

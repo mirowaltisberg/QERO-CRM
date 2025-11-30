@@ -248,7 +248,7 @@ export const contactService = {
     const supabase = createClient();
     let updated = 0;
     const payload: Partial<Contact> = { ...data };
-    if (payload.status && payload.status !== "follow_up") {
+    if (payload.status !== undefined && payload.status !== "follow_up") {
       payload.follow_up_at = null;
       payload.follow_up_note = null;
     }

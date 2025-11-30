@@ -30,6 +30,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     updateStatus,
     scheduleFollowUp,
     clearFollowUp,
+    clearStatus,
     setCantonFilter,
     clearCantonFilter,
   } = useContacts({ initialContacts });
@@ -153,6 +154,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         onUpdateStatus={updateStatus}
         onScheduleFollowUp={scheduleFollowUp}
         onClearFollowUp={clearFollowUp}
+        onClearStatus={clearStatus}
       />
     </div>
   );

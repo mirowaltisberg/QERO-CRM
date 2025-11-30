@@ -24,17 +24,20 @@ export function TmaView({ initialCandidates }: Props) {
     scheduleFollowUp,
     updateNotes,
     updateDocuments,
-    setCantonFilter,
+    clearStatus,
     setStatusFilter,
+    statusFilter,
   } = useTmaCandidates({ initialCandidates });
 
   const countByStatus = useMemo(() => {
     return candidates.reduce(
       (acc, candidate) => {
-        acc[candidate.status] = (acc[candidate.status] || 0) + 1;
+        if (candidate.status && acc[candidate.status] !== undefined) {
+          acc[candidate.status] += 1;
+        }
         return acc;
       },
-      {} as Record<string, number>
+      { A: 0, B: 0, C: 0 }
     );
   }, [candidates]);
 
@@ -43,39 +46,61 @@ export function TmaView({ initialCandidates }: Props) {
       <TmaList candidates={candidates} activeId={activeCandidate?.id ?? null} onSelect={selectCandidate} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <div className="flex flex-wrap items-center justify-between border-b border-gray-200 px-6 py-3">
-          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
-            <Button variant="ghost" size="sm" onClick={() => setStatusFilter("all")}>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+            <Button
+              variant={statusFilter === "all" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("all")}
+            >
               All ({candidates.length})
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setStatusFilter("A")}>
+            <Button
+              variant={statusFilter === "A" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("A")}
+            >
               A ({countByStatus.A || 0})
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setStatusFilter("B")}>
+            <Button
+              variant={statusFilter === "B" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("B")}
+            >
               B ({countByStatus.B || 0})
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setStatusFilter("C")}>
+            <Button
+              variant={statusFilter === "C" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("C")}
+            >
               C ({countByStatus.C || 0})
             </Button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            {actionState.type && <span>{actionState.message}</span>}
             <Button variant="ghost" size="sm" onClick={refreshCandidates}>
               Refresh
             </Button>
           </div>
         </div>
         {error && <p className="px-6 py-2 text-xs text-red-500">{error}</p>}
-        <div className="grid gap-4 p-6 lg:grid-cols-[2fr_1fr]">
-          <TmaDetail
-            candidate={activeCandidate}
-            onUpdateStatus={updateStatus}
-            onScheduleFollowUp={scheduleFollowUp}
-            onUpdateNotes={updateNotes}
-            onUpdateDocuments={updateDocuments}
-          />
-          <TmaImporter onImportComplete={refreshCandidates} />
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid gap-4 p-6 lg:grid-cols-[2fr_1fr]">
+            <TmaDetail
+              key={activeCandidate?.id ?? "empty"}
+              candidate={activeCandidate}
+              onUpdateStatus={updateStatus}
+              onClearStatus={clearStatus}
+              onScheduleFollowUp={scheduleFollowUp}
+              onUpdateNotes={updateNotes}
+              onUpdateDocuments={updateDocuments}
+            />
+            <TmaImporter onImportComplete={refreshCandidates} />
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
 

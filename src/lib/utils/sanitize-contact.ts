@@ -7,7 +7,7 @@ export function sanitizeContactPayload(payload: ContactCreateInput) {
     phone: payload.phone ?? null,
     email: payload.email ?? null,
     canton: payload.canton ?? null,
-    status: payload.status,
+  status: payload.status ?? null,
     follow_up_at: payload.follow_up_at ?? null,
     follow_up_note: payload.follow_up_note ?? null,
     last_call: payload.last_call ?? null,

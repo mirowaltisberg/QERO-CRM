@@ -1,11 +1,9 @@
 import { z } from 'zod';
 import {
   CALL_OUTCOME_LIST,
-  CONTACT_STATUS,
   CONTACT_STATUS_LIST,
   SWISS_CANTONS,
   TMA_STATUS_LIST,
-  TMA_STATUS,
 } from '../utils/constants';
 
 const phoneSchema = z
@@ -37,12 +35,12 @@ const baseContactSchema = z.object({
 });
 
 export const ContactCreateSchema = baseContactSchema.extend({
-  status: statusSchema.default(CONTACT_STATUS.WORKING),
+  status: statusSchema.nullable().optional().default(null),
 });
 
 export const ContactUpdateSchema = baseContactSchema
   .extend({
-    status: statusSchema.optional(),
+    status: statusSchema.nullable().optional(),
   })
   .partial();
 
@@ -81,11 +79,11 @@ const tmaBaseSchema = z.object({
 });
 
 export const TmaCreateSchema = tmaBaseSchema.extend({
-  status: z.enum(TMA_STATUS_LIST).default(TMA_STATUS.B),
+  status: z.enum(TMA_STATUS_LIST).nullable().optional().default(null),
 });
 
 export const TmaUpdateSchema = tmaBaseSchema.extend({
-  status: z.enum(TMA_STATUS_LIST).optional(),
+  status: z.enum(TMA_STATUS_LIST).nullable().optional(),
 }).partial();
 
 export const TmaFilterSchema = z.object({

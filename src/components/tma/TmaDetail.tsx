@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils/cn";
 interface Props {
   candidate: TmaCandidate | null;
   onUpdateStatus: (status: TmaStatus) => Promise<void> | void;
+  onClearStatus: () => Promise<void> | void;
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
   onUpdateNotes: (value: string | null) => Promise<void>;
   onUpdateDocuments: (payload: { cv_url?: string | null; references_url?: string | null }) => Promise<void>;
@@ -24,30 +25,29 @@ interface Props {
 export function TmaDetail({
   candidate,
   onUpdateStatus,
+  onClearStatus,
   onScheduleFollowUp,
   onUpdateNotes,
   onUpdateDocuments,
 }: Props) {
+  const initialFollowUpDate = candidate?.follow_up_at ? new Date(candidate.follow_up_at) : null;
   const [notes, setNotes] = useState(candidate?.notes ?? "");
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
-  const [followUpDate, setFollowUpDate] = useState(getTomorrowISO());
-  const [followUpTime, setFollowUpTime] = useState("09:00");
+  const [followUpDate, setFollowUpDate] = useState(
+    initialFollowUpDate ? initialFollowUpDate.toISOString().slice(0, 10) : getTomorrowISO()
+  );
+  const [followUpTime, setFollowUpTime] = useState(
+    initialFollowUpDate ? initialFollowUpDate.toISOString().slice(11, 16) : "09:00"
+  );
   const [followUpNote, setFollowUpNote] = useState(candidate?.follow_up_note ?? "");
   const [uploading, setUploading] = useState<"cv" | "references" | null>(null);
-
-  if (!candidate) {
-    return (
-      <section className="flex flex-1 items-center justify-center text-sm text-gray-500">
-        Select a candidate to view details.
-      </section>
-    );
-  }
 
   const handleNotesSave = async (value: string) => {
     await onUpdateNotes(value.trim().length ? value : null);
   };
 
   const handleQuickFollowUp = async () => {
+    if (!candidate) return;
     const date = getTomorrowNine();
     await onScheduleFollowUp({ date, note: candidate.follow_up_note ?? undefined });
   };
@@ -61,6 +61,7 @@ export function TmaDetail({
 
   const handleUpload = useCallback(
     async (file: File, type: "cv" | "references") => {
+      if (!candidate) return;
       const supabase = createClient();
       const bucket = "tma-docs";
       const path = `${candidate.id}/${type}-${Date.now()}-${file.name}`;
@@ -81,8 +82,16 @@ export function TmaDetail({
     [candidate, onUpdateDocuments]
   );
 
+  if (!candidate) {
+    return (
+      <section className="flex flex-1 items-center justify-center text-sm text-gray-500">
+        Select a candidate to view details.
+      </section>
+    );
+  }
+
   return (
-    <section className="flex flex-1 flex-col gap-4 p-6">
+    <section className="flex h-full flex-col gap-4 overflow-y-auto p-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-400">Candidate</p>
@@ -95,8 +104,15 @@ export function TmaDetail({
             {candidate.canton && <CantonTag canton={candidate.canton} size="sm" />}
           </div>
         </div>
-        <Tag status={undefined} className={cn(TMA_STATUS_COLORS[candidate.status as TmaStatus])}>
-          {TMA_STATUS_LABELS[candidate.status as TmaStatus]}
+        <Tag
+          status={undefined}
+          className={
+            candidate.status
+              ? cn(TMA_STATUS_COLORS[candidate.status as TmaStatus])
+              : "bg-gray-100 text-gray-500 border-gray-200"
+          }
+        >
+          {candidate.status ? TMA_STATUS_LABELS[candidate.status as TmaStatus] : "Set status"}
         </Tag>
       </div>
 
@@ -120,6 +136,15 @@ export function TmaDetail({
             </button>
           ))}
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-3 text-xs text-gray-500 hover:text-gray-900"
+          onClick={onClearStatus}
+          disabled={!candidate.status}
+        >
+          Clear status
+        </Button>
       </Panel>
 
       <Panel title="Follow-up" description="Stay on top of next actions">
@@ -264,4 +289,5 @@ function formatFollowUp(value: string) {
     minute: "2-digit",
   }).format(new Date(value));
 }
+
 

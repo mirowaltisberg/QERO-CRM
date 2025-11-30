@@ -17,11 +17,13 @@ CREATE TABLE contacts (
   phone TEXT,
   email TEXT,
   canton TEXT,
-  status TEXT DEFAULT 'working' CHECK (status IN (
-    'hot',
-    'working',
-    'follow_up'
-  )),
+  status TEXT DEFAULT NULL CHECK (
+    status IS NULL OR status IN (
+      'hot',
+      'working',
+      'follow_up'
+    )
+  ),
   follow_up_at TIMESTAMPTZ,
   follow_up_note TEXT,
   last_call TIMESTAMPTZ,
@@ -47,7 +49,9 @@ CREATE TABLE tma_candidates (
   phone TEXT,
   email TEXT,
   canton TEXT,
-  status TEXT DEFAULT 'B' CHECK (status IN ('A', 'B', 'C')),
+  status TEXT DEFAULT NULL CHECK (
+    status IS NULL OR status IN ('A', 'B', 'C')
+  ),
   notes TEXT,
   follow_up_at TIMESTAMPTZ,
   follow_up_note TEXT,

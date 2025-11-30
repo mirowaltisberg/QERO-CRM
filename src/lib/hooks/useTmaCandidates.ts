@@ -57,7 +57,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
 
   const updateStatus = useCallback(
     async (status: TmaStatus) => {
-      if (!activeCandidate) return;
+      if (!activeCandidate || activeCandidate.status === status) return;
       setActionState({ type: "saving", message: "Updating status..." });
       try {
         const response = await fetch(`/api/tma/${activeCandidate.id}`, {
@@ -141,6 +141,25 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     [activeCandidate, updateCandidateLocally]
   );
 
+  const clearStatus = useCallback(async () => {
+    if (!activeCandidate || activeCandidate.status === null) return;
+    setActionState({ type: "saving", message: "Clearing status..." });
+    try {
+      const response = await fetch(`/api/tma/${activeCandidate.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: null }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "Failed to clear status");
+      updateCandidateLocally(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear status");
+    } finally {
+      setActionState({ type: null });
+    }
+  }, [activeCandidate, updateCandidateLocally]);
+
   return {
     candidates: filteredCandidates,
     activeCandidate,
@@ -154,8 +173,10 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     scheduleFollowUp,
     updateNotes,
     updateDocuments,
+    clearStatus,
     setCantonFilter,
     setStatusFilter,
   };
 }
+
 

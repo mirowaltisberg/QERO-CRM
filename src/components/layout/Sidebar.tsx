@@ -124,9 +124,12 @@ export function Sidebar({ user, profile }: SidebarProps) {
           >
             <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
               {avatarUrl ? (
-                <img
+                <Image
                   src={avatarUrl}
                   alt={displayName}
+                  width={32}
+                  height={32}
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               ) : (

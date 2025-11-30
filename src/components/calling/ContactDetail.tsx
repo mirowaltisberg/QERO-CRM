@@ -25,6 +25,7 @@ interface ContactDetailProps {
   onUpdateStatus: (status: ContactStatus) => Promise<void> | void;
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
   onClearFollowUp: () => Promise<void> | void;
+  onClearStatus: () => Promise<void> | void;
 }
 
 export const ContactDetail = memo(function ContactDetail({
@@ -39,6 +40,7 @@ export const ContactDetail = memo(function ContactDetail({
   onUpdateStatus,
   onScheduleFollowUp,
   onClearFollowUp,
+  onClearStatus,
 }: ContactDetailProps) {
   const [notesValue, setNotesValue] = useState(contact?.notes ?? "");
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
@@ -90,7 +92,7 @@ export const ContactDetail = memo(function ContactDetail({
             <h1 className="text-2xl font-semibold text-gray-900">{contact.company_name}</h1>
             <p className="text-sm text-gray-500">{contact.contact_name ?? "Hiring Team"}</p>
           </div>
-          <Tag status={contact.status} />
+          <Tag status={contact.status} tone="muted" fallbackLabel="Set status" />
         </div>
 
         <Panel
@@ -123,6 +125,15 @@ export const ContactDetail = memo(function ContactDetail({
               />
             ))}
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-3 text-xs text-gray-500 hover:text-gray-900"
+            onClick={onClearStatus}
+            disabled={!contact.status}
+          >
+            Clear status
+          </Button>
           <div className="mt-4 rounded-xl border border-dashed border-gray-200 p-4 text-sm text-gray-600">
             <div className="flex flex-wrap items-center gap-3">
               <div>

@@ -364,10 +364,9 @@
 ### Todo
 - [ ] Task 17: Data Fetching & Caching
 - [ ] Task 18: Animation & Bundle Polish
-- [ ] Task 20: TMA Mode (Candidate CRM) with CSV import & document uploads
 
 ### In Progress
-- (none)
+- [ ] Task 20: TMA Mode (Candidate CRM) with CSV import & document uploads
 
 ### Completed
 - [x] Task 1: Project Setup & File Structure ✅
@@ -396,6 +395,8 @@
 - Tasks 14-16 delivered (profiling insights, interaction responsiveness, list virt) and deployed; app now feels instant on target hardware.
 - Task 19 completed: database + UI now use Hot/Working/Follow Up statuses, quick/custom follow-up scheduling, dashboard follow-up cards, Supabase schema updated & deployed.
 - Task 20 scoped: TMA (talent) mode will mirror company CRM with separate data model, CSV import, doc uploads, and candidate-specific labels (A/B/C) + canton filters + follow-ups.
+- Executor note (Dec 1 PM): User wants both company and TMA imports to default to no status (“nothing”) plus fix TMA detail scrolling so notes are reachable; implementation underway as part of Task 20.
+- Executor note (Dec 1 Eve): Status defaults cleared (DB + importers + UI), follow-up reset flow updated, and TMA detail/list/importer now support empty labels, document uploads, and scrollable notes panel.
 
 ---
 

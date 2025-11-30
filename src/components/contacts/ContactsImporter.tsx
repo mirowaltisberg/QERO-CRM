@@ -191,7 +191,7 @@ function mapRowToContact(row: CsvRow): ContactCreateInput | null {
     email,
     canton,
     notes,
-    status: "working",
+    status: null,
   };
 }
 

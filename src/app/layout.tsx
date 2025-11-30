@@ -22,10 +22,6 @@ export default async function RootLayout({
   const user = await getUser();
   const profile = user ? await getProfile() : null;
 
-  // Check if we're on an auth page (login/register)
-  // These pages don't need the sidebar
-  const isAuthPage = false; // We'll handle this differently
-
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
