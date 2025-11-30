@@ -170,20 +170,22 @@ export function TmaDetail({
       </div>
 
       <div className="grid flex-1 gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex h-full flex-col gap-6">
-          <Panel title="Notes" description="Autosaves automatically" className="flex-1">
-            <Textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              onAutoSave={handleNotesSave}
-              autosaveDelay={800}
-              placeholder="Interview notes, preferences, availability..."
-              className="min-h-[320px]"
-            />
-          </Panel>
-        </div>
+        <Panel
+          title="Notes"
+          description="Autosaves automatically"
+          className="lg:col-span-2"
+        >
+          <Textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            onAutoSave={handleNotesSave}
+            autosaveDelay={800}
+            placeholder="Interview notes, preferences, availability..."
+            className="min-h-[360px]"
+          />
+        </Panel>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 lg:col-start-2">
           <Panel title="Follow-up" description="Stay on top of next actions">
             <div className="space-y-4 text-sm text-gray-600">
               <div>

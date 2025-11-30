@@ -51,8 +51,12 @@ export const TmaList = memo(function TmaList({ candidates, activeId, onSelect }:
                   {candidate.status ? TMA_STATUS_LABELS[candidate.status as TmaStatus] : "Set status"}
                 </Tag>
               </div>
-              <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
-                <p>{candidate.email ?? "No email"}</p>
+              <div className="mt-1 flex items-center justify-between text-xs text-gray-500 gap-2">
+                <p className="truncate">
+                  {candidate.position_title?.trim() ||
+                    candidate.email ||
+                    "No details"}
+                </p>
                 <CantonTag canton={candidate.canton} size="md" />
               </div>
               {candidate.follow_up_at && (
