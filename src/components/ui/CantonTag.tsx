@@ -4,10 +4,10 @@ import { cn } from "@/lib/utils/cn";
 
 type CantonColor = { bg: string; text: string; border: string };
 
-const cantonColor = (hex: string, text: "text-white" | "text-black" = "text-white"): CantonColor => ({
-  bg: `bg-[${hex}]`,
+const cantonColor = (hex: string, text: string = "#ffffff"): CantonColor => ({
+  bg: hex,
   text,
-  border: `border-[${hex}]`,
+  border: hex,
 });
 
 const CANTON_COLORS: Record<string, CantonColor> = {
@@ -33,15 +33,9 @@ const CANTON_COLORS: Record<string, CantonColor> = {
   TG: cantonColor("#4CAF50"),
 };
 
-function getCantonStyles(canton: string | null | undefined) {
-  if (!canton) {
-    return "bg-gray-100 text-gray-500 border-gray-200";
-  }
-  const palette = CANTON_COLORS[canton];
-  if (palette) {
-    return `${palette.bg} ${palette.text} ${palette.border}`;
-  }
-  return "bg-slate-100 text-slate-600 border-slate-200";
+function getCantonPalette(canton: string | null | undefined) {
+  if (!canton) return null;
+  return CANTON_COLORS[canton] ?? null;
 }
 
 interface CantonTagProps {
@@ -51,18 +45,26 @@ interface CantonTagProps {
 }
 
 export function CantonTag({ canton, onClick, size = "sm" }: CantonTagProps) {
+  const palette = getCantonPalette(canton);
   const classes = cn(
     "inline-flex items-center rounded-full border font-medium transition-all duration-200",
     size === "sm" ? "px-2.5 py-0.5 text-[11px]" : "px-3 py-1 text-xs",
-    getCantonStyles(canton),
     onClick && "cursor-pointer hover:-translate-y-0.5 shadow-sm"
   );
+  const style = palette
+    ? {
+        backgroundColor: palette.bg,
+        color: palette.text,
+        borderColor: palette.border,
+      }
+    : undefined;
 
   if (onClick && canton) {
     return (
       <button
         type="button"
         className={classes}
+        style={style}
         onClick={(event) => {
           event.stopPropagation();
           onClick?.(canton);
@@ -73,6 +75,19 @@ export function CantonTag({ canton, onClick, size = "sm" }: CantonTagProps) {
     );
   }
 
-  return <span className={classes}>{canton ?? "—"}</span>;
+  return (
+    <span
+      className={classes}
+      style={
+        style ?? {
+          backgroundColor: "#F3F4F6",
+          color: "#6B7280",
+          borderColor: "#E5E7EB",
+        }
+      }
+    >
+      {canton ?? "—"}
+    </span>
+  );
 }
 

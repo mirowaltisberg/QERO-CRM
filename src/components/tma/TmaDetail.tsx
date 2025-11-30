@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import type { TmaCandidate } from "@/lib/types";
-import { TMA_STATUS_LIST, TMA_STATUS_LABELS, TMA_STATUS_COLORS, type TmaStatus } from "@/lib/utils/constants";
+import { TMA_STATUS_LIST, TMA_STATUS_LABELS, TMA_STATUS_STYLES, type TmaStatus } from "@/lib/utils/constants";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils/cn";
 
@@ -122,10 +122,15 @@ export function TmaDetail({
         <div className="flex items-center gap-3">
           <Tag
             status={undefined}
-            className={
+            className="bg-gray-100 text-gray-500 border-gray-200"
+            style={
               candidate.status
-                ? cn(TMA_STATUS_COLORS[candidate.status as TmaStatus])
-                : "bg-gray-100 text-gray-500 border-gray-200"
+                ? {
+                    backgroundColor: `${TMA_STATUS_STYLES[candidate.status as TmaStatus].bg}20`,
+                    color: TMA_STATUS_STYLES[candidate.status as TmaStatus].text,
+                    borderColor: `${TMA_STATUS_STYLES[candidate.status as TmaStatus].border}50`,
+                  }
+                : undefined
             }
           >
             {candidate.status ? TMA_STATUS_LABELS[candidate.status as TmaStatus] : "Set status"}

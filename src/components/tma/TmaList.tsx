@@ -3,7 +3,7 @@
 import { memo } from "react";
 import type { TmaCandidate } from "@/lib/types";
 import { Tag } from "@/components/ui/tag";
-import { TMA_STATUS_COLORS, TMA_STATUS_LABELS, type TmaStatus } from "@/lib/utils/constants";
+import { TMA_STATUS_LABELS, TMA_STATUS_STYLES, type TmaStatus } from "@/lib/utils/constants";
 
 interface Props {
   candidates: TmaCandidate[];
@@ -36,10 +36,15 @@ export const TmaList = memo(function TmaList({ candidates, activeId, onSelect }:
                 </p>
                 <Tag
                   status={undefined}
-                  className={
+                  className="bg-gray-100 text-gray-500 border-gray-200"
+                  style={
                     candidate.status
-                      ? TMA_STATUS_COLORS[candidate.status as TmaStatus]
-                      : "bg-gray-100 text-gray-500 border-gray-200"
+                      ? {
+                          backgroundColor: `${TMA_STATUS_STYLES[candidate.status as TmaStatus].bg}20`,
+                          color: TMA_STATUS_STYLES[candidate.status as TmaStatus].text,
+                          borderColor: `${TMA_STATUS_STYLES[candidate.status as TmaStatus].border}50`,
+                        }
+                      : undefined
                   }
                 >
                   {candidate.status ? TMA_STATUS_LABELS[candidate.status as TmaStatus] : "Set status"}
