@@ -20,6 +20,7 @@ interface Props {
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
   onUpdateNotes: (value: string | null) => Promise<void>;
   onUpdateDocuments: (payload: { cv_url?: string | null; references_url?: string | null }) => Promise<void>;
+  onUpdatePosition: (value: string | null) => Promise<void> | void;
 }
 
 export function TmaDetail({
@@ -29,6 +30,7 @@ export function TmaDetail({
   onScheduleFollowUp,
   onUpdateNotes,
   onUpdateDocuments,
+  onUpdatePosition,
 }: Props) {
   const initialFollowUpDate = candidate?.follow_up_at ? new Date(candidate.follow_up_at) : null;
   const [notes, setNotes] = useState(candidate?.notes ?? "");
@@ -41,6 +43,13 @@ export function TmaDetail({
   );
   const [followUpNote, setFollowUpNote] = useState(candidate?.follow_up_note ?? "");
   const [uploading, setUploading] = useState<"cv" | "references" | null>(null);
+  const [position, setPosition] = useState(candidate?.position_title ?? "");
+  const handlePositionBlur = useCallback(async () => {
+    if (!candidate) return;
+    const trimmed = position.trim();
+    if (trimmed === (candidate.position_title?.trim() ?? "")) return;
+    await onUpdatePosition(trimmed.length ? trimmed : null);
+  }, [candidate, onUpdatePosition, position]);
 
   const handleNotesSave = async (value: string) => {
     await onUpdateNotes(value.trim().length ? value : null);
@@ -118,6 +127,16 @@ export function TmaDetail({
             )}
             {candidate.canton && <CantonTag canton={candidate.canton} size="sm" />}
           </div>
+          <div className="mt-3 max-w-sm">
+            <label className="text-xs uppercase text-gray-400">Role / Position</label>
+            <Input
+              value={position}
+              onChange={(event) => setPosition(event.target.value)}
+              onBlur={handlePositionBlur}
+              placeholder="e.g. Montage-Elektriker"
+              className="mt-1"
+            />
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <Tag
@@ -147,30 +166,8 @@ export function TmaDetail({
         </div>
       </div>
 
-      <div className="grid flex-1 gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid flex-1 gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex h-full flex-col gap-6">
-          <Panel title="Status" description="Categorize candidate quality">
-            <div className="flex flex-wrap gap-2">
-              {TMA_STATUS_LIST.map((status) => (
-                <button
-                  key={status}
-                  onClick={() => onUpdateStatus(status)}
-                  className={cn(
-                    "rounded-xl border px-4 py-3 text-left text-sm transition",
-                    candidate.status === status
-                      ? "border-gray-900 bg-gray-900 text-white"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"
-                  )}
-                >
-                  <p className="font-medium">{TMA_STATUS_LABELS[status]}</p>
-                  <p className="text-xs text-gray-400">
-                    {status === "A" ? "Ready to deploy" : status === "B" ? "Active pipeline" : "Keep warm"}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </Panel>
-
           <Panel title="Notes" description="Autosaves automatically" className="flex-1">
             <Textarea
               value={notes}
@@ -201,6 +198,28 @@ export function TmaDetail({
                   Custom…
                 </Button>
               </div>
+            </div>
+          </Panel>
+
+          <Panel title="Status" description="Categorize candidate quality">
+            <div className="flex flex-wrap gap-2">
+              {TMA_STATUS_LIST.map((status) => (
+                <button
+                  key={status}
+                  onClick={() => onUpdateStatus(status)}
+                  className={cn(
+                    "rounded-xl border px-4 py-3 text-left text-sm transition",
+                    candidate.status === status
+                      ? "border-gray-900 bg-gray-900 text-white"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"
+                  )}
+                >
+                  <p className="font-medium">{TMA_STATUS_LABELS[status]}</p>
+                  <p className="text-xs text-gray-400">
+                    {status === "A" ? "Ready to deploy" : status === "B" ? "Active pipeline" : "Keep warm"}
+                  </p>
+                </button>
+              ))}
             </div>
           </Panel>
 

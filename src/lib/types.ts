@@ -31,6 +31,7 @@ export interface TmaCandidate {
   email: string | null;
   canton: string | null;
   status: TmaStatus | null;
+  position_title: string | null;
   notes: string | null;
   follow_up_at: string | null;
   follow_up_note: string | null;

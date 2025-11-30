@@ -105,6 +105,13 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
     row["Region geschaeftlich"] ||
     row["Bundesland/Kanton privat"] ||
     row["Weiteres/r Bundesland/Kanton"];
+  const position =
+    row["Beruf"] ||
+    row["Position"] ||
+    row["Job"] ||
+    row["Funktion"] ||
+    row["Role"] ||
+    row["Titel"];
 
   return {
     first_name: firstName,
@@ -112,6 +119,7 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
     phone: (row["Telefon"] || row["Phone"] || "").trim() || null,
     email: (row["Email"] || row["E-Mail"] || "").trim() || null,
     canton: formatCanton(cantonSource),
+    position_title: position?.trim() || null,
     status,
     notes: (row["Notizen"] || row["Notes"] || "").trim() || null,
   };

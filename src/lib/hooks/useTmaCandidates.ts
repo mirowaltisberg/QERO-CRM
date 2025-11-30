@@ -151,6 +151,28 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     [activeCandidate, updateCandidateLocally]
   );
 
+  const updatePosition = useCallback(
+    async (position_title: string | null) => {
+      if (!activeCandidate) return;
+      setActionState({ type: "saving", message: "Updating position..." });
+      try {
+        const response = await fetch(`/api/tma/${activeCandidate.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ position_title }),
+        });
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || "Failed to update position");
+        updateCandidateLocally(json.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update position");
+      } finally {
+        setActionState({ type: null });
+      }
+    },
+    [activeCandidate, updateCandidateLocally]
+  );
+
   const clearStatus = useCallback(async () => {
     if (!activeCandidate || activeCandidate.status === null) return;
     setActionState({ type: "saving", message: "Clearing status..." });
@@ -183,6 +205,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     scheduleFollowUp,
     updateNotes,
     updateDocuments,
+    updatePosition,
     clearStatus,
     setCantonFilter,
     clearCantonFilter: () => setCantonFilter(null),

@@ -52,6 +52,7 @@ CREATE TABLE tma_candidates (
   status TEXT DEFAULT NULL CHECK (
     status IS NULL OR status IN ('A', 'B', 'C')
   ),
+  position_title TEXT,
   notes TEXT,
   follow_up_at TIMESTAMPTZ,
   follow_up_note TEXT,

@@ -71,6 +71,7 @@ const tmaBaseSchema = z.object({
   phone: phoneSchema,
   email: emailSchema,
   canton: z.enum(SWISS_CANTONS).optional().nullable(),
+  position_title: optionalTextSchema,
   notes: optionalTextSchema,
   follow_up_at: z.string().datetime().optional().nullable(),
   follow_up_note: optionalTextSchema,
