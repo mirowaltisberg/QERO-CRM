@@ -20,6 +20,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   const [error, setError] = useState<string | null>(null);
   const [cantonFilter, setCantonFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TmaStatus | "all">("all");
+  const [sortOption, setSortOption] = useState<"recent" | "oldest" | "name">("recent");
 
   const filteredCandidates = useMemo(() => {
     return candidates.filter((candidate) => {
@@ -39,10 +40,31 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     ).sort();
   }, [candidates]);
 
+  const sortedCandidates = useMemo(() => {
+    const copy = [...filteredCandidates];
+    switch (sortOption) {
+      case "oldest":
+        copy.sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        break;
+      case "name":
+        copy.sort((a, b) =>
+          `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
+        );
+        break;
+      default:
+        copy.sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+    }
+    return copy;
+  }, [filteredCandidates, sortOption]);
+
   const activeCandidate = useMemo(() => {
-    if (!activeId) return filteredCandidates[0] ?? null;
-    return filteredCandidates.find((c) => c.id === activeId) ?? filteredCandidates[0] ?? null;
-  }, [activeId, filteredCandidates]);
+    if (!activeId) return sortedCandidates[0] ?? null;
+    return sortedCandidates.find((c) => c.id === activeId) ?? sortedCandidates[0] ?? null;
+  }, [activeId, sortedCandidates]);
 
   const selectCandidate = useCallback((id: string) => {
     setActiveId(id);
@@ -195,7 +217,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   }, [activeCandidate, updateCandidateLocally]);
 
   return {
-    candidates: filteredCandidates,
+    candidates: sortedCandidates,
     activeCandidate,
     actionState,
     error,
@@ -213,6 +235,8 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     clearCantonFilter: () => setCantonFilter(null),
     setStatusFilter,
     availableCantons,
+    sortOption,
+    setSortOption,
   };
 }
 

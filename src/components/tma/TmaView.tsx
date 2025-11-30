@@ -33,6 +33,8 @@ export function TmaView({ initialCandidates }: Props) {
     clearCantonFilter,
     availableCantons,
     cantonFilter,
+    sortOption,
+    setSortOption,
   } = useTmaCandidates({ initialCandidates });
   const [importOpen, setImportOpen] = useState(false);
 
@@ -111,6 +113,20 @@ export function TmaView({ initialCandidates }: Props) {
                 Clear
               </Button>
             )}
+            <label className="flex items-center gap-2">
+              <span className="text-gray-500">Sort</span>
+              <select
+                className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
+                value={sortOption}
+                onChange={(event) =>
+                  setSortOption(event.target.value as "recent" | "oldest" | "name")
+                }
+              >
+                <option value="recent">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="name">Name</option>
+              </select>
+            </label>
             {actionState.type && <span>{actionState.message}</span>}
             <Button variant="ghost" size="sm" onClick={refreshCandidates}>
               Refresh
