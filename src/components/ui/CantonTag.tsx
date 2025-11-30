@@ -2,17 +2,35 @@
 
 import { cn } from "@/lib/utils/cn";
 
-const CANTON_COLORS: Record<
-  string,
-  { bg: string; text: string; border: string }
-> = {
-  ZH: { bg: "bg-blue-100", text: "text-blue-800", border: "border-blue-200" },
-  TG: { bg: "bg-emerald-100", text: "text-emerald-800", border: "border-emerald-200" },
-  GE: { bg: "bg-amber-100", text: "text-amber-800", border: "border-amber-200" },
-  VD: { bg: "bg-amber-100", text: "text-amber-800", border: "border-amber-200" },
-  TI: { bg: "bg-lime-100", text: "text-lime-800", border: "border-lime-200" },
-  BS: { bg: "bg-indigo-100", text: "text-indigo-800", border: "border-indigo-200" },
-  AG: { bg: "bg-cyan-100", text: "text-cyan-800", border: "border-cyan-200" },
+type CantonColor = { bg: string; text: string; border: string };
+
+const cantonColor = (hex: string, text: "text-white" | "text-black" = "text-white"): CantonColor => ({
+  bg: `bg-[${hex}]`,
+  text,
+  border: `border-[${hex}]`,
+});
+
+const CANTON_COLORS: Record<string, CantonColor> = {
+  ZH: cantonColor("#0078FF"),
+  BE: cantonColor("#C60000"),
+  LU: cantonColor("#0057B8"),
+  UR: cantonColor("#FFD200", "text-black"),
+  SZ: cantonColor("#D80027"),
+  OW: cantonColor("#B80F0A"),
+  NW: cantonColor("#E6001A"),
+  GL: cantonColor("#FF4B00"),
+  ZG: cantonColor("#1E81B0"),
+  FR: cantonColor("#2D2D2D"),
+  SO: cantonColor("#FF0000"),
+  BS: cantonColor("#1A1A1A"),
+  BL: cantonColor("#E2001A"),
+  SH: cantonColor("#F7C600", "text-black"),
+  AR: cantonColor("#999999", "text-black"),
+  AI: cantonColor("#000000"),
+  SG: cantonColor("#007A3D"),
+  GR: cantonColor("#005087"),
+  AG: cantonColor("#0083CA"),
+  TG: cantonColor("#4CAF50"),
 };
 
 function getCantonStyles(canton: string | null | undefined) {

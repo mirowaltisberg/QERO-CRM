@@ -47,9 +47,9 @@ export const TMA_STATUS_LABELS: Record<TmaStatus, string> = {
 };
 
 export const TMA_STATUS_COLORS: Record<TmaStatus, string> = {
-  A: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  B: "bg-amber-100 text-amber-700 border-amber-200",
-  C: "bg-rose-100 text-rose-700 border-rose-200",
+  A: "bg-[#0AAF50]/15 text-[#0AAF50] border-[#0AAF50]/40",
+  B: "bg-[#FFD147]/25 text-[#B27C00] border-[#FFD147]/70",
+  C: "bg-[#F34B4B]/15 text-[#C51515] border-[#F34B4B]/50",
 };
 
 /**
