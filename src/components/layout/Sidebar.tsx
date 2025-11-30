@@ -71,8 +71,9 @@ export function Sidebar({ user, profile }: SidebarProps) {
               <li key={item.name}>
                 <Link
                   href={item.href}
+                  prefetch={true}
                   className={cn(
-                    "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors",
+                    "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors duration-100",
                     isActive
                       ? "bg-white text-gray-900 shadow-sm border border-border"
                       : "text-gray-600 hover:bg-white hover:text-gray-900"
@@ -97,8 +98,9 @@ export function Sidebar({ user, profile }: SidebarProps) {
         <div className="border-t border-border p-2">
           <Link
             href="/settings"
+            prefetch={true}
             className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+              "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-100",
               pathname === "/settings"
                 ? "bg-white text-gray-900 shadow-sm border border-border"
                 : "text-gray-600 hover:bg-white hover:text-gray-900"
