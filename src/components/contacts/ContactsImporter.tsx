@@ -13,10 +13,14 @@ interface ContactsImporterProps {
 
 type CsvRow = Record<string, string>;
 
+// Batch size for importing - prevents timeout
+const BATCH_SIZE = 500;
+
 export function ContactsImporter({ onImported }: ContactsImporterProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"idle" | "uploading" | "error" | "success">("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -24,6 +28,7 @@ export function ContactsImporter({ onImported }: ContactsImporterProps) {
 
     setStatus("uploading");
     setMessage("Verarbeite CSV…");
+    setProgress(null);
 
     Papa.parse<CsvRow>(file, {
       header: true,
@@ -40,27 +45,56 @@ export function ContactsImporter({ onImported }: ContactsImporterProps) {
             return;
           }
 
-          const response = await fetch("/api/contacts/import", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contacts: mapped }),
-          });
-          const json = await response.json();
-          if (!response.ok) {
-            throw new Error(json.error || "Import fehlgeschlagen");
+          // Split into batches to avoid timeout
+          const batches = chunkArray(mapped, BATCH_SIZE);
+          let totalCreated = 0;
+          let totalErrors = 0;
+
+          setMessage(`Importiere ${mapped.length} Firmen in ${batches.length} Batches…`);
+          setProgress({ current: 0, total: mapped.length });
+
+          for (let i = 0; i < batches.length; i++) {
+            const batch = batches[i];
+            
+            setMessage(`Batch ${i + 1}/${batches.length} (${batch.length} Firmen)…`);
+            
+            const response = await fetch("/api/contacts/import", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ contacts: batch }),
+            });
+            
+            const json = await response.json();
+            
+            if (!response.ok) {
+              console.error(`Batch ${i + 1} failed:`, json.error);
+              totalErrors += batch.length;
+            } else {
+              totalCreated += json.created?.length ?? 0;
+              totalErrors += json.errors?.length ?? 0;
+            }
+
+            setProgress({ current: (i + 1) * BATCH_SIZE, total: mapped.length });
+            
+            // Small delay between batches to avoid rate limiting
+            if (i < batches.length - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
           }
 
-          const summary = json.created?.length ?? mapped.length;
-
-          // refetch contacts so UI can update immediately
+          // Refetch contacts so UI can update immediately
           const refreshed = await fetch("/api/contacts", { cache: "no-store" }).then((res) => res.json());
           onImported?.(refreshed.data ?? []);
 
           setStatus("success");
-          setMessage(`Import abgeschlossen (${summary} Firmen).`);
-          // no need to router.refresh, we control state client-side now
+          setProgress(null);
+          setMessage(
+            `Import abgeschlossen: ${totalCreated} Firmen importiert` +
+            (totalErrors > 0 ? `, ${totalErrors} Fehler` : "")
+          );
         } catch (error) {
           setStatus("error");
+          setProgress(null);
           setMessage(error instanceof Error ? error.message : "Import fehlgeschlagen");
         } finally {
           if (fileInputRef.current) {
@@ -92,9 +126,17 @@ export function ContactsImporter({ onImported }: ContactsImporterProps) {
       >
         {status === "uploading" ? "Importiere…" : "CSV importieren"}
       </Button>
+      {progress && (
+        <div className="w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gray-900 transition-all duration-300"
+            style={{ width: `${Math.min(100, (progress.current / progress.total) * 100)}%` }}
+          />
+        </div>
+      )}
       {message && (
         <p
-          className="text-xs"
+          className="text-xs max-w-xs text-right"
           style={{
             color: status === "error" ? "#dc2626" : "#6b7280",
           }}
@@ -153,4 +195,12 @@ function coalesce(...values: Array<string | undefined>): string | undefined {
     }
   }
   return undefined;
+}
+
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
 }
