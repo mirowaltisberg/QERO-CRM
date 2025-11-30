@@ -68,7 +68,7 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
         full_name: parsed.data.fullName,
         phone: parsed.data.phone,
       },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback`,
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://qero-crm.vercel.app"}/auth/callback`,
     },
   });
 
@@ -130,7 +130,7 @@ export async function resetPassword(formData: FormData): Promise<AuthResult> {
   const supabase = await createClient();
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/reset-password`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://qero-crm.vercel.app"}/auth/reset-password`,
   });
 
   if (error) {
