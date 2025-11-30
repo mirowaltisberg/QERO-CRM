@@ -51,9 +51,10 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
 
   const parsed = RegisterSchema.safeParse(rawData);
   if (!parsed.success) {
+    const issues = parsed.error.issues;
     return {
       success: false,
-      error: parsed.error.errors[0]?.message || "Invalid input",
+      error: issues[0]?.message || "Invalid input",
     };
   }
 
@@ -89,9 +90,10 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
 
   const parsed = LoginSchema.safeParse(rawData);
   if (!parsed.success) {
+    const issues = parsed.error.issues;
     return {
       success: false,
-      error: parsed.error.errors[0]?.message || "Invalid input",
+      error: issues[0]?.message || "Invalid input",
     };
   }
 
