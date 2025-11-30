@@ -35,7 +35,7 @@ export function TmaDetail({
   onUpdatePosition,
 }: Props) {
   const initialFollowUpDate = candidate?.follow_up_at ? new Date(candidate.follow_up_at) : null;
-  const [notes, setNotes] = useState(candidate?.notes ?? "");
+  const [notes, setNotes] = useState(() => candidate?.notes ?? "");
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [followUpDate, setFollowUpDate] = useState(
     initialFollowUpDate ? initialFollowUpDate.toISOString().slice(0, 10) : getTomorrowISO()
@@ -45,13 +45,14 @@ export function TmaDetail({
   );
   const [followUpNote, setFollowUpNote] = useState(candidate?.follow_up_note ?? "");
   const [uploading, setUploading] = useState<"cv" | "references" | "short_profile" | null>(null);
-  const [position, setPosition] = useState(candidate?.position_title ?? "");
+  const [position, setPosition] = useState(() => candidate?.position_title ?? "");
   const handlePositionBlur = useCallback(async () => {
     if (!candidate) return;
     const trimmed = position.trim();
     if (trimmed === (candidate.position_title?.trim() ?? "")) return;
     await onUpdatePosition(trimmed.length ? trimmed : null);
   }, [candidate, onUpdatePosition, position]);
+
 
   const handleNotesSave = async (value: string) => {
     await onUpdateNotes(value.trim().length ? value : null);
@@ -170,22 +171,20 @@ export function TmaDetail({
       </div>
 
       <div className="grid flex-1 gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <Panel
-          title="Notes"
-          description="Autosaves automatically"
-          className="lg:col-span-2"
-        >
-          <Textarea
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            onAutoSave={handleNotesSave}
-            autosaveDelay={800}
-            placeholder="Interview notes, preferences, availability..."
-            className="min-h-[360px]"
-          />
-        </Panel>
+        <div className="flex h-full flex-col gap-6">
+          <Panel title="Notes" description="Autosaves automatically" className="flex-1">
+            <Textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              onAutoSave={handleNotesSave}
+              autosaveDelay={800}
+              placeholder="Interview notes, preferences, availability..."
+              className="min-h-[420px]"
+            />
+          </Panel>
+        </div>
 
-        <div className="flex flex-col gap-6 lg:col-start-2">
+        <div className="flex flex-col gap-6">
           <Panel title="Follow-up" description="Stay on top of next actions">
             <div className="space-y-4 text-sm text-gray-600">
               <div>
