@@ -1,0 +1,59 @@
+import { NextRequest } from 'next/server';
+import { contactService } from '@/lib/data/data-service';
+import { respondError, respondSuccess, formatZodError } from '@/lib/utils/api-response';
+import {
+  ContactCreateSchema,
+  ContactFilterSchema,
+} from '@/lib/validation/schemas';
+import { sanitizeContactPayload } from '@/lib/utils/sanitize-contact';
+
+function buildFilters(request: NextRequest) {
+  const params = request.nextUrl.searchParams;
+  const raw = {
+    status: params.get('status') || undefined,
+    canton: params.get('canton') || undefined,
+    search: params.get('search') || undefined,
+    list_id: params.get('list_id') || undefined,
+  };
+  return ContactFilterSchema.safeParse(raw);
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const filtersResult = buildFilters(request);
+    if (!filtersResult.success) {
+      return respondError(formatZodError(filtersResult.error), 400);
+    }
+
+    // TODO: Replace contactService with Supabase queries when backend is connected
+    const contacts = await contactService.getAll(filtersResult.data);
+    return respondSuccess(contacts, {
+      status: 200,
+      meta: { count: contacts.length },
+    });
+  } catch (error) {
+    console.error('GET /api/contacts error', error);
+    return respondError('Failed to fetch contacts', 500);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json().catch(() => null);
+    if (!body) {
+      return respondError('Invalid JSON payload', 400);
+    }
+    const parsed = ContactCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return respondError(formatZodError(parsed.error), 400);
+    }
+
+    // TODO: Replace contactService with Supabase mutations when backend is connected
+    const contact = await contactService.create(sanitizeContactPayload(parsed.data));
+    return respondSuccess(contact, { status: 201 });
+  } catch (error) {
+    console.error('POST /api/contacts error', error);
+    return respondError('Failed to create contact', 500);
+  }
+}
+
