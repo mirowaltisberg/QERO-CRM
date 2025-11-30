@@ -47,25 +47,31 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hasPendingChangesRef = useRef(false);
 
     const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
       if (!isControlled) {
         setInternalValue(event.target.value);
       }
 
+      hasPendingChangesRef.current = true;
       onChange?.(event);
     };
 
     useEffect(() => {
       if (!onAutoSave) return;
+      if (!hasPendingChangesRef.current) return;
 
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
 
+      const valueToSave = currentValue;
+
       saveTimeoutRef.current = setTimeout(() => {
         setStatus('saving');
-        Promise.resolve(onAutoSave(currentValue))
+        hasPendingChangesRef.current = false;
+        Promise.resolve(onAutoSave(valueToSave))
           .then(() => {
             setStatus('saved');
             if (statusTimeoutRef.current) {
@@ -121,10 +127,16 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           )}
 
           {onAutoSave && (
-            <span className="text-gray-400">
+            <span
+              aria-live="polite"
+              className={cn(
+                'min-h-[1rem] text-gray-400 transition-opacity duration-200',
+                status === 'idle' ? 'opacity-0' : 'opacity-100',
+                status === 'saving' && 'text-gray-500'
+              )}
+            >
               {status === 'saving' && 'Saving…'}
-              {status === 'saved' && 'Saved'}
-              {status === 'idle' && ''}
+              {status === 'saved' && 'Synced'}
             </span>
           )}
         </div>

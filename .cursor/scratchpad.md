@@ -228,11 +228,10 @@
 
 ## Project Status Board
 
-### Current Phase: Phase 4 - Authentication & User Management
+### Current Phase: ✅ All Core Tasks Complete!
 
 ### Todo
-- [ ] Task 10: Authentication System (Supabase Auth)
-- [ ] Task 11: Account Settings Dashboard
+- (none)
 
 ### In Progress
 - (none)
@@ -247,9 +246,16 @@
 - [x] Task 7: Dashboard ✅
 - [x] Task 8: Canton Tags + Apple-like Polish ✅
 - [x] Task 9: Supabase + Vercel Deployment ✅
+- [x] Task 10: Authentication System (Supabase Auth) ✅
+- [x] Task 11: Account Settings Dashboard ✅
+- [x] Task 12: Large Dataset Support (10k+ contacts) ✅
+- [x] Task 13: Smooth notes autosave indicator ✅
 
 ### Blocked
 - (none)
+
+## Current Status / Progress Tracking
+- Task 13 completed: Notes autosave indicator now debounced + subtle “Saving/Synced” states, preventing flicker spam.
 
 ---
 
@@ -385,6 +391,7 @@ Reviewed original requirements against plan. Changes made:
 4. **Added keyboard shortcut numbers 1-5** - for quick outcome selection during calls
 5. **Clarified file structure** - added comments explaining each file's purpose
 6. **Task 5 is now the PRIMARY feature** - marked with ⭐
+7. **Nov 30:** Executor addressing Task 13 (smooth notes autosave indicator, remove flicker)
 
 ### Decision Log
 - **Mock Data First:** User confirmed to start with mock/sample data, connect Supabase later
