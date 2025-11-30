@@ -3,16 +3,16 @@
 import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '@/lib/utils/cn';
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'prefix'> {
   label?: string;
   hint?: string;
   error?: string;
-  prefix?: ReactNode;
-  suffix?: ReactNode;
+  leftAddon?: ReactNode;
+  rightAddon?: ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, hint, error, prefix, suffix, className, id, ...props }, ref) => {
+  ({ label, hint, error, leftAddon, rightAddon, className, id, ...props }, ref) => {
     const generatedId = useId();
     const inputId = id ?? generatedId;
     const descriptionId = hint ? `${inputId}-hint` : undefined;
@@ -29,7 +29,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             className
           )}
         >
-          {prefix && <span className="text-gray-400">{prefix}</span>}
+          {leftAddon && <span className="text-gray-400">{leftAddon}</span>}
 
           <input
             id={inputId}
@@ -40,7 +40,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
 
-          {suffix && <span className="text-gray-400">{suffix}</span>}
+          {rightAddon && <span className="text-gray-400">{rightAddon}</span>}
         </div>
 
         {(hint || error) && (
@@ -57,4 +57,3 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 );
 
 Input.displayName = 'Input';
-
