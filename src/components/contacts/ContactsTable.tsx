@@ -69,8 +69,8 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
     });
   };
 
-  const handleImportComplete = (newContacts: Contact[]) => {
-    setClientContacts(newContacts);
+  const handleImportComplete = () => {
+    // Refresh the page to get updated contacts from server
     router.refresh();
   };
 
@@ -89,7 +89,7 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
           onToggleGroupByCanton={toggleGroupByCanton}
           availableCantons={availableCantons}
         />
-        <ContactsImporter onImported={handleImportComplete} />
+        <ContactsImporter onImportComplete={handleImportComplete} />
       </div>
 
       {error && (
