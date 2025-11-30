@@ -3,7 +3,7 @@
  * Matches the Supabase schema for future integration
  */
 
-import type { ContactStatus, CallOutcome } from "./utils/constants";
+import type { ContactStatus, CallOutcome, TmaStatus } from "./utils/constants";
 
 /**
  * Contact - A person/company to call
@@ -21,6 +21,22 @@ export interface Contact {
   last_call: string | null; // ISO timestamp
   notes: string | null;
   created_at: string; // ISO timestamp
+}
+
+export interface TmaCandidate {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string | null;
+  email: string | null;
+  canton: string | null;
+  status: TmaStatus;
+  notes: string | null;
+  follow_up_at: string | null;
+  follow_up_note: string | null;
+  cv_url: string | null;
+  references_url: string | null;
+  created_at: string;
 }
 
 /**
@@ -83,6 +99,14 @@ export interface ContactFilters {
   canton?: string;
   search?: string;
   list_id?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface TmaFilters {
+  status?: TmaStatus;
+  canton?: string;
+  search?: string;
   page?: number;
   pageSize?: number;
 }

@@ -36,6 +36,31 @@ CREATE INDEX idx_contacts_created_at ON contacts(created_at DESC);
 CREATE INDEX idx_contacts_last_call ON contacts(last_call DESC);
 CREATE INDEX idx_contacts_follow_up_at ON contacts(follow_up_at);
 
+-- ================================================
+-- TMA CANDIDATES TABLE
+-- Separate dataset for talents/employees (TMA Mode)
+-- ================================================
+CREATE TABLE tma_candidates (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  canton TEXT,
+  status TEXT DEFAULT 'B' CHECK (status IN ('A', 'B', 'C')),
+  notes TEXT,
+  follow_up_at TIMESTAMPTZ,
+  follow_up_note TEXT,
+  cv_url TEXT,
+  references_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_tma_status ON tma_candidates(status);
+CREATE INDEX idx_tma_canton ON tma_candidates(canton);
+CREATE INDEX idx_tma_created_at ON tma_candidates(created_at DESC);
+CREATE INDEX idx_tma_follow_up_at ON tma_candidates(follow_up_at);
+
 -- Full-text search index for company and contact names
 CREATE INDEX idx_contacts_search ON contacts 
   USING GIN (to_tsvector('english', company_name || ' ' || contact_name || ' ' || COALESCE(email, '')));
@@ -110,6 +135,11 @@ CREATE INDEX idx_list_members_contact ON list_members(contact_id);
 -- Example RLS policies (customize based on your auth needs):
 -- CREATE POLICY "Users can view their own contacts" ON contacts
 --   FOR SELECT USING (auth.uid() = user_id);
+
+-- ================================================
+-- STORAGE BUCKETS
+-- ================================================
+-- SELECT storage.create_bucket('tma-docs', '{"public": true}');
 
 -- ================================================
 -- USEFUL VIEWS

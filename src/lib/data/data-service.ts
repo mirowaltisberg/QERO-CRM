@@ -3,8 +3,18 @@
  * Uses Supabase for all data operations
  */
 
-import type { Contact, CallLog, List, ContactFilters, DashboardStats, PaginatedContacts } from "../types";
-import type { CallOutcome } from "../utils/constants";
+import type {
+  Contact,
+  CallLog,
+  List,
+  ContactFilters,
+  DashboardStats,
+  PaginatedContacts,
+  TmaCandidate,
+  TmaFilters,
+} from "../types";
+import type { CallOutcome, TmaStatus } from "../utils/constants";
+import type { TmaCreateInput } from "../validation/schemas";
 import { createClient } from "../supabase/client";
 
 // Default page size - can handle up to 10k+ with pagination
@@ -483,6 +493,100 @@ export const listService = {
     }
 
     return count || 0;
+  },
+};
+
+/**
+ * TMA Candidate Operations
+ */
+export const tmaService = {
+  async getAll(filters?: TmaFilters): Promise<TmaCandidate[]> {
+    const supabase = createClient();
+    let query = supabase.from("tma_candidates").select("*").order("created_at", { ascending: false });
+
+    if (filters?.status) {
+      query = query.eq("status", filters.status);
+    }
+    if (filters?.canton) {
+      query = query.eq("canton", filters.canton);
+    }
+    if (filters?.search) {
+      const search = filters.search.toLowerCase();
+      query = query.or(
+        `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`
+      );
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error("Error fetching TMA candidates:", error);
+      return [];
+    }
+    return data ?? [];
+  },
+
+  async getById(id: string): Promise<TmaCandidate | null> {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("tma_candidates")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) {
+      console.error("Error fetching TMA candidate:", error);
+      return null;
+    }
+    return data;
+  },
+
+  async create(data: TmaCreateInput): Promise<TmaCandidate> {
+    const supabase = createClient();
+    const { data: created, error } = await supabase
+      .from("tma_candidates")
+      .insert(data)
+      .select()
+      .single();
+    if (error) {
+      console.error("Error creating TMA candidate:", error);
+      throw new Error(error.message);
+    }
+    return created;
+  },
+
+  async update(id: string, data: Partial<TmaCandidate>): Promise<TmaCandidate | null> {
+    const supabase = createClient();
+    const { data: updated, error } = await supabase
+      .from("tma_candidates")
+      .update(data)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) {
+      console.error("Error updating TMA candidate:", error);
+      return null;
+    }
+    return updated;
+  },
+
+  async delete(id: string): Promise<boolean> {
+    const supabase = createClient();
+    const { error } = await supabase.from("tma_candidates").delete().eq("id", id);
+    if (error) {
+      console.error("Error deleting TMA candidate:", error);
+      return false;
+    }
+    return true;
+  },
+
+  async bulkUpdate(ids: string[], status: TmaStatus): Promise<void> {
+    await Promise.all(
+      ids.map((id) =>
+        this.update(id, {
+          status,
+          ...(status !== "C" ? { follow_up_at: null, follow_up_note: null } : {}),
+        })
+      )
+    );
   },
 };
 

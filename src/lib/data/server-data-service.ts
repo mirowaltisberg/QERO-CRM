@@ -3,7 +3,7 @@
  * Uses Supabase Server Client for server components
  */
 
-import type { Contact, ContactFilters } from "../types";
+import type { Contact, ContactFilters, TmaCandidate, TmaFilters } from "../types";
 import { createClient } from "../supabase/server";
 
 // Supabase has a default max_rows of 1000, so we fetch in batches
@@ -127,5 +127,36 @@ export const serverContactService = {
     }
 
     return count ?? 0;
+  },
+};
+
+export const serverTmaService = {
+  async getAll(filters?: TmaFilters): Promise<TmaCandidate[]> {
+    const supabase = await createClient();
+
+    let query = supabase
+      .from("tma_candidates")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (filters?.status) {
+      query = query.eq("status", filters.status);
+    }
+    if (filters?.canton) {
+      query = query.eq("canton", filters.canton);
+    }
+    if (filters?.search) {
+      const search = filters.search.toLowerCase();
+      query = query.or(
+        `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`
+      );
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error("Error fetching TMA candidates:", error);
+      return [];
+    }
+    return data ?? [];
   },
 };

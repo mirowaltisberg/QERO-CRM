@@ -32,6 +32,12 @@ const navigation = [
     shortcut: "G then T",
   },
   {
+    name: "TMA",
+    href: "/tma",
+    icon: UsersIcon,
+    shortcut: "G then M",
+  },
+  {
     name: "Dashboard",
     href: "/dashboard",
     icon: ChartIcon,

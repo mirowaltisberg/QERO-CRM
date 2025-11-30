@@ -242,6 +242,49 @@
 - [ ] Error handling with toast notifications
 - **Success Criteria:** App fully keyboard navigable, accessible, production-ready
 
+**Task 20: TMA Mode (Candidate CRM)**
+
+**Background / Goal**
+- Users need a dedicated area for tracking **TMA (talent/employee) records** independent from company contacts.
+- TMA entries require CSV import, document storage (CV + Zeugnisse), custom status labels (A/B/C), canton filters, rich notes, and follow-ups similar to companies.
+- UI should expose TMA as a new primary nav item under Companies, with its own calling/table/dashboard surfaces eventually.
+
+**Key Workstreams**
+1. **Data Model**
+   - Create new Supabase table `tma_candidates` with fields: `id`, `first_name`, `last_name`, `phone`, `email`, `canton`, `status` (enum A/B/C), `notes`, `follow_up_at`, `follow_up_note`, `cv_url`, `references_url`, `created_at`.
+   - Document storage: configure Supabase Storage bucket `tma-docs/` for CVs & Zeugnisse; store signed URLs.
+   - Zod schemas + TypeScript types mirroring new table.
+
+2. **API Layer**
+   - New Next.js routes `/api/tma` (GET/POST), `/api/tma/[id]` (GET/PATCH/DELETE), `/api/tma/import` (POST for CSV).
+   - Services similar to `contactService`, but scoped to `tma` table + storage helpers for file uploads.
+
+3. **UI / Navigation**
+   - Update Sidebar nav: add “TMA” entry beneath Companies.
+   - Create `/tma` route with table/filters (status A/B/C, canton, search) and CSV importer (mapping candidate fields).
+   - Provide detail drawer/panel showing candidate info, large notes area, follow-up scheduling (same pattern as companies but with A/B/C statuses).
+   - Add document upload controls (CV, Zeugnisse) with drag/drop + preview/download links.
+
+4. **CSV Import**
+   - New importer component accepting candidate CSV, mapping headers (Vorname, Nachname, Kanton, etc.) to TMA schema.
+   - Batch processing similar to contacts importer; after import show summary and refresh TMA list.
+
+5. **Storage Integration**
+   - Expose file upload UI in candidate detail to push to Supabase Storage via signed URLs (server action or API route).
+   - Display uploaded docs as badges/links with metadata (uploaded at).
+
+6. **Follow-up & Status**
+   - Replace Hot/Working/Follow Up with TMA statuses A/B/C (color-coded).
+   - Keep follow-up scheduling identical to companies (tomorrow 9am + custom), highlight next action in list/table.
+
+7. **Dashboard Tie-in (later)**
+   - Future work: unify dashboards or add TMA-focused metrics (A/B/C counts, upcoming candidate follow-ups).
+
+**Success Criteria**
+- Sidebar shows new TMA mode, fully functional table + detail view separated from companies.
+- Users can import candidates via CSV, upload CV/Zeugnisse, assign status A/B/C, schedule follow-ups, and filter by canton.
+- Supabase schema + storage configured, deployed, and documented.
+
 ## Phase 5: Performance & Native Feel
 
 **Task 14: Profiling & Baseline Metrics**
@@ -321,6 +364,7 @@
 ### Todo
 - [ ] Task 17: Data Fetching & Caching
 - [ ] Task 18: Animation & Bundle Polish
+- [ ] Task 20: TMA Mode (Candidate CRM) with CSV import & document uploads
 
 ### In Progress
 - (none)
@@ -351,6 +395,7 @@
 - Task 13 completed: Notes autosave indicator now debounced + subtle “Saving/Synced” states, preventing flicker spam.
 - Tasks 14-16 delivered (profiling insights, interaction responsiveness, list virt) and deployed; app now feels instant on target hardware.
 - Task 19 completed: database + UI now use Hot/Working/Follow Up statuses, quick/custom follow-up scheduling, dashboard follow-up cards, Supabase schema updated & deployed.
+- Task 20 scoped: TMA (talent) mode will mirror company CRM with separate data model, CSV import, doc uploads, and candidate-specific labels (A/B/C) + canton filters + follow-ups.
 
 ---
 

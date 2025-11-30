@@ -28,6 +28,31 @@ export const CONTACT_STATUS_COLORS: Record<ContactStatus, string> = {
 };
 
 /**
+ * TMA Candidate Status Options (A/B/C)
+ */
+export const TMA_STATUS = {
+  A: "A",
+  B: "B",
+  C: "C",
+} as const;
+
+export type TmaStatus = (typeof TMA_STATUS)[keyof typeof TMA_STATUS];
+
+export const TMA_STATUS_LIST = [TMA_STATUS.A, TMA_STATUS.B, TMA_STATUS.C] as const;
+
+export const TMA_STATUS_LABELS: Record<TmaStatus, string> = {
+  A: "A (Top)",
+  B: "B (Active)",
+  C: "C (Pipeline)",
+};
+
+export const TMA_STATUS_COLORS: Record<TmaStatus, string> = {
+  A: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  B: "bg-sky-100 text-sky-700 border-sky-200",
+  C: "bg-slate-100 text-slate-600 border-slate-200",
+};
+
+/**
  * Call Outcome Options
  */
 export const CALL_OUTCOME = {

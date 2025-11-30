@@ -4,6 +4,8 @@ import {
   CONTACT_STATUS,
   CONTACT_STATUS_LIST,
   SWISS_CANTONS,
+  TMA_STATUS_LIST,
+  TMA_STATUS,
 } from '../utils/constants';
 
 const phoneSchema = z
@@ -65,7 +67,39 @@ export const CallLogQuerySchema = z.object({
   contact_id: z.string().trim().min(1, 'contact_id is required'),
 });
 
+const tmaBaseSchema = z.object({
+  first_name: z.string().trim().min(1, "First name is required"),
+  last_name: z.string().trim().min(1, "Last name is required"),
+  phone: phoneSchema,
+  email: emailSchema,
+  canton: z.enum(SWISS_CANTONS).optional().nullable(),
+  notes: optionalTextSchema,
+  follow_up_at: z.string().datetime().optional().nullable(),
+  follow_up_note: optionalTextSchema,
+  cv_url: z.string().url().optional().nullable(),
+  references_url: z.string().url().optional().nullable(),
+});
+
+export const TmaCreateSchema = tmaBaseSchema.extend({
+  status: z.enum(TMA_STATUS_LIST).default(TMA_STATUS.B),
+});
+
+export const TmaUpdateSchema = tmaBaseSchema.extend({
+  status: z.enum(TMA_STATUS_LIST).optional(),
+}).partial();
+
+export const TmaFilterSchema = z.object({
+  status: z.enum(TMA_STATUS_LIST).optional(),
+  canton: z.enum(SWISS_CANTONS).optional(),
+  search: z.string().trim().min(1).optional(),
+  page: z.number().int().min(1).optional(),
+  pageSize: z.number().int().min(1).max(1000).optional(),
+});
+
 export type ContactCreateInput = z.infer<typeof ContactCreateSchema>;
 export type ContactUpdateInput = z.infer<typeof ContactUpdateSchema>;
 export type ContactFilterInput = z.infer<typeof ContactFilterSchema>;
 export type CallLogCreateInput = z.infer<typeof CallLogCreateSchema>;
+export type TmaCreateInput = z.infer<typeof TmaCreateSchema>;
+export type TmaUpdateInput = z.infer<typeof TmaUpdateSchema>;
+export type TmaFilterInput = z.infer<typeof TmaFilterSchema>;
