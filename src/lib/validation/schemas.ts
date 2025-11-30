@@ -19,7 +19,7 @@ const emailSchema = z.string().trim().email('Invalid email address').optional().
 const optionalTextSchema = z.string().trim().max(2000, 'Notes are too long').optional().nullable();
 
 const statusSchema = z.enum(CONTACT_STATUS_LIST, {
-  errorMap: () => ({ message: 'Invalid contact status' }),
+  message: 'Invalid contact status',
 });
 
 const baseContactSchema = z.object({
@@ -52,7 +52,7 @@ export const ContactFilterSchema = z.object({
 export const CallLogCreateSchema = z.object({
   contact_id: z.string().trim().min(1, 'contact_id is required'),
   outcome: z.enum(CALL_OUTCOME_LIST, {
-    errorMap: () => ({ message: 'Invalid call outcome' }),
+    message: 'Invalid call outcome',
   }),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
@@ -65,4 +65,3 @@ export type ContactCreateInput = z.infer<typeof ContactCreateSchema>;
 export type ContactUpdateInput = z.infer<typeof ContactUpdateSchema>;
 export type ContactFilterInput = z.infer<typeof ContactFilterSchema>;
 export type CallLogCreateInput = z.infer<typeof CallLogCreateSchema>;
-
