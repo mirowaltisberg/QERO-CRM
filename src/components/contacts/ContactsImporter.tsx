@@ -5,6 +5,7 @@ import Papa from "papaparse";
 import { Button } from "@/components/ui/button";
 import type { ContactCreateInput } from "@/lib/validation/schemas";
 import type { Contact } from "@/lib/types";
+import { SWISS_CANTONS, type SwissCanton } from "@/lib/utils/constants";
 
 interface ContactsImporterProps {
   onImported?: (contacts: Contact[]) => void;
@@ -135,9 +136,14 @@ function mapRowToContact(row: CsvRow): ContactCreateInput | null {
   };
 }
 
-function formatCanton(value: string | undefined) {
+function formatCanton(value: string | undefined): SwissCanton | null {
   if (!value) return null;
-  return value.slice(0, 2).toUpperCase();
+  const code = value.slice(0, 2).toUpperCase();
+  // Validate that it's a valid Swiss canton code
+  if (SWISS_CANTONS.includes(code as SwissCanton)) {
+    return code as SwissCanton;
+  }
+  return null;
 }
 
 function coalesce(...values: Array<string | undefined>): string | undefined {
@@ -148,4 +154,3 @@ function coalesce(...values: Array<string | undefined>): string | undefined {
   }
   return undefined;
 }
-
