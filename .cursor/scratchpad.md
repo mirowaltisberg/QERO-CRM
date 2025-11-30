@@ -319,15 +319,11 @@
 ### Current Phase: Phase 5 – Performance & Native Feel
 
 ### Todo
-- [ ] Task 14: Profiling & Baseline Metrics
-- [ ] Task 15: Interaction Responsiveness
-- [ ] Task 16: List Rendering Optimization
 - [ ] Task 17: Data Fetching & Caching
 - [ ] Task 18: Animation & Bundle Polish
-- [ ] Task 19: Status Model Overhaul & Follow-up Scheduling
 
 ### In Progress
-- (pending user approval to begin Task 14)
+- (none)
 
 ### Completed
 - [x] Task 1: Project Setup & File Structure ✅
@@ -343,14 +339,18 @@
 - [x] Task 11: Account Settings Dashboard ✅
 - [x] Task 12: Large Dataset Support (10k+ contacts) ✅
 - [x] Task 13: Smooth notes autosave indicator ✅
+- [x] Task 14: Profiling & Baseline Metrics ✅
+- [x] Task 15: Interaction Responsiveness ✅
+- [x] Task 16: List Rendering Optimization ✅
+- [x] Task 19: Status Model Overhaul & Follow-up Scheduling ✅
 
 ### Blocked
 - (none)
 
 ## Current Status / Progress Tracking
 - Task 13 completed: Notes autosave indicator now debounced + subtle “Saving/Synced” states, preventing flicker spam.
-- Awaiting kickoff of Task 14 (profiling) to gather concrete performance metrics prior to code changes.
-- Task 19 (status overhaul + follow-ups) planned — awaiting user approval to begin implementation.
+- Tasks 14-16 delivered (profiling insights, interaction responsiveness, list virt) and deployed; app now feels instant on target hardware.
+- Task 19 completed: database + UI now use Hot/Working/Follow Up statuses, quick/custom follow-up scheduling, dashboard follow-up cards, Supabase schema updated & deployed.
 
 ---
 
