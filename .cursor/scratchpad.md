@@ -285,6 +285,25 @@
 - Users can import candidates via CSV, upload CV/Zeugnisse, assign status A/B/C, schedule follow-ups, and filter by canton.
 - Supabase schema + storage configured, deployed, and documented.
 
+#### Latest Plan Update (Dec 1 – TMA UI Polish)
+1. **Detail Layout Reflow**
+   - Convert `TmaDetail` into a split layout: identity + phone/email + status controls + expanded notes take the primary column, while follow-up scheduler and documents stack in a slimmer side column that stays visible.
+   - Keep phone number and category badges adjacent to actionable controls (e.g., tel link or copy button).
+2. **Importer Placement**
+   - Remove the persistent importer card from the content grid.
+   - Add a `...` menu (or button) near the TMA navigation header that opens the CSV importer modal/panel so it’s accessible without dominating the UI.
+3. **Filter Toolbar**
+   - Maintain the new status/canton filters in a compact top toolbar; ensure the canton dropdown aligns with the new action menu.
+4. **Implementation Steps**
+   1. Introduce a `PageActions` menu in `TmaView` header with “Import CSV”.
+   2. Update `TmaDetail` layout (CSS grid/flex) so Follow-up/Documents form a right rail; ensure responsiveness (sidebar stacks below on narrow screens).
+   3. Emphasize phone + category near the header (possibly add quick call button similar to Calling view).
+   4. Stretch notes to fill remaining height with sticky autosave indicator.
+5. **Success Criteria**
+   - Phone, category, and notes are immediately visible on standard laptop resolutions without scrolling.
+   - Follow-up and documents remain accessible but secondary.
+   - CSV importer is reachable via the new action menu without occupying constant space.
+
 ## Phase 5: Performance & Native Feel
 
 **Task 14: Profiling & Baseline Metrics**
@@ -354,6 +373,13 @@
 - Recruiter can tag contact Hot/Working/Follow Up from calling/table views.
 - Follow-up quick actions persist to Supabase and appear on dashboard list.
 - Default status transitions don’t feel intrusive; UI no longer shows redundant “NEW” pill.
+
+### Challenge 7: TMA Detail Layout Optimized for Outreach
+- **Problem:** In TMA mode, recruiters need instant access to phone numbers, candidate category (A/B/C), and long notes, but the current layout pushes these below fold while Follow-up/Documents occupy primary space.
+- **Solution Hypotheses:**
+  - Recompose the detail component into a two-column layout: core identity/phone/status/notes on the left, secondary panels (follow-up scheduler, documents) on the right.
+  - Make phone + category badges prominent near the header and keep notes full-height with sticky autosave feedback.
+  - Move the CSV importer into a contextual action (three-dot menu) so it no longer consumes vertical space beside the detail view.
 
 ---
 

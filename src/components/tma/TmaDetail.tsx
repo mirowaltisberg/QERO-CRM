@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { Tag } from "@/components/ui/tag";
@@ -82,6 +82,8 @@ export function TmaDetail({
     [candidate, onUpdateDocuments]
   );
 
+  const phoneLink = useMemo(() => candidate?.phone?.replace(/\s+/g, ""), [candidate?.phone]);
+
   if (!candidate) {
     return (
       <section className="flex flex-1 items-center justify-center text-sm text-gray-500">
@@ -91,108 +93,130 @@ export function TmaDetail({
   }
 
   return (
-    <section className="flex h-full flex-col gap-4 overflow-y-auto p-6">
-      <div className="flex items-center justify-between">
+    <section className="flex h-full flex-col overflow-y-auto">
+      <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-400">Candidate</p>
           <h1 className="text-2xl font-semibold text-gray-900">
             {candidate.first_name} {candidate.last_name}
           </h1>
-          <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-            {candidate.email && <a href={`mailto:${candidate.email}`} className="hover:text-gray-900">{candidate.email}</a>}
-            {candidate.phone && <span>• {candidate.phone}</span>}
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-600">
+            {candidate.email && (
+              <a href={`mailto:${candidate.email}`} className="hover:text-gray-900">
+                {candidate.email}
+              </a>
+            )}
+            {candidate.phone && (
+              <button
+                onClick={() => {
+                  if (phoneLink) window.open(`tel:${phoneLink}`, "_self");
+                }}
+                className="inline-flex rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700 hover:border-gray-400"
+              >
+                Call {candidate.phone}
+              </button>
+            )}
             {candidate.canton && <CantonTag canton={candidate.canton} size="sm" />}
           </div>
         </div>
-        <Tag
-          status={undefined}
-          className={
-            candidate.status
-              ? cn(TMA_STATUS_COLORS[candidate.status as TmaStatus])
-              : "bg-gray-100 text-gray-500 border-gray-200"
-          }
-        >
-          {candidate.status ? TMA_STATUS_LABELS[candidate.status as TmaStatus] : "Set status"}
-        </Tag>
+        <div className="flex items-center gap-3">
+          <Tag
+            status={undefined}
+            className={
+              candidate.status
+                ? cn(TMA_STATUS_COLORS[candidate.status as TmaStatus])
+                : "bg-gray-100 text-gray-500 border-gray-200"
+            }
+          >
+            {candidate.status ? TMA_STATUS_LABELS[candidate.status as TmaStatus] : "Set status"}
+          </Tag>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-gray-500 hover:text-gray-900"
+            onClick={onClearStatus}
+            disabled={!candidate.status}
+          >
+            Clear status
+          </Button>
+        </div>
       </div>
 
-      <Panel title="Status" description="Categorize candidate quality">
-        <div className="flex flex-wrap gap-2">
-          {TMA_STATUS_LIST.map((status) => (
-            <button
-              key={status}
-              onClick={() => onUpdateStatus(status)}
-              className={cn(
-                "rounded-xl border px-4 py-3 text-left text-sm transition",
-                candidate.status === status
-                  ? "border-gray-900 bg-gray-900 text-white"
-                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"
-              )}
-            >
-              <p className="font-medium">{TMA_STATUS_LABELS[status]}</p>
-              <p className="text-xs text-gray-400">
-                {status === "A" ? "Ready to deploy" : status === "B" ? "Active pipeline" : "Keep warm"}
-              </p>
-            </button>
-          ))}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mt-3 text-xs text-gray-500 hover:text-gray-900"
-          onClick={onClearStatus}
-          disabled={!candidate.status}
-        >
-          Clear status
-        </Button>
-      </Panel>
+      <div className="grid flex-1 gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="flex h-full flex-col gap-6">
+          <Panel title="Status" description="Categorize candidate quality">
+            <div className="flex flex-wrap gap-2">
+              {TMA_STATUS_LIST.map((status) => (
+                <button
+                  key={status}
+                  onClick={() => onUpdateStatus(status)}
+                  className={cn(
+                    "rounded-xl border px-4 py-3 text-left text-sm transition",
+                    candidate.status === status
+                      ? "border-gray-900 bg-gray-900 text-white"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"
+                  )}
+                >
+                  <p className="font-medium">{TMA_STATUS_LABELS[status]}</p>
+                  <p className="text-xs text-gray-400">
+                    {status === "A" ? "Ready to deploy" : status === "B" ? "Active pipeline" : "Keep warm"}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </Panel>
 
-      <Panel title="Follow-up" description="Stay on top of next actions">
-        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
-          <div>
-            <p className="text-xs uppercase text-gray-400">Next follow-up</p>
-            <p className="text-sm text-gray-900">
-              {candidate.follow_up_at ? formatFollowUp(candidate.follow_up_at) : "None scheduled"}
-            </p>
-            {candidate.follow_up_note && <p className="text-xs text-gray-400 mt-1">{candidate.follow_up_note}</p>}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" onClick={handleQuickFollowUp}>
-              Tomorrow · 09:00
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setIsFollowUpModalOpen(true)}>
-              Custom…
-            </Button>
-          </div>
+          <Panel title="Notes" description="Autosaves automatically" className="flex-1">
+            <Textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              onAutoSave={handleNotesSave}
+              autosaveDelay={800}
+              placeholder="Interview notes, preferences, availability..."
+              className="min-h-[320px]"
+            />
+          </Panel>
         </div>
-      </Panel>
 
-      <Panel title="Documents" description="Upload CV and Zeugnisse">
-        <div className="grid gap-4 md:grid-cols-2">
-          <DocumentCard
-            title="CV"
-            url={candidate.cv_url}
-            uploading={uploading === "cv"}
-            onUpload={(file) => handleUpload(file, "cv")}
-          />
-          <DocumentCard
-            title="Zeugnisse"
-            url={candidate.references_url}
-            uploading={uploading === "references"}
-            onUpload={(file) => handleUpload(file, "references")}
-          />
+        <div className="flex flex-col gap-6">
+          <Panel title="Follow-up" description="Stay on top of next actions">
+            <div className="space-y-4 text-sm text-gray-600">
+              <div>
+                <p className="text-xs uppercase text-gray-400">Next follow-up</p>
+                <p className="text-sm text-gray-900">
+                  {candidate.follow_up_at ? formatFollowUp(candidate.follow_up_at) : "None scheduled"}
+                </p>
+                {candidate.follow_up_note && <p className="text-xs text-gray-400 mt-1">{candidate.follow_up_note}</p>}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={handleQuickFollowUp}>
+                  Tomorrow · 09:00
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setIsFollowUpModalOpen(true)}>
+                  Custom…
+                </Button>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel title="Documents" description="Upload CV and Zeugnisse">
+            <div className="space-y-4">
+              <DocumentCard
+                title="CV"
+                url={candidate.cv_url}
+                uploading={uploading === "cv"}
+                onUpload={(file) => handleUpload(file, "cv")}
+              />
+              <DocumentCard
+                title="Zeugnisse"
+                url={candidate.references_url}
+                uploading={uploading === "references"}
+                onUpload={(file) => handleUpload(file, "references")}
+              />
+            </div>
+          </Panel>
         </div>
-      </Panel>
-
-      <Panel title="Notes" description="Autosaves automatically">
-        <Textarea
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-          onAutoSave={handleNotesSave}
-          autosaveDelay={800}
-          placeholder="Interview notes, preferences, availability..."
-        />
-      </Panel>
+      </div>
 
       <Modal open={isFollowUpModalOpen} onClose={() => setIsFollowUpModalOpen(false)}>
         <div className="space-y-4">

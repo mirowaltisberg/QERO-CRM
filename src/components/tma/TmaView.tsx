@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { TmaCandidate } from "@/lib/types";
 import { useTmaCandidates } from "@/lib/hooks/useTmaCandidates";
 import { TmaList } from "./TmaList";
 import { TmaDetail } from "./TmaDetail";
 import { TmaImporter } from "./TmaImporter";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 
 interface Props {
   initialCandidates: TmaCandidate[];
@@ -32,6 +33,7 @@ export function TmaView({ initialCandidates }: Props) {
     availableCantons,
     cantonFilter,
   } = useTmaCandidates({ initialCandidates });
+  const [importOpen, setImportOpen] = useState(false);
 
   const countByStatus = useMemo(() => {
     return candidates.reduce(
@@ -80,7 +82,7 @@ export function TmaView({ initialCandidates }: Props) {
               C ({countByStatus.C || 0})
             </Button>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
+          <div className="flex items-center gap-3 text-xs text-gray-500">
             <label className="flex items-center gap-2">
               <span className="text-gray-500">Canton</span>
               <select
@@ -112,26 +114,32 @@ export function TmaView({ initialCandidates }: Props) {
             <Button variant="ghost" size="sm" onClick={refreshCandidates}>
               Refresh
             </Button>
+            <Button variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
+              ⋯
+            </Button>
           </div>
         </div>
         {error && <p className="px-6 py-2 text-xs text-red-500">{error}</p>}
         <div className="flex-1 overflow-y-auto">
-          <div className="grid gap-4 p-6 lg:grid-cols-[2fr_1fr]">
-            <TmaDetail
-              key={activeCandidate?.id ?? "empty"}
-              candidate={activeCandidate}
-              onUpdateStatus={updateStatus}
-              onClearStatus={clearStatus}
-              onScheduleFollowUp={scheduleFollowUp}
-              onUpdateNotes={updateNotes}
-              onUpdateDocuments={updateDocuments}
-            />
-            <div className="flex flex-col items-end">
-              <TmaImporter onImportComplete={refreshCandidates} />
-            </div>
-          </div>
+          <TmaDetail
+            key={activeCandidate?.id ?? "empty"}
+            candidate={activeCandidate}
+            onUpdateStatus={updateStatus}
+            onClearStatus={clearStatus}
+            onScheduleFollowUp={scheduleFollowUp}
+            onUpdateNotes={updateNotes}
+            onUpdateDocuments={updateDocuments}
+          />
         </div>
       </div>
+      <Modal open={importOpen} onClose={() => setImportOpen(false)}>
+        <TmaImporter
+          onImportComplete={() => {
+            setImportOpen(false);
+            refreshCandidates();
+          }}
+        />
+      </Modal>
     </div>
   );
 }
