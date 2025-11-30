@@ -17,7 +17,7 @@ interface ContactDetailProps {
   onOutcome: (outcome: CallOutcome) => void;
   onNext: () => void;
   onSaveNotes: (value: string | null) => Promise<void>;
-  notesRef: React.RefObject<HTMLTextAreaElement>;
+  notesRef: React.RefObject<HTMLTextAreaElement | null>;
   actionMessage?: string | null;
   actionType?: "logging" | "saving" | null;
 }
