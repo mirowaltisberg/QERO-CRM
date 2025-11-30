@@ -1,0 +1,17 @@
+<svg width="320" height="120" viewBox="0 0 320 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="120" rx="16" fill="none"/>
+  <g transform="translate(12 12)">
+    <g transform="translate(0 0)">
+      <circle cx="40" cy="48" r="36" fill="#F9B000"/>
+      <circle cx="40" cy="48" r="18" fill="#0F172A"/>
+      <path d="M59 65L78 84" stroke="#F9B000" stroke-width="10" stroke-linecap="round"/>
+    </g>
+    <path d="M116 27C129.807 27 140 37.0088 140 50.5C140 63.9912 129.807 74 116 74H89V27H116ZM105 42.5V58.5H116C120.694 58.5 124 55.0567 124 50.5C124 45.9433 120.694 42.5 116 42.5H105Z" fill="white"/>
+    <path d="M151 27H192V41.5H167V47H189.5V60.5H167V74H151V27Z" fill="white"/>
+    <path d="M203 27H221.5L231 42L240.5 27H259.5L241.5 54L260 84H241.5L231.5 66.5L221 84H203L220.5 54L203 27Z" fill="white"/>
+    <text x="0" y="105" font-size="18" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" fill="white" font-weight="600">
+      vermittelt Timing.
+    </text>
+  </g>
+</svg>
+

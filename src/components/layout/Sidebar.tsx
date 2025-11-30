@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 
@@ -53,11 +54,20 @@ export function Sidebar({ user, profile }: SidebarProps) {
   return (
     <aside className="w-56 h-full border-r border-border bg-gray-50 flex flex-col">
       {/* Logo */}
-      <div className="h-14 flex items-center px-4 border-b border-border">
-        <span className="font-semibold text-gray-900 tracking-tight">
-          QERO
-        </span>
-        <span className="ml-1.5 text-xs text-gray-400 font-medium">CRM</span>
+      <div className="h-16 flex items-center px-4 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Image
+            src="/qero-logo.svg"
+            alt="QERO"
+            width={132}
+            height={44}
+            priority
+            className="h-10 w-auto"
+          />
+          <span className="text-[11px] uppercase tracking-wide text-gray-400 hidden sm:block">
+            Minimal Cold Calling CRM
+          </span>
+        </div>
       </div>
 
       {/* Navigation */}
