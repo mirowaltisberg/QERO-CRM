@@ -145,12 +145,10 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         key={activeContact?.id ?? "empty"}
         contact={activeContact}
         onCall={handleCall}
-        onOutcome={handleOutcome}
         onNext={goToNextContact}
         onSaveNotes={updateNotes}
         notesRef={notesRef}
         actionMessage={actionMessage}
-        actionType={actionState.type}
         onUpdateStatus={updateStatus}
         onScheduleFollowUp={scheduleFollowUp}
         onClearFollowUp={clearFollowUp}

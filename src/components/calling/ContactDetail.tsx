@@ -9,19 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import type { Contact } from "@/lib/types";
-import type { CallOutcome, ContactStatus } from "@/lib/utils/constants";
-import { OutcomeButtons } from "./OutcomeButtons";
+import type { ContactStatus } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
 
 interface ContactDetailProps {
   contact: Contact | null;
   onCall: () => void;
-  onOutcome: (outcome: CallOutcome) => void;
   onNext: () => void;
   onSaveNotes: (value: string | null) => Promise<void>;
   notesRef: React.RefObject<HTMLTextAreaElement | null>;
   actionMessage?: string | null;
-  actionType?: "logging" | "saving" | null;
   onUpdateStatus: (status: ContactStatus) => Promise<void> | void;
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
   onClearFollowUp: () => Promise<void> | void;
@@ -31,12 +28,10 @@ interface ContactDetailProps {
 export const ContactDetail = memo(function ContactDetail({
   contact,
   onCall,
-  onOutcome,
   onNext,
   onSaveNotes,
   notesRef,
   actionMessage,
-  actionType,
   onUpdateStatus,
   onScheduleFollowUp,
   onClearFollowUp,
@@ -162,11 +157,7 @@ export const ContactDetail = memo(function ContactDetail({
           </div>
         </Panel>
 
-        <Panel title="Outcome" description="Log result with one tap">
-          <OutcomeButtons onSelect={onOutcome} loading={actionType === "logging"} />
-        </Panel>
-
-        <Panel title="Notes" description="Autosaves every few seconds">
+        <Panel title="Notes" description="Autosaves every few seconds" className="flex-1">
           <Textarea
             ref={notesRef}
             value={notesValue}
@@ -174,6 +165,7 @@ export const ContactDetail = memo(function ContactDetail({
             onAutoSave={handleAutoSave}
             autosaveDelay={800}
             placeholder="Add context, objections, next steps..."
+            className="min-h-[200px]"
           />
         </Panel>
 
