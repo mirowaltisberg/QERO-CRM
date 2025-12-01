@@ -97,19 +97,22 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
     async (blob: Blob, originalName: string) => {
       setUploadingAvatar(true);
       try {
-        const fileExt = originalName.split(".").pop()?.toLowerCase() || "jpg";
-        const fileName = `${user.id}/avatar.${fileExt}`;
-        const croppedFile = new File([blob], `avatar.${fileExt}`, { type: blob.type || "image/jpeg" });
+        const fileExt = (originalName.split(".").pop() || "jpg").toLowerCase();
+        const timestamp = Date.now();
+        const storagePath = `${user.id}/avatar-${timestamp}.${fileExt}`;
+        const croppedFile = new File([blob], `avatar-${timestamp}.${fileExt}`, {
+          type: blob.type || `image/${fileExt}`,
+        });
 
         const { error: uploadError } = await supabase.storage
           .from("avatars")
-          .upload(fileName, croppedFile, { upsert: true });
+          .upload(storagePath, croppedFile, { upsert: true });
 
         if (uploadError) throw uploadError;
 
         const {
           data: { publicUrl },
-        } = supabase.storage.from("avatars").getPublicUrl(fileName);
+        } = supabase.storage.from("avatars").getPublicUrl(storagePath);
 
         const { error: updateError } = await supabase
           .from("profiles")
@@ -118,7 +121,8 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
 
         if (updateError) throw updateError;
 
-        setAvatarUrl(publicUrl);
+        // Append cache buster so the new image loads immediately everywhere
+        setAvatarUrl(`${publicUrl}?v=${timestamp}`);
         setMessage({ type: "success", text: "Avatar updated!" });
         router.refresh();
       } catch (error) {
