@@ -1,13 +1,13 @@
 import { NextRequest } from "next/server";
 import { respondError, respondSuccess } from "@/lib/utils/api-response";
-import { tmaService } from "@/lib/data/data-service";
 import { createClient } from "@/lib/supabase/server";
-import type { TmaCreateInput } from "@/lib/validation/schemas";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { TmaCreateSchema } from "@/lib/validation/schemas";
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const supabaseAdmin = createAdminClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
         continue;
       }
       try {
-        await tmaService.create(parsed.data as unknown as TmaCreateInput);
+        await supabaseAdmin.from("tma_candidates").insert(parsed.data);
         success += 1;
       } catch (err) {
         errors.push({ index: i, message: err instanceof Error ? err.message : "Unknown error" });
