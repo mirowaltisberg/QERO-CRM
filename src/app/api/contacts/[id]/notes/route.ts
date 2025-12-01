@@ -75,7 +75,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Failed to create note:", error);
+    return NextResponse.json({ error: error.message, details: error }, { status: 500 });
   }
 
   return NextResponse.json({ data: note }, { status: 201 });

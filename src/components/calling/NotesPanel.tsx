@@ -53,12 +53,18 @@ export const NotesPanel = memo(function NotesPanel({
         body: JSON.stringify({ content: newNote.trim() }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        console.error("Failed to add note:", data.error);
+        alert(`Failed to add note: ${data.error}`);
+        return;
+      }
       if (data.data) {
         setNotes((prev) => [data.data, ...prev]);
         setNewNote("");
       }
     } catch (error) {
       console.error("Failed to add note:", error);
+      alert("Failed to add note. Check console for details.");
     } finally {
       setSubmitting(false);
     }
