@@ -249,18 +249,21 @@ export function TmaDetail({
         </div>
       </div>
 
-      <div className="grid flex-1 gap-6 px-6 py-6 md:grid-cols-[minmax(0,1fr)_320px] overflow-hidden min-h-0">
-        <div className="flex h-full flex-col gap-6 overflow-hidden min-h-0">
-          <NotesPanel
-            entityId={candidate.id}
-            entityType="tma"
-            legacyNotes={candidate.notes}
-            onSaveLegacyNotes={onUpdateNotes}
-          />
-        </div>
+      <div className="flex-1 min-h-0 overflow-hidden px-6 py-6">
+        <div className="grid h-full min-h-0 gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
+          {/* Left column - Notes */}
+          <div className="flex h-full flex-col gap-6 overflow-hidden min-h-0">
+            <NotesPanel
+              entityId={candidate.id}
+              entityType="tma"
+              legacyNotes={candidate.notes}
+              onSaveLegacyNotes={onUpdateNotes}
+            />
+          </div>
 
-        <div className="flex flex-col gap-6">
-          <Panel title="Follow-up" description="Stay on top of next actions">
+          {/* Right column - Status, Activity, Documents */}
+          <div className="flex flex-col gap-6 overflow-y-auto pr-1">
+            <Panel title="Follow-up" description="Stay on top of next actions">
             <div className="space-y-4 text-sm text-gray-600">
               <div>
                 <p className="text-xs uppercase text-gray-400">Next follow-up</p>
@@ -365,6 +368,7 @@ export function TmaDetail({
             </div>
           </Panel>
         </div>
+      </div>
       </div>
 
       <Modal open={isFollowUpModalOpen} onClose={() => setIsFollowUpModalOpen(false)}>
