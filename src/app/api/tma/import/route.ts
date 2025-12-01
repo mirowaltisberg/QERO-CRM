@@ -1,11 +1,30 @@
 import { NextRequest } from "next/server";
 import { respondError, respondSuccess } from "@/lib/utils/api-response";
 import { tmaService } from "@/lib/data/data-service";
+import { createClient } from "@/lib/supabase/server";
 import type { TmaCreateInput } from "@/lib/validation/schemas";
 import { TmaCreateSchema } from "@/lib/validation/schemas";
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return respondError("Unauthorized", 401);
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("team_id")
+      .eq("id", user.id)
+      .single();
+
+    const activeTeamId =
+      profile?.team_id || "00000000-0000-0000-0000-000000000010"; // default Elektro
+
     const body = await request.json().catch(() => null);
     if (!body || !Array.isArray(body)) {
       return respondError("Payload must be an array of candidates", 400);
@@ -16,7 +35,10 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < body.length; i++) {
       const row = body[i];
-      const parsed = TmaCreateSchema.safeParse(row);
+      const parsed = TmaCreateSchema.safeParse({
+        ...row,
+        team_id: row.team_id ?? activeTeamId,
+      });
       if (!parsed.success) {
         errors.push({ index: i, message: parsed.error.message });
         continue;

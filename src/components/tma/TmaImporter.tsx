@@ -38,18 +38,23 @@ export function TmaImporter({ onImportComplete }: Props) {
         const uniqueRows = dedupeCandidates(parsedRows);
 
         try {
-          const response = await fetch("/api/tma/import", {
+        const response = await fetch("/api/tma/import", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(uniqueRows),
+          credentials: "include",
+          body: JSON.stringify(uniqueRows),
           });
           const json = await response.json();
           if (!response.ok) {
-            throw new Error(json.error || "Import failed");
+          throw new Error(json.error || json.data?.errors?.[0]?.message || "Import failed");
           }
           const deduped = parsedRows.length - uniqueRows.length;
           const dedupeNote = deduped > 0 ? ` (${deduped} duplicates skipped)` : "";
-          setMessage(`Imported ${json.data.created} candidates (${json.data.errors.length} errors)${dedupeNote}`);
+        const errorNote =
+          json.data.errors.length > 0 ? ` (first error: ${json.data.errors[0].message})` : "";
+        setMessage(
+          `Imported ${json.data.created} candidates (${json.data.errors.length} errors)${dedupeNote}${errorNote}`
+        );
           onImportComplete?.();
         } catch (error) {
           setMessage(error instanceof Error ? error.message : "Import failed");
