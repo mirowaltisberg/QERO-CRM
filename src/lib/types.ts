@@ -3,7 +3,7 @@
  * Matches the Supabase schema for future integration
  */
 
-import type { ContactStatus, CallOutcome, TmaStatus } from "./utils/constants";
+import type { ContactStatus, CallOutcome, TmaStatus, TmaActivity } from "./utils/constants";
 
 /**
  * Organization - Top-level entity
@@ -51,7 +51,8 @@ export interface TmaCandidate {
   phone: string | null;
   email: string | null;
   canton: string | null;
-  status: TmaStatus | null;
+  status: TmaStatus | null; // Quality: A (Top), B (Ok), C (Flop)
+  activity: TmaActivity | null; // Activity: active, inactive
   position_title: string | null;
   notes: string | null;
   follow_up_at: string | null;

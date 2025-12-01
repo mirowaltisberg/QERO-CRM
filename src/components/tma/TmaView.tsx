@@ -22,11 +22,13 @@ export function TmaView({ initialCandidates }: Props) {
     selectCandidate,
     refreshCandidates,
     updateStatus,
+    updateActivity,
     scheduleFollowUp,
     updateNotes,
     updateDocuments,
     updatePosition,
     clearStatus,
+    clearActivity,
     setStatusFilter,
     statusFilter,
     setCantonFilter,
@@ -151,6 +153,8 @@ export function TmaView({ initialCandidates }: Props) {
             candidate={activeCandidate}
             onUpdateStatus={updateStatus}
             onClearStatus={clearStatus}
+            onUpdateActivity={updateActivity}
+            onClearActivity={clearActivity}
             onScheduleFollowUp={scheduleFollowUp}
             onUpdateNotes={updateNotes}
             onUpdateDocuments={updateDocuments}

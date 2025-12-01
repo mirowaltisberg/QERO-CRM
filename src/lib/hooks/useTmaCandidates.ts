@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TmaCandidate } from "@/lib/types";
-import type { TmaStatus } from "@/lib/utils/constants";
+import type { TmaStatus, TmaActivity } from "@/lib/utils/constants";
 
 interface UseTmaCandidatesOptions {
   initialCandidates?: TmaCandidate[];
@@ -252,6 +252,47 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     }
   }, [activeCandidate, updateCandidateLocally]);
 
+  const updateActivity = useCallback(
+    async (activity: TmaActivity) => {
+      if (!activeCandidate || activeCandidate.activity === activity) return;
+      setActionState({ type: "saving", message: "Updating activity..." });
+      try {
+        const response = await fetch(`/api/tma/${activeCandidate.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ activity }),
+        });
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || "Failed to update activity");
+        updateCandidateLocally(json.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update activity");
+      } finally {
+        setActionState({ type: null });
+      }
+    },
+    [activeCandidate, updateCandidateLocally]
+  );
+
+  const clearActivity = useCallback(async () => {
+    if (!activeCandidate || activeCandidate.activity === null) return;
+    setActionState({ type: "saving", message: "Clearing activity..." });
+    try {
+      const response = await fetch(`/api/tma/${activeCandidate.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activity: null }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "Failed to clear activity");
+      updateCandidateLocally(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear activity");
+    } finally {
+      setActionState({ type: null });
+    }
+  }, [activeCandidate, updateCandidateLocally]);
+
   return {
     candidates: sortedCandidates,
     activeCandidate,
@@ -263,11 +304,13 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     selectCandidate,
     refreshCandidates,
     updateStatus,
+    updateActivity,
     scheduleFollowUp,
     updateNotes,
     updateDocuments,
     updatePosition,
     clearStatus,
+    clearActivity,
     setCantonFilter,
     clearCantonFilter: () => setCantonFilter(null),
     setStatusFilter,

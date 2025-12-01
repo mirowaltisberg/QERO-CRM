@@ -28,7 +28,7 @@ export const CONTACT_STATUS_COLORS: Record<ContactStatus, string> = {
 };
 
 /**
- * TMA Candidate Status Options (A/B/C)
+ * TMA Candidate Quality Status (A/B/C)
  */
 export const TMA_STATUS = {
   A: "A",
@@ -42,8 +42,8 @@ export const TMA_STATUS_LIST = [TMA_STATUS.A, TMA_STATUS.B, TMA_STATUS.C] as con
 
 export const TMA_STATUS_LABELS: Record<TmaStatus, string> = {
   A: "A (Top)",
-  B: "B (Active)",
-  C: "C (Pipeline)",
+  B: "B (Ok)",
+  C: "C (Flop)",
 };
 
 export const TMA_STATUS_COLORS: Record<TmaStatus, string> = {
@@ -56,6 +56,26 @@ export const TMA_STATUS_STYLES: Record<TmaStatus, { bg: string; text: string; bo
   A: { bg: "#0AAF50", text: "#0A3F21", border: "#0AAF50" },
   B: { bg: "#FFD147", text: "#6B4A00", border: "#FFD147" },
   C: { bg: "#F34B4B", text: "#5D0C0C", border: "#F34B4B" },
+};
+
+/**
+ * TMA Activity Status (Active/Not Active)
+ */
+export const TMA_ACTIVITY = {
+  ACTIVE: "active",
+  INACTIVE: "inactive",
+} as const;
+
+export type TmaActivity = (typeof TMA_ACTIVITY)[keyof typeof TMA_ACTIVITY];
+
+export const TMA_ACTIVITY_LABELS: Record<TmaActivity, string> = {
+  active: "Active",
+  inactive: "Not Active",
+};
+
+export const TMA_ACTIVITY_STYLES: Record<TmaActivity, { bg: string; text: string; border: string }> = {
+  active: { bg: "#3B82F6", text: "#1E3A5F", border: "#3B82F6" },
+  inactive: { bg: "#9CA3AF", text: "#374151", border: "#9CA3AF" },
 };
 
 /**

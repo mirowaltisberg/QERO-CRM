@@ -11,7 +11,15 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { NotesPanel } from "@/components/calling/NotesPanel";
 import type { TmaCandidate } from "@/lib/types";
-import { TMA_STATUS_LIST, TMA_STATUS_LABELS, TMA_STATUS_STYLES, type TmaStatus } from "@/lib/utils/constants";
+import { 
+  TMA_STATUS_LIST, 
+  TMA_STATUS_LABELS, 
+  TMA_STATUS_STYLES, 
+  TMA_ACTIVITY_LABELS,
+  TMA_ACTIVITY_STYLES,
+  type TmaStatus,
+  type TmaActivity,
+} from "@/lib/utils/constants";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils/cn";
 
@@ -19,6 +27,8 @@ interface Props {
   candidate: TmaCandidate | null;
   onUpdateStatus: (status: TmaStatus) => Promise<void> | void;
   onClearStatus: () => Promise<void> | void;
+  onUpdateActivity: (activity: TmaActivity) => Promise<void> | void;
+  onClearActivity: () => Promise<void> | void;
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
   onUpdateNotes: (value: string | null) => Promise<void>;
   onUpdateDocuments: (
@@ -31,6 +41,8 @@ export function TmaDetail({
   candidate,
   onUpdateStatus,
   onClearStatus,
+  onUpdateActivity,
+  onClearActivity,
   onScheduleFollowUp,
   onUpdateNotes,
   onUpdateDocuments,
@@ -201,7 +213,8 @@ export function TmaDetail({
             />
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Quality Status (A/B/C) */}
           <Tag
             status={undefined}
             className="bg-gray-100 text-gray-500 border-gray-200"
@@ -215,17 +228,24 @@ export function TmaDetail({
                 : undefined
             }
           >
-            {candidate.status ? TMA_STATUS_LABELS[candidate.status as TmaStatus] : "Set status"}
+            {candidate.status ? TMA_STATUS_LABELS[candidate.status as TmaStatus] : "Quality"}
           </Tag>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs text-gray-500 hover:text-gray-900"
-            onClick={onClearStatus}
-            disabled={!candidate.status}
+          {/* Activity Status (Active/Not Active) */}
+          <Tag
+            status={undefined}
+            className="bg-gray-100 text-gray-500 border-gray-200"
+            style={
+              candidate.activity
+                ? {
+                    backgroundColor: `${TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].bg}20`,
+                    color: TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].text,
+                    borderColor: `${TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].border}50`,
+                  }
+                : undefined
+            }
           >
-            Clear status
-          </Button>
+            {candidate.activity ? TMA_ACTIVITY_LABELS[candidate.activity as TmaActivity] : "Activity"}
+          </Tag>
         </div>
       </div>
 
@@ -260,25 +280,65 @@ export function TmaDetail({
             </div>
           </Panel>
 
-          <Panel title="Status" description="Categorize candidate quality">
+          <Panel title="Quality" description="Rate candidate quality">
             <div className="flex flex-wrap gap-2">
               {TMA_STATUS_LIST.map((status) => (
                 <button
                   key={status}
                   onClick={() => onUpdateStatus(status)}
                   className={cn(
-                    "rounded-xl border px-4 py-3 text-left text-sm transition",
+                    "rounded-xl border px-3 py-2 text-left text-sm transition",
                     candidate.status === status
                       ? "border-gray-900 bg-gray-900 text-white"
                       : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"
                   )}
                 >
                   <p className="font-medium">{TMA_STATUS_LABELS[status]}</p>
-                  <p className="text-xs text-gray-400">
-                    {status === "A" ? "Ready to deploy" : status === "B" ? "Active pipeline" : "Keep warm"}
-                  </p>
                 </button>
               ))}
+              {candidate.status && (
+                <button
+                  onClick={onClearStatus}
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </Panel>
+
+          <Panel title="Activity" description="Is candidate actively looking?">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => onUpdateActivity("active")}
+                className={cn(
+                  "rounded-xl border px-4 py-2 text-sm font-medium transition",
+                  candidate.activity === "active"
+                    ? "border-blue-500 bg-blue-500 text-white"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
+                )}
+              >
+                Active
+              </button>
+              <button
+                onClick={() => onUpdateActivity("inactive")}
+                className={cn(
+                  "rounded-xl border px-4 py-2 text-sm font-medium transition",
+                  candidate.activity === "inactive"
+                    ? "border-gray-500 bg-gray-500 text-white"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"
+                )}
+              >
+                Not Active
+              </button>
+              {candidate.activity && (
+                <button
+                  onClick={onClearActivity}
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600"
+                >
+                  Clear
+                </button>
+              )}
             </div>
           </Panel>
 

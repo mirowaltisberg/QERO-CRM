@@ -4,7 +4,10 @@ import {
   CONTACT_STATUS_LIST,
   SWISS_CANTONS,
   TMA_STATUS_LIST,
+  TMA_ACTIVITY,
 } from '../utils/constants';
+
+const TMA_ACTIVITY_LIST = [TMA_ACTIVITY.ACTIVE, TMA_ACTIVITY.INACTIVE] as const;
 
 const phoneSchema = z
   .string()
@@ -84,15 +87,18 @@ const tmaBaseSchema = z.object({
 
 export const TmaCreateSchema = tmaBaseSchema.extend({
   status: z.enum(TMA_STATUS_LIST).nullable().optional().default(null),
+  activity: z.enum(TMA_ACTIVITY_LIST).nullable().optional().default(null),
 });
 
 export const TmaUpdateSchema = tmaBaseSchema.extend({
   status: z.enum(TMA_STATUS_LIST).nullable().optional(),
+  activity: z.enum(TMA_ACTIVITY_LIST).nullable().optional(),
   claimed_by: z.string().uuid().nullable().optional(),
 }).partial();
 
 export const TmaFilterSchema = z.object({
   status: z.enum(TMA_STATUS_LIST).optional(),
+  activity: z.enum(TMA_ACTIVITY_LIST).optional(),
   canton: z.enum(SWISS_CANTONS).optional(),
   search: z.string().trim().min(1).optional(),
   page: z.number().int().min(1).optional(),

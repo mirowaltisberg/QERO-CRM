@@ -127,6 +127,7 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
     position_title: position?.trim() || null,
     short_profile_url: shortProfile?.trim() || null,
     status,
+    activity: null, // Default to null, can be set manually later
     notes: (row["Notizen"] || row["Notes"] || "").trim() || null,
   };
 }
