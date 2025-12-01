@@ -691,6 +691,42 @@ Reviewed original requirements against plan. Changes made:
 
 ---
 
+### Task 21: Streamlined Status & Follow-up Controls (Dec 2)
+
+**Background / Goal**
+- The Status panel takes too much vertical space in the Calling view; recruiters mostly care about notes.
+- Status and follow-up are "nice-to-have" but shouldn't dominate the UI.
+- Future: support multi-user note attribution with profile pictures.
+
+**Solution**
+1. **Collapse Status panel** into a compact inline toolbar above Notes:
+   - Two small buttons: `Working` and `Hot` (one-click toggles, highlight when active).
+   - A `Follow-up` dropdown button with preset options:
+     - "Tomorrow 9 AM"
+     - "Today 5 PM"
+     - "Custom…" (opens existing modal)
+   - Clicking a preset schedules immediately.
+2. **Expand Notes panel** to fill remaining vertical space (`flex-1`, `min-h-[280px]`).
+3. **Multi-user note attribution** (future-ready):
+   - Store `author_id` (UUID FK to `profiles`) on each note entry.
+   - Display author avatar inline before each note block.
+   - For now, notes are a single text field; later migrate to a `contact_notes` table with `{ id, contact_id, author_id, content, created_at }`.
+
+**Implementation Steps**
+1. Remove `<Panel title="Status">` block from `ContactDetail`.
+2. Add a compact inline toolbar rendered just above the Notes panel:
+   - Two `<Button size="sm">` for Working / Hot (highlight when active).
+   - `<DropdownMenu>` for Follow-up with three items (Tomorrow 9 AM, Today 5 PM, Custom…).
+3. Adjust Notes `<Panel>` to `className="flex-1"` and textarea `min-h-[280px]`.
+4. (Future) Add `author_id` column to notes; render avatar from `profiles.avatar_url`.
+
+**Success Criteria**
+- Status + follow-up controls occupy ≤ 48 px height.
+- Notes panel fills remaining space.
+- Follow-up presets persist correctly to Supabase.
+
+---
+
 ## Lessons
 
 1. **npm naming restrictions**: Cannot use capital letters in project names. Created project with lowercase name then copied files.

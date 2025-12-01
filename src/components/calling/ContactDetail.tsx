@@ -58,11 +58,6 @@ export const ContactDetail = memo(function ContactDetail({
     [onSaveNotes]
   );
 
-  const handleQuickFollowUp = useCallback(async () => {
-    const target = getTomorrowNine();
-    await onScheduleFollowUp({ date: target, note: contact?.follow_up_note ?? undefined });
-  }, [contact?.follow_up_note, onScheduleFollowUp]);
-
   const handleCustomFollowUp = useCallback(async () => {
     const date = combineDateTime(customDate, customTime);
     if (!date) return;
@@ -108,54 +103,59 @@ export const ContactDetail = memo(function ContactDetail({
           </div>
         </Panel>
 
-        <Panel title="Status" description="Control lead heat & follow-ups">
-          <div className="flex flex-wrap gap-2">
-            {STATUS_OPTIONS.map((option) => (
-              <StatusButton
-                key={option.value}
-                label={option.label}
-                description={option.description}
-                active={contact.status === option.value}
-                onClick={() => onUpdateStatus(option.value)}
-              />
-            ))}
-          </div>
+        {/* Compact status + follow-up toolbar */}
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+          <span className="text-xs text-gray-400 mr-1">Status</span>
           <Button
-            variant="ghost"
             size="sm"
-            className="mt-3 text-xs text-gray-500 hover:text-gray-900"
-            onClick={onClearStatus}
-            disabled={!contact.status}
+            variant={contact.status === "working" ? "secondary" : "ghost"}
+            className={cn(
+              "text-xs",
+              contact.status === "working" && "bg-gray-900 text-white hover:bg-gray-800"
+            )}
+            onClick={() => onUpdateStatus("working")}
           >
-            Clear status
+            Working
           </Button>
-          <div className="mt-4 rounded-xl border border-dashed border-gray-200 p-4 text-sm text-gray-600">
-            <div className="flex flex-wrap items-center gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-gray-400">Follow-up</p>
-                <p className="text-sm text-gray-900">
-                  {followUpDate ? formatFollowUpDate(followUpDate) : "No follow-up scheduled"}
-                </p>
-                {contact.follow_up_note && (
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{contact.follow_up_note}</p>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="secondary" onClick={handleQuickFollowUp}>
-                  Tomorrow · 09:00
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setIsFollowUpModalOpen(true)}>
-                  Custom…
-                </Button>
-                {followUpDate && (
-                  <Button size="sm" variant="ghost" onClick={onClearFollowUp}>
-                    Clear
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </Panel>
+          <Button
+            size="sm"
+            variant={contact.status === "hot" ? "secondary" : "ghost"}
+            className={cn(
+              "text-xs",
+              contact.status === "hot" && "bg-orange-500 text-white hover:bg-orange-600"
+            )}
+            onClick={() => onUpdateStatus("hot")}
+          >
+            Hot
+          </Button>
+          {contact.status && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-xs text-gray-400 hover:text-gray-700"
+              onClick={onClearStatus}
+            >
+              ✕
+            </Button>
+          )}
+
+          <div className="mx-2 h-4 w-px bg-gray-200" />
+
+          <span className="text-xs text-gray-400 mr-1">Follow-up</span>
+          <FollowUpDropdown
+            currentDate={followUpDate}
+            onSelect={(preset) => {
+              if (preset === "custom") {
+                setIsFollowUpModalOpen(true);
+              } else if (preset === "tomorrow9") {
+                onScheduleFollowUp({ date: getTomorrowNine(), note: contact.follow_up_note ?? undefined });
+              } else if (preset === "today5") {
+                onScheduleFollowUp({ date: getTodayFive(), note: contact.follow_up_note ?? undefined });
+              }
+            }}
+            onClear={onClearFollowUp}
+          />
+        </div>
 
         <Panel title="Notes" description="Autosaves every few seconds" className="flex-1">
           <Textarea
@@ -165,7 +165,7 @@ export const ContactDetail = memo(function ContactDetail({
             onAutoSave={handleAutoSave}
             autosaveDelay={800}
             placeholder="Add context, objections, next steps..."
-            className="min-h-[200px]"
+            className="min-h-[280px] flex-1"
           />
         </Panel>
 
@@ -230,40 +230,76 @@ const InfoBlock = memo(function InfoBlock({
   );
 });
 
-const STATUS_OPTIONS: Array<{
-  value: ContactStatus;
-  label: string;
-  description: string;
-}> = [
-  { value: "hot", label: "Hot", description: "High intent – call ASAP" },
-  { value: "working", label: "Working", description: "Currently being handled" },
-  { value: "follow_up", label: "Follow Up", description: "Waiting for future touch" },
-];
-
-function StatusButton({
-  label,
-  description,
-  active,
-  onClick,
+function FollowUpDropdown({
+  currentDate,
+  onSelect,
+  onClear,
 }: {
-  label: string;
-  description: string;
-  active: boolean;
-  onClick: () => void;
+  currentDate: Date | null;
+  onSelect: (preset: "tomorrow9" | "today5" | "custom") => void;
+  onClear: () => void;
 }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "rounded-xl border px-4 py-3 text-left text-sm transition-all duration-150",
-        active
-          ? "border-gray-900 bg-gray-900 text-white shadow-sm"
-          : "border-gray-200 bg-white text-gray-700 hover:border-gray-400"
+    <div className="relative">
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-xs"
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        {currentDate ? formatFollowUpDate(currentDate) : "Set"} ▾
+      </Button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full z-20 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+            <button
+              className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-100"
+              onClick={() => {
+                onSelect("tomorrow9");
+                setOpen(false);
+              }}
+            >
+              Tomorrow 9 AM
+            </button>
+            <button
+              className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-100"
+              onClick={() => {
+                onSelect("today5");
+                setOpen(false);
+              }}
+            >
+              Today 5 PM
+            </button>
+            <button
+              className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-100"
+              onClick={() => {
+                onSelect("custom");
+                setOpen(false);
+              }}
+            >
+              Custom…
+            </button>
+            {currentDate && (
+              <>
+                <div className="my-1 border-t border-gray-100" />
+                <button
+                  className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-gray-100"
+                  onClick={() => {
+                    onClear();
+                    setOpen(false);
+                  }}
+                >
+                  Clear follow-up
+                </button>
+              </>
+            )}
+          </div>
+        </>
       )}
-    >
-      <p className="font-medium">{label}</p>
-      <p className="text-xs text-gray-400">{description}</p>
-    </button>
+    </div>
   );
 }
 
@@ -271,6 +307,12 @@ function getTomorrowNine() {
   const date = new Date();
   date.setDate(date.getDate() + 1);
   date.setHours(9, 0, 0, 0);
+  return date;
+}
+
+function getTodayFive() {
+  const date = new Date();
+  date.setHours(17, 0, 0, 0);
   return date;
 }
 
