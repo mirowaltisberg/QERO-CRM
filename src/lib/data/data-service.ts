@@ -568,7 +568,10 @@ export const tmaService = {
       .from("tma_candidates")
       .update(data)
       .eq("id", id)
-      .select()
+      .select(`
+        *,
+        claimer:profiles!claimed_by(id, full_name, avatar_url)
+      `)
       .single();
     if (error) {
       console.error("Error updating TMA candidate:", error);

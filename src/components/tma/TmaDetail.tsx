@@ -74,18 +74,28 @@ export function TmaDetail({
       const bucket = "tma-docs";
       const path = `${candidate.id}/${type}-${Date.now()}-${file.name}`;
       setUploading(type);
+      
       const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
       if (error) {
         console.error("Upload error", error);
+        alert(`Upload failed: ${error.message}`);
         setUploading(null);
         return;
       }
+      
       const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-      await onUpdateDocuments({
-        cv_url: type === "cv" ? data.publicUrl : candidate.cv_url,
-        references_url: type === "references" ? data.publicUrl : candidate.references_url,
-        short_profile_url: type === "short_profile" ? data.publicUrl : candidate.short_profile_url,
-      });
+      
+      try {
+        await onUpdateDocuments({
+          cv_url: type === "cv" ? data.publicUrl : candidate.cv_url,
+          references_url: type === "references" ? data.publicUrl : candidate.references_url,
+          short_profile_url: type === "short_profile" ? data.publicUrl : candidate.short_profile_url,
+        });
+      } catch (err) {
+        console.error("Failed to save document URL:", err);
+        alert(`Failed to save document: ${err instanceof Error ? err.message : "Unknown error"}`);
+      }
+      
       setUploading(null);
     },
     [candidate, onUpdateDocuments]
