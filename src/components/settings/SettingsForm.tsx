@@ -49,12 +49,6 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
       return;
     }
 
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      setMessage({ type: "error", text: "Image must be less than 2MB" });
-      return;
-    }
-
     setUploadingAvatar(true);
     setMessage(null);
 
@@ -232,7 +226,7 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-900">Profile Photo</p>
-              <p className="text-xs text-gray-500">Click to upload (max 2MB)</p>
+              <p className="text-xs text-gray-500">Click to upload (any size)</p>
             </div>
           </div>
 
