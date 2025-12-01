@@ -14,6 +14,7 @@ interface NotesPanelProps {
   entityType: "contact" | "tma";
   legacyNotes?: string | null; // Old single-field notes (for backward compat)
   onSaveLegacyNotes?: (value: string | null) => Promise<void>;
+  currentUserId?: string;
 }
 
 export const NotesPanel = memo(function NotesPanel({
@@ -21,6 +22,7 @@ export const NotesPanel = memo(function NotesPanel({
   entityType,
   legacyNotes,
   onSaveLegacyNotes,
+  currentUserId,
 }: NotesPanelProps) {
   const [notes, setNotes] = useState<NoteType[]>([]);
   const [newNote, setNewNote] = useState("");
@@ -121,7 +123,18 @@ export const NotesPanel = memo(function NotesPanel({
         ) : notes.length === 0 ? (
           <p className="text-sm text-gray-400">No notes yet. Add the first one!</p>
         ) : (
-          notes.map((note) => <NoteCard key={note.id} note={note} />)
+          notes.map((note) => (
+            <NoteCard
+              key={note.id}
+              note={note}
+              canEdit={currentUserId ? note.author_id === currentUserId : false}
+              onNoteUpdated={(updated) =>
+                setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)))
+              }
+              entityType={entityType}
+              entityId={entityId}
+            />
+          ))
         )}
 
         {/* Legacy notes (if any exist and no new notes) */}
@@ -143,7 +156,19 @@ export const NotesPanel = memo(function NotesPanel({
   );
 });
 
-const NoteCard = memo(function NoteCard({ note }: { note: NoteType }) {
+const NoteCard = memo(function NoteCard({
+  note,
+  entityType,
+  entityId,
+  canEdit,
+  onNoteUpdated,
+}: {
+  note: NoteType;
+  entityType: "contact" | "tma";
+  entityId: string;
+  canEdit: boolean;
+  onNoteUpdated: (note: NoteType) => void;
+}) {
   const author = note.author;
   const initials = author?.full_name
     ?.split(" ")
@@ -151,6 +176,41 @@ const NoteCard = memo(function NoteCard({ note }: { note: NoteType }) {
     .join("")
     .toUpperCase()
     .slice(0, 2) || "??";
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(note.content);
+  const [saving, setSaving] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+
+  const apiPath =
+    entityType === "contact"
+      ? `/api/contacts/${entityId}/notes/${note.id}`
+      : `/api/tma/${entityId}/notes/${note.id}`;
+
+  const handleSave = async () => {
+    const trimmed = editValue.trim();
+    if (!trimmed || trimmed === note.content) {
+      setEditing(false);
+      setEditValue(note.content);
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetch(apiPath, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: trimmed }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "Failed to update note");
+      onNoteUpdated(json.data);
+      setEditing(false);
+    } catch (error) {
+      console.error("Failed to update note:", error);
+      alert("Failed to update note");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -182,11 +242,55 @@ const NoteCard = memo(function NoteCard({ note }: { note: NoteType }) {
             <span className="text-gray-400">·</span>
             <span className="text-gray-400 text-xs">
               {formatRelativeTime(note.created_at)}
+              {note.updated_at && note.updated_at !== note.created_at && (
+                <span className="text-[10px] text-gray-400 ml-2">
+                  (edited {formatRelativeTime(note.updated_at)})
+                </span>
+              )}
             </span>
+            {canEdit && (
+              <div className="relative ml-auto">
+                <button
+                  className="rounded-full border border-gray-200 p-1 text-gray-500 hover:text-gray-900"
+                  onClick={() => setShowMenu((prev) => !prev)}
+                >
+                  ⋮
+                </button>
+                {showMenu && (
+                  <div className="absolute right-0 mt-1 rounded-md border border-gray-200 bg-white shadow-lg text-xs">
+                    <button
+                      className="block w-full px-3 py-2 text-left hover:bg-gray-50"
+                      onClick={() => {
+                        setEditing(true);
+                        setShowMenu(false);
+                      }}
+                    >
+                      Edit note
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
-            {note.content}
-          </p>
+          {editing ? (
+            <div className="mt-2 space-y-2">
+              <Textarea
+                value={editValue}
+                onChange={(event) => setEditValue(event.target.value)}
+                className="min-h-[80px]"
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleSave} disabled={saving}>
+                  {saving ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">{note.content}</p>
+          )}
         </div>
       </div>
     </div>

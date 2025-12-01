@@ -23,6 +23,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       author_id,
       content,
       created_at,
+      updated_at,
       author:profiles!author_id(id, full_name, avatar_url)
     `)
     .eq("tma_id", id)
@@ -90,6 +91,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       author_id,
       content,
       created_at,
+      updated_at,
       author:profiles!author_id(id, full_name, avatar_url)
     `)
     .single();

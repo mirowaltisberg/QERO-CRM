@@ -94,6 +94,7 @@ export interface ContactNote {
   author_id: string;
   content: string;
   created_at: string;
+  updated_at?: string | null;
   // Joined from profiles
   author?: {
     id: string;
@@ -111,6 +112,7 @@ export interface TmaNote {
   author_id: string;
   content: string;
   created_at: string;
+  updated_at?: string | null;
   // Joined from profiles
   author?: {
     id: string;
