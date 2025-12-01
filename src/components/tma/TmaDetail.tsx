@@ -35,6 +35,7 @@ interface Props {
     payload: { cv_url?: string | null; references_url?: string | null; short_profile_url?: string | null }
   ) => Promise<void>;
   onUpdatePosition: (value: string | null) => Promise<void> | void;
+  onUpdateAddress: (payload: { city: string | null; street: string | null; postal_code: string | null }) => Promise<void> | void;
 }
 
 export function TmaDetail({
@@ -47,6 +48,7 @@ export function TmaDetail({
   onUpdateNotes,
   onUpdateDocuments,
   onUpdatePosition,
+  onUpdateAddress,
 }: Props) {
   const initialFollowUpDate = candidate?.follow_up_at ? new Date(candidate.follow_up_at) : null;
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
@@ -59,12 +61,32 @@ export function TmaDetail({
   const [followUpNote, setFollowUpNote] = useState(candidate?.follow_up_note ?? "");
   const [uploading, setUploading] = useState<"cv" | "references" | "short_profile" | null>(null);
   const [position, setPosition] = useState(() => candidate?.position_title ?? "");
+  const [city, setCity] = useState(() => candidate?.city ?? "");
+  const [street, setStreet] = useState(() => candidate?.street ?? "");
+  const [postalCode, setPostalCode] = useState(() => candidate?.postal_code ?? "");
   const handlePositionBlur = useCallback(async () => {
     if (!candidate) return;
     const trimmed = position.trim();
     if (trimmed === (candidate.position_title?.trim() ?? "")) return;
     await onUpdatePosition(trimmed.length ? trimmed : null);
   }, [candidate, onUpdatePosition, position]);
+
+  const handleAddressBlur = useCallback(async () => {
+    if (!candidate) return;
+    const payload = {
+      city: city.trim() ? city.trim() : null,
+      street: street.trim() ? street.trim() : null,
+      postal_code: postalCode.trim() ? postalCode.trim() : null,
+    };
+    if (
+      payload.city === (candidate.city ?? null) &&
+      payload.street === (candidate.street ?? null) &&
+      payload.postal_code === (candidate.postal_code ?? null)
+    ) {
+      return;
+    }
+    await onUpdateAddress(payload);
+  }, [candidate, city, street, postalCode, onUpdateAddress]);
 
   const handleQuickFollowUp = async () => {
     if (!candidate) return;
@@ -213,15 +235,47 @@ export function TmaDetail({
               {candidate.street && <span className="text-gray-600">{candidate.street}</span>}
             </div>
           )}
-          <div className="mt-3 max-w-sm">
-            <label className="text-xs uppercase text-gray-400">Role / Position</label>
-            <Input
-              value={position}
-              onChange={(event) => setPosition(event.target.value)}
-              onBlur={handlePositionBlur}
-              placeholder="e.g. Montage-Elektriker"
-              className="mt-1"
-            />
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs uppercase text-gray-400">Role / Position</label>
+              <Input
+                value={position}
+                onChange={(event) => setPosition(event.target.value)}
+                onBlur={handlePositionBlur}
+                placeholder="e.g. Montage-Elektriker"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs uppercase text-gray-400">City</label>
+              <Input
+                value={city}
+                onChange={(event) => setCity(event.target.value)}
+                onBlur={handleAddressBlur}
+                placeholder="e.g. Zürich"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs uppercase text-gray-400">Postal Code</label>
+              <Input
+                value={postalCode}
+                onChange={(event) => setPostalCode(event.target.value)}
+                onBlur={handleAddressBlur}
+                placeholder="e.g. 8004"
+                className="mt-1"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs uppercase text-gray-400">Street</label>
+              <Input
+                value={street}
+                onChange={(event) => setStreet(event.target.value)}
+                onBlur={handleAddressBlur}
+                placeholder="e.g. Badenerstrasse 575"
+                className="mt-1"
+              />
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">

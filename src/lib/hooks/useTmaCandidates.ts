@@ -262,6 +262,28 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     }
   }, [activeCandidate, updateCandidateLocally]);
 
+  const updateAddress = useCallback(
+    async (payload: { city: string | null; street: string | null; postal_code: string | null }) => {
+      if (!activeCandidate) return;
+      setActionState({ type: "saving", message: "Updating address..." });
+      try {
+        const response = await fetch(`/api/tma/${activeCandidate.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || "Failed to update address");
+        updateCandidateLocally(json.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update address");
+      } finally {
+        setActionState({ type: null });
+      }
+    },
+    [activeCandidate, updateCandidateLocally]
+  );
+
   const updateActivity = useCallback(
     async (activity: TmaActivity) => {
       if (!activeCandidate || activeCandidate.activity === activity) return;
@@ -320,6 +342,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     updateNotes,
     updateDocuments,
     updatePosition,
+    updateAddress,
     clearStatus,
     clearActivity,
     setCantonFilter,
