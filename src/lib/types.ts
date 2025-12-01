@@ -75,6 +75,23 @@ export interface CallLog {
 }
 
 /**
+ * Contact Note - Individual note with author attribution
+ */
+export interface ContactNote {
+  id: string;
+  contact_id: string;
+  author_id: string;
+  content: string;
+  created_at: string;
+  // Joined from profiles
+  author?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  };
+}
+
+/**
  * List - A named collection of contacts
  */
 export interface List {

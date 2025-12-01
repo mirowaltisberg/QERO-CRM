@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { ContactList } from "./ContactList";
 import { ContactDetail } from "./ContactDetail";
 import type { Contact } from "@/lib/types";
@@ -34,8 +34,6 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     setCantonFilter,
     clearCantonFilter,
   } = useContacts({ initialContacts });
-
-  const notesRef = useRef<HTMLTextAreaElement>(null);
 
   const actionMessage = useMemo(() => {
     if (actionState.type && actionState.message) {
@@ -113,13 +111,6 @@ export function CallingView({ initialContacts }: CallingViewProps) {
       },
     },
     {
-      key: KEYBOARD_SHORTCUTS.FOCUS_NOTES,
-      handler: (event) => {
-        event.preventDefault();
-        notesRef.current?.focus();
-      },
-    },
-    {
       key: KEYBOARD_SHORTCUTS.CONFIRM,
       handler: (event) => {
         event.preventDefault();
@@ -147,7 +138,6 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         onCall={handleCall}
         onNext={goToNextContact}
         onSaveNotes={updateNotes}
-        notesRef={notesRef}
         actionMessage={actionMessage}
         onUpdateStatus={updateStatus}
         onScheduleFollowUp={scheduleFollowUp}

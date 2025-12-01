@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { Tag } from "@/components/ui/tag";
 import { CantonTag } from "@/components/ui/CantonTag";
-import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { NotesPanel } from "./NotesPanel";
 import type { Contact } from "@/lib/types";
 import type { ContactStatus } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
@@ -17,7 +18,6 @@ interface ContactDetailProps {
   onCall: () => void;
   onNext: () => void;
   onSaveNotes: (value: string | null) => Promise<void>;
-  notesRef: React.RefObject<HTMLTextAreaElement | null>;
   actionMessage?: string | null;
   onUpdateStatus: (status: ContactStatus) => Promise<void> | void;
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
@@ -30,14 +30,12 @@ export const ContactDetail = memo(function ContactDetail({
   onCall,
   onNext,
   onSaveNotes,
-  notesRef,
   actionMessage,
   onUpdateStatus,
   onScheduleFollowUp,
   onClearFollowUp,
   onClearStatus,
 }: ContactDetailProps) {
-  const [notesValue, setNotesValue] = useState(contact?.notes ?? "");
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [customDate, setCustomDate] = useState(() => getDefaultDateISO());
   const [customTime, setCustomTime] = useState("09:00");
@@ -46,17 +44,6 @@ export const ContactDetail = memo(function ContactDetail({
   const displayPhone = contact?.phone ?? "No phone number";
   const displayEmail = contact?.email ?? "No email";
   const followUpDate = contact?.follow_up_at ? new Date(contact.follow_up_at) : null;
-
-  const handleNotesChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setNotesValue(event.target.value);
-  }, []);
-
-  const handleAutoSave = useCallback(
-    async (value: string) => {
-      await onSaveNotes(value.trim().length ? value : null);
-    },
-    [onSaveNotes]
-  );
 
   const handleCustomFollowUp = useCallback(async () => {
     const date = combineDateTime(customDate, customTime);
@@ -157,17 +144,11 @@ export const ContactDetail = memo(function ContactDetail({
           />
         </div>
 
-        <Panel title="Notes" description="Autosaves every few seconds" className="flex-1">
-          <Textarea
-            ref={notesRef}
-            value={notesValue}
-            onChange={handleNotesChange}
-            onAutoSave={handleAutoSave}
-            autosaveDelay={800}
-            placeholder="Add context, objections, next steps..."
-            className="min-h-[280px] flex-1"
-          />
-        </Panel>
+        <NotesPanel
+          contactId={contact.id}
+          legacyNotes={contact.notes}
+          onSaveLegacyNotes={onSaveNotes}
+        />
 
         <div className="flex items-center justify-between">
           <div className="text-xs text-gray-400">
