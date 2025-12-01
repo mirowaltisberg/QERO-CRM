@@ -54,10 +54,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       payload.status = "C";
     }
 
+    const supabase = await createClient();
+    
     // Check if this is a document upload - auto-claim if unclaimed
     const isDocumentUpload = payload.cv_url || payload.references_url || payload.short_profile_url;
     if (isDocumentUpload) {
-      const supabase = await createClient();
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
@@ -74,10 +75,32 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
-    const updated = await tmaService.update(id, payload);
-    if (!updated) {
+    // Perform update using server client
+    const { error: updateError } = await supabase
+      .from("tma_candidates")
+      .update(payload)
+      .eq("id", id);
+
+    if (updateError) {
+      console.error("Update error:", updateError);
+      return respondError(updateError.message, 500);
+    }
+
+    // Fetch updated record with claimer
+    const { data: updated, error: fetchError } = await supabase
+      .from("tma_candidates")
+      .select(`
+        *,
+        claimer:profiles!claimed_by(id, full_name, avatar_url)
+      `)
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !updated) {
+      console.error("Fetch error:", fetchError);
       return respondError("Candidate not found", 404);
     }
+    
     return respondSuccess(updated);
   } catch (error) {
     console.error(`PATCH /api/tma/${id} error`, error);
