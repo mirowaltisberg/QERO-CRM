@@ -79,24 +79,30 @@ export function Sidebar({ user, profile }: SidebarProps) {
         collapsed ? "w-16" : "w-56"
       )}
     >
-      {/* Logo */}
-      <div className="h-16 flex items-center px-3 border-b border-border justify-between">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <Image src="/qero-logo.svg" alt="QERO" width={collapsed ? 32 : 132} height={44} priority className="h-10 w-auto" />
-          {!collapsed && (
-            <span className="text-[11px] uppercase tracking-wide text-gray-400 hidden lg:block">
-              Minimal Cold Calling CRM
-            </span>
-          )}
-        </div>
-        <Button
-          variant="ghost"
-          className="h-7 w-7 p-0 text-gray-500 hover:text-gray-900"
+      {/* Logo + collapse toggle */}
+      <div
+        className={cn(
+          "flex items-center border-b border-border",
+          collapsed ? "h-auto flex-col gap-1 py-3" : "h-16 justify-between px-3"
+        )}
+      >
+        {collapsed ? (
+          <Link href="/calling" className="flex items-center justify-center">
+            <Image src="/qero-logo.svg" alt="QERO" width={28} height={28} priority className="h-7 w-7" />
+          </Link>
+        ) : (
+          <Link href="/calling" className="flex items-center">
+            <Image src="/qero-logo.svg" alt="QERO" width={100} height={32} priority className="h-8 w-auto" />
+          </Link>
+        )}
+        <button
+          type="button"
           onClick={toggleCollapsed}
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 shadow-sm hover:bg-gray-100 hover:text-gray-700 transition-colors"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           <ChevronIcon collapsed={collapsed} />
-        </Button>
+        </button>
       </div>
 
       {/* Navigation */}
@@ -112,7 +118,8 @@ export function Sidebar({ user, profile }: SidebarProps) {
                   href={item.href}
                   prefetch={true}
                   className={cn(
-                    "group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors duration-100",
+                    "group flex items-center rounded-md text-sm transition-colors duration-100",
+                    collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-2",
                     isActive
                       ? "bg-white text-gray-900 shadow-sm border border-border"
                       : "text-gray-600 hover:bg-white hover:text-gray-900"
@@ -140,11 +147,13 @@ export function Sidebar({ user, profile }: SidebarProps) {
             href="/settings"
             prefetch={true}
             className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-100",
+              "flex items-center rounded-md text-sm transition-colors duration-100",
+              collapsed ? "justify-center p-2" : "gap-3 px-3 py-2",
               pathname === "/settings"
                 ? "bg-white text-gray-900 shadow-sm border border-border"
                 : "text-gray-600 hover:bg-white hover:text-gray-900"
             )}
+            title={collapsed ? displayName : undefined}
           >
             <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
               {avatarUrl ? (
