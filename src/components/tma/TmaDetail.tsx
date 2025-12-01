@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { Tag } from "@/components/ui/tag";
@@ -24,6 +25,7 @@ interface Props {
     payload: { cv_url?: string | null; references_url?: string | null; short_profile_url?: string | null }
   ) => Promise<void>;
   onUpdatePosition: (value: string | null) => Promise<void> | void;
+  onClaim: () => Promise<void> | void;
 }
 
 export function TmaDetail({
@@ -34,6 +36,7 @@ export function TmaDetail({
   onUpdateNotes,
   onUpdateDocuments,
   onUpdatePosition,
+  onClaim,
 }: Props) {
   const initialFollowUpDate = candidate?.follow_up_at ? new Date(candidate.follow_up_at) : null;
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
@@ -100,12 +103,68 @@ export function TmaDetail({
     );
   }
 
+  const claimer = candidate.claimer;
+  const claimerInitials = claimer?.full_name
+    ?.split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "??";
+
   return (
     <section className="flex h-full flex-col overflow-y-auto">
       <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-wide text-gray-400">Candidate</p>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          {/* Claimed status */}
+          <div className="flex items-center gap-2 mb-1">
+            {claimer ? (
+              <>
+                <div className="h-5 w-5 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
+                  {claimer.avatar_url ? (
+                    <Image
+                      src={claimer.avatar_url}
+                      alt={claimer.full_name || "Claimer"}
+                      width={20}
+                      height={20}
+                      unoptimized
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-[8px] font-medium text-gray-500">
+                      {claimerInitials}
+                    </div>
+                  )}
+                </div>
+                <span className="text-xs text-gray-500">{claimer.full_name}</span>
+              </>
+            ) : (
+              <button
+                onClick={onClaim}
+                className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+              >
+                Unclaimed – Click to claim
+              </button>
+            )}
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+            {claimer && (
+              <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
+                {claimer.avatar_url ? (
+                  <Image
+                    src={claimer.avatar_url}
+                    alt={claimer.full_name || "Claimer"}
+                    width={32}
+                    height={32}
+                    unoptimized
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs font-medium text-gray-500">
+                    {claimerInitials}
+                  </div>
+                )}
+              </div>
+            )}
             {candidate.first_name} {candidate.last_name}
           </h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-600">

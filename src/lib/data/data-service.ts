@@ -502,7 +502,13 @@ export const listService = {
 export const tmaService = {
   async getAll(filters?: TmaFilters): Promise<TmaCandidate[]> {
     const supabase = createClient();
-    let query = supabase.from("tma_candidates").select("*").order("created_at", { ascending: false });
+    let query = supabase
+      .from("tma_candidates")
+      .select(`
+        *,
+        claimer:profiles!claimed_by(id, full_name, avatar_url)
+      `)
+      .order("created_at", { ascending: false });
 
     if (filters?.status) {
       query = query.eq("status", filters.status);
@@ -529,7 +535,10 @@ export const tmaService = {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("tma_candidates")
-      .select("*")
+      .select(`
+        *,
+        claimer:profiles!claimed_by(id, full_name, avatar_url)
+      `)
       .eq("id", id)
       .single();
     if (error) {

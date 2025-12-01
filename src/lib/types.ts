@@ -61,6 +61,13 @@ export interface TmaCandidate {
   short_profile_url: string | null;
   team_id: string | null; // Which industry vertical this candidate belongs to
   created_at: string;
+  claimed_by: string | null;
+  // Joined from profiles when fetched
+  claimer?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 /**

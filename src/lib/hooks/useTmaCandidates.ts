@@ -216,6 +216,23 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     }
   }, [activeCandidate, updateCandidateLocally]);
 
+  const claimCandidate = useCallback(async () => {
+    if (!activeCandidate || activeCandidate.claimed_by) return;
+    setActionState({ type: "saving", message: "Claiming candidate..." });
+    try {
+      const response = await fetch(`/api/tma/${activeCandidate.id}/claim`, {
+        method: "POST",
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "Failed to claim candidate");
+      updateCandidateLocally(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to claim candidate");
+    } finally {
+      setActionState({ type: null });
+    }
+  }, [activeCandidate, updateCandidateLocally]);
+
   return {
     candidates: sortedCandidates,
     activeCandidate,
@@ -231,6 +248,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     updateDocuments,
     updatePosition,
     clearStatus,
+    claimCandidate,
     setCantonFilter,
     clearCantonFilter: () => setCantonFilter(null),
     setStatusFilter,
