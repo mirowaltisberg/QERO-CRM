@@ -29,7 +29,7 @@ const RegisterSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   fullName: z.string().min(2, "Full name is required"),
   phone: phoneSchema,
-  teamId: z.string().uuid("Please select a valid team"),
+  teamId: z.string().min(1, "Please select your team"),
 });
 
 const LoginSchema = z.object({
