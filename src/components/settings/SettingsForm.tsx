@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import { signOut } from "@/lib/auth/actions";
 import { motion } from "framer-motion";
+import { Modal } from "@/components/ui/modal";
 
 interface Profile {
   id: string;
@@ -36,8 +37,38 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [cropSource, setCropSource] = useState<{
+    file: File;
+    url: string;
+    width: number;
+    height: number;
+  } | null>(null);
 
   const supabase = createClient();
+
+  const openCropper = useCallback((file: File) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      setCropSource({
+        file,
+        url: objectUrl,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      setMessage({ type: "error", text: "Failed to load image preview" });
+    };
+    img.src = objectUrl;
+  }, []);
+
+  function resetFileInput() {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
 
   async function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -46,47 +77,68 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
     // Validate file type
     if (!file.type.startsWith("image/")) {
       setMessage({ type: "error", text: "Please upload an image file" });
+      resetFileInput();
       return;
     }
 
-    setUploadingAvatar(true);
     setMessage(null);
-
-    try {
-      // Create unique filename
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}/avatar.${fileExt}`;
-
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(fileName);
-
-      // Update profile with new avatar URL
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
-        .eq("id", user.id);
-
-      if (updateError) throw updateError;
-
-      setAvatarUrl(publicUrl);
-      setMessage({ type: "success", text: "Avatar updated!" });
-      router.refresh();
-    } catch (error) {
-      console.error("Avatar upload error:", error);
-      setMessage({ type: "error", text: "Failed to upload avatar" });
-    } finally {
-      setUploadingAvatar(false);
-    }
+    openCropper(file);
   }
+
+  const handleCropCancel = useCallback(() => {
+    if (cropSource) {
+      URL.revokeObjectURL(cropSource.url);
+    }
+    setCropSource(null);
+    resetFileInput();
+  }, [cropSource]);
+
+  const uploadCroppedAvatar = useCallback(
+    async (blob: Blob, originalName: string) => {
+      setUploadingAvatar(true);
+      try {
+        const fileExt = originalName.split(".").pop()?.toLowerCase() || "jpg";
+        const fileName = `${user.id}/avatar.${fileExt}`;
+        const croppedFile = new File([blob], `avatar.${fileExt}`, { type: blob.type || "image/jpeg" });
+
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(fileName, croppedFile, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("avatars").getPublicUrl(fileName);
+
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
+          .eq("id", user.id);
+
+        if (updateError) throw updateError;
+
+        setAvatarUrl(publicUrl);
+        setMessage({ type: "success", text: "Avatar updated!" });
+        router.refresh();
+      } catch (error) {
+        console.error("Avatar upload error:", error);
+        setMessage({ type: "error", text: "Failed to upload avatar" });
+      } finally {
+        setUploadingAvatar(false);
+      }
+    },
+    [router, supabase, user.id]
+  );
+
+  const handleCropSave = useCallback(
+    async (blob: Blob) => {
+      if (!cropSource) return;
+      await uploadCroppedAvatar(blob, cropSource.file.name);
+      handleCropCancel();
+    },
+    [cropSource, uploadCroppedAvatar, handleCropCancel]
+  );
 
   async function handleSaveProfile() {
     setSaving(true);
@@ -226,7 +278,7 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-900">Profile Photo</p>
-              <p className="text-xs text-gray-500">Click to upload (any size)</p>
+              <p className="text-xs text-gray-500">Click to upload (crop before save)</p>
             </div>
           </div>
 
@@ -294,7 +346,163 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
           </Button>
         </form>
       </Panel>
+      {cropSource && (
+        <AvatarCropModal
+          url={cropSource.url}
+          width={cropSource.width}
+          height={cropSource.height}
+          onCancel={handleCropCancel}
+          onConfirm={handleCropSave}
+          loading={uploadingAvatar}
+        />
+      )}
     </div>
   );
+}
+
+interface AvatarCropModalProps {
+  url: string;
+  width: number;
+  height: number;
+  loading: boolean;
+  onCancel: () => void;
+  onConfirm: (blob: Blob) => Promise<void>;
+}
+
+function AvatarCropModal({ url, width, height, loading, onCancel, onConfirm }: AvatarCropModalProps) {
+  const [zoom, setZoom] = useState(1.2);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragRef.current = { x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    const deltaX = event.clientX - dragRef.current.x;
+    const deltaY = event.clientY - dragRef.current.y;
+    const sensitivity = 220;
+    setOffset((prev) => ({
+      x: clamp(prev.x + deltaX / sensitivity, -1, 1),
+      y: clamp(prev.y + deltaY / sensitivity, -1, 1),
+    }));
+    dragRef.current = { x: event.clientX, y: event.clientY };
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const blob = await generateCroppedBlob(url, width, height, zoom, offset.x, offset.y);
+      await onConfirm(blob);
+    } catch (error) {
+      console.error("Crop error:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={loading ? () => {} : onCancel}>
+      <div className="space-y-4">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-gray-900">Adjust avatar</h3>
+          <p className="text-sm text-gray-500">Drag the image to reposition. Use the slider to zoom.</p>
+        </div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative h-48 w-48 overflow-hidden rounded-full bg-gray-100 shadow-inner border border-gray-200">
+            <div
+              className="absolute inset-0 cursor-grab active:cursor-grabbing"
+              style={{
+                backgroundImage: `url(${url})`,
+                backgroundSize: `${zoom * 100}%`,
+                backgroundPosition: `${50 + offset.x * 50}% ${50 + offset.y * 50}%`,
+                backgroundRepeat: "no-repeat",
+              }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={() => (dragRef.current = null)}
+            />
+          </div>
+          <label className="w-full text-xs uppercase text-gray-400">
+            Zoom
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.01}
+              value={zoom}
+              onChange={(event) => setZoom(Number(event.target.value))}
+              className="w-full mt-1"
+            />
+          </label>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onCancel} disabled={saving || loading}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={saving || loading}>
+            {saving || loading ? "Saving..." : "Save"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function generateCroppedBlob(
+  url: string,
+  width: number,
+  height: number,
+  zoom: number,
+  offsetX: number,
+  offsetY: number
+): Promise<Blob> {
+  return new Promise(async (resolve, reject) => {
+    const image = new window.Image();
+    image.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        const size = 512;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas not supported"));
+          return;
+        }
+
+        const cropWidth = width / zoom;
+        const cropHeight = height / zoom;
+        const maxShiftX = width - cropWidth;
+        const maxShiftY = height - cropHeight;
+        const originX = ((offsetX + 1) / 2) * maxShiftX;
+        const originY = ((offsetY + 1) / 2) * maxShiftY;
+
+        ctx.drawImage(image, originX, originY, cropWidth, cropHeight, 0, 0, size, size);
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Failed to create avatar blob"));
+        }, "image/jpeg", 0.9);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    image.onerror = () => reject(new Error("Failed to load image"));
+    image.src = url;
+  });
 }
 
