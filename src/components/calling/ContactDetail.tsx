@@ -145,7 +145,8 @@ export const ContactDetail = memo(function ContactDetail({
         </div>
 
         <NotesPanel
-          contactId={contact.id}
+          entityId={contact.id}
+          entityType="contact"
           legacyNotes={contact.notes}
           onSaveLegacyNotes={onSaveNotes}
         />

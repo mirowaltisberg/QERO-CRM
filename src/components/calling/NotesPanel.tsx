@@ -5,33 +5,41 @@ import Image from "next/image";
 import { Panel } from "@/components/ui/panel";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type { ContactNote } from "@/lib/types";
+import type { ContactNote, TmaNote } from "@/lib/types";
+
+type NoteType = ContactNote | TmaNote;
 
 interface NotesPanelProps {
-  contactId: string | null;
+  entityId: string | null;
+  entityType: "contact" | "tma";
   legacyNotes?: string | null; // Old single-field notes (for backward compat)
   onSaveLegacyNotes?: (value: string | null) => Promise<void>;
 }
 
 export const NotesPanel = memo(function NotesPanel({
-  contactId,
+  entityId,
+  entityType,
   legacyNotes,
   onSaveLegacyNotes,
 }: NotesPanelProps) {
-  const [notes, setNotes] = useState<ContactNote[]>([]);
+  const [notes, setNotes] = useState<NoteType[]>([]);
   const [newNote, setNewNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch notes when contact changes
+  const apiPath = entityType === "contact" 
+    ? `/api/contacts/${entityId}/notes`
+    : `/api/tma/${entityId}/notes`;
+
+  // Fetch notes when entity changes
   useEffect(() => {
-    if (!contactId) {
+    if (!entityId) {
       setNotes([]);
       return;
     }
 
     setLoading(true);
-    fetch(`/api/contacts/${contactId}/notes`)
+    fetch(apiPath)
       .then((res) => res.json())
       .then((data) => {
         if (data.data) {
@@ -40,14 +48,14 @@ export const NotesPanel = memo(function NotesPanel({
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [contactId]);
+  }, [entityId, apiPath]);
 
   const handleSubmit = useCallback(async () => {
-    if (!contactId || !newNote.trim()) return;
+    if (!entityId || !newNote.trim()) return;
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/contacts/${contactId}/notes`, {
+      const res = await fetch(apiPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: newNote.trim() }),
@@ -68,7 +76,7 @@ export const NotesPanel = memo(function NotesPanel({
     } finally {
       setSubmitting(false);
     }
-  }, [contactId, newNote]);
+  }, [entityId, newNote, apiPath]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -80,7 +88,7 @@ export const NotesPanel = memo(function NotesPanel({
     [handleSubmit]
   );
 
-  if (!contactId) {
+  if (!entityId) {
     return null;
   }
 
@@ -135,7 +143,7 @@ export const NotesPanel = memo(function NotesPanel({
   );
 });
 
-const NoteCard = memo(function NoteCard({ note }: { note: ContactNote }) {
+const NoteCard = memo(function NoteCard({ note }: { note: NoteType }) {
   const author = note.author;
   const initials = author?.full_name
     ?.split(" ")

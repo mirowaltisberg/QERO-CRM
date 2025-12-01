@@ -92,6 +92,23 @@ export interface ContactNote {
 }
 
 /**
+ * TMA Note - Individual note with author attribution for TMA candidates
+ */
+export interface TmaNote {
+  id: string;
+  tma_id: string;
+  author_id: string;
+  content: string;
+  created_at: string;
+  // Joined from profiles
+  author?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  };
+}
+
+/**
  * List - A named collection of contacts
  */
 export interface List {

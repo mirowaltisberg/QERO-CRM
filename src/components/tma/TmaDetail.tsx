@@ -8,6 +8,7 @@ import { CantonTag } from "@/components/ui/CantonTag";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { NotesPanel } from "@/components/calling/NotesPanel";
 import type { TmaCandidate } from "@/lib/types";
 import { TMA_STATUS_LIST, TMA_STATUS_LABELS, TMA_STATUS_STYLES, type TmaStatus } from "@/lib/utils/constants";
 import { createClient } from "@/lib/supabase/client";
@@ -35,7 +36,6 @@ export function TmaDetail({
   onUpdatePosition,
 }: Props) {
   const initialFollowUpDate = candidate?.follow_up_at ? new Date(candidate.follow_up_at) : null;
-  const [notes, setNotes] = useState(() => candidate?.notes ?? "");
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [followUpDate, setFollowUpDate] = useState(
     initialFollowUpDate ? initialFollowUpDate.toISOString().slice(0, 10) : getTomorrowISO()
@@ -52,11 +52,6 @@ export function TmaDetail({
     if (trimmed === (candidate.position_title?.trim() ?? "")) return;
     await onUpdatePosition(trimmed.length ? trimmed : null);
   }, [candidate, onUpdatePosition, position]);
-
-
-  const handleNotesSave = async (value: string) => {
-    await onUpdateNotes(value.trim().length ? value : null);
-  };
 
   const handleQuickFollowUp = async () => {
     if (!candidate) return;
@@ -172,16 +167,12 @@ export function TmaDetail({
 
       <div className="grid flex-1 gap-6 px-6 py-6 md:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex h-full flex-col gap-6">
-          <Panel title="Notes" description="Autosaves automatically" className="flex-1">
-            <Textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              onAutoSave={handleNotesSave}
-              autosaveDelay={800}
-              placeholder="Interview notes, preferences, availability..."
-              className="min-h-[420px]"
-            />
-          </Panel>
+          <NotesPanel
+            entityId={candidate.id}
+            entityType="tma"
+            legacyNotes={candidate.notes}
+            onSaveLegacyNotes={onUpdateNotes}
+          />
         </div>
 
         <div className="flex flex-col gap-6">
