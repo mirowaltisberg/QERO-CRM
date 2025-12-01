@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
+import { Button } from "@/components/ui/button";
 
 interface SidebarProps {
   user?: {
@@ -47,6 +49,19 @@ const navigation = [
 
 export function Sidebar({ user, profile }: SidebarProps) {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("qero-sidebar-collapsed") === "true";
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("qero-sidebar-collapsed", String(!prev));
+      }
+      return !prev;
+    });
+  };
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || "User";
   const avatarUrl = profile?.avatar_url;
@@ -58,22 +73,30 @@ export function Sidebar({ user, profile }: SidebarProps) {
     .slice(0, 2);
 
   return (
-    <aside className="w-56 h-full border-r border-border bg-gray-50 flex flex-col">
+    <aside
+      className={cn(
+        "h-full border-r border-border bg-gray-50 flex flex-col transition-[width] duration-200 ease-out",
+        collapsed ? "w-16" : "w-56"
+      )}
+    >
       {/* Logo */}
-      <div className="h-16 flex items-center px-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          <Image
-            src="/qero-logo.svg"
-            alt="QERO"
-            width={132}
-            height={44}
-            priority
-            className="h-10 w-auto"
-          />
-          <span className="text-[11px] uppercase tracking-wide text-gray-400 hidden sm:block">
-            Minimal Cold Calling CRM
-          </span>
+      <div className="h-16 flex items-center px-3 border-b border-border justify-between">
+        <div className="flex items-center gap-2 overflow-hidden">
+          <Image src="/qero-logo.svg" alt="QERO" width={collapsed ? 32 : 132} height={44} priority className="h-10 w-auto" />
+          {!collapsed && (
+            <span className="text-[11px] uppercase tracking-wide text-gray-400 hidden lg:block">
+              Minimal Cold Calling CRM
+            </span>
+          )}
         </div>
+        <Button
+          variant="ghost"
+          className="h-7 w-7 p-0 text-gray-500 hover:text-gray-900"
+          onClick={toggleCollapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <ChevronIcon collapsed={collapsed} />
+        </Button>
       </div>
 
       {/* Navigation */}
@@ -89,15 +112,16 @@ export function Sidebar({ user, profile }: SidebarProps) {
                   href={item.href}
                   prefetch={true}
                   className={cn(
-                    "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors duration-100",
+                    "group flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors duration-100",
                     isActive
                       ? "bg-white text-gray-900 shadow-sm border border-border"
                       : "text-gray-600 hover:bg-white hover:text-gray-900"
                   )}
+                  title={collapsed ? `${item.name} (${item.shortcut})` : undefined}
                 >
-                  <item.icon className="w-4 h-4" />
-                  <span className="flex-1">{item.name}</span>
-                  {!isActive && (
+                  <item.icon className="w-4 h-4 shrink-0" />
+                  {!collapsed && <span className="flex-1 whitespace-nowrap">{item.name}</span>}
+                  {!collapsed && !isActive && (
                     <span className="text-xs text-gray-400 hidden group-hover:block">
                       {item.shortcut}
                     </span>
@@ -138,25 +162,51 @@ export function Sidebar({ user, profile }: SidebarProps) {
                 </div>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="truncate font-medium text-gray-900">{displayName}</p>
-              <p className="truncate text-xs text-gray-500">{user.email}</p>
-            </div>
-            <SettingsIcon className="h-4 w-4 text-gray-400" />
+            {!collapsed && (
+              <>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate font-medium text-gray-900">{displayName}</p>
+                  <p className="truncate text-xs text-gray-500">{user.email}</p>
+                </div>
+                <SettingsIcon className="h-4 w-4 text-gray-400" />
+              </>
+            )}
           </Link>
         </div>
       )}
 
       {/* Keyboard hints */}
       <div className="p-4 border-t border-border">
-        <div className="text-xs text-gray-400 space-y-1">
-          <div className="flex items-center justify-between">
-            <span>Command palette</span>
+        {!collapsed ? (
+          <div className="text-xs text-gray-400 space-y-1">
+            <div className="flex items-center justify-between">
+              <span>Command palette</span>
+              <kbd className="kbd">Q</kbd>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center text-xs text-gray-400">
             <kbd className="kbd">Q</kbd>
           </div>
-        </div>
+        )}
       </div>
     </aside>
+  );
+}
+
+function ChevronIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={cn("h-4 w-4 transition-transform duration-200", collapsed ? "rotate-180" : "rotate-0")}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M15 19l-7-7 7-7" />
+    </svg>
   );
 }
 

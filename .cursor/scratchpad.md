@@ -327,6 +327,29 @@ User still sees Follow-up/Status/Documents stacked beneath Notes on production e
    - After fix/caching strategy, redeploy to Vercel prod and alias as usual.
    - Ask user to hard refresh again; if still mismatched, prepare plan for deeper cache purge (e.g., `vercel rm` + redeploy) or rename component chunk to break cache.
 
+#### Plan (Dec 2 – Foldable Sidebar Nav)
+User wants the main nav stack (`Calling`, `Companies`, `TMA`, `Dashboard`) to be collapsible/foldable so the content canvas gains horizontal room. Implementation plan:
+
+1. **Current Layout Audit**
+   - Inspect `src/components/layout/Sidebar.tsx` (and any related layout wrappers) to see how `<nav className="flex-1 p-2">…</nav>` is rendered, what state/props it uses, and how it affects routing.
+   - Success: Document existing structure + ensure folding won’t break keyboard shortcuts or selection highlighting.
+
+2. **Interaction Design**
+   - Decide on the fold trigger (e.g., chevron button near sidebar top). When folded, show compact icons or hide nav entirely while keeping hover tooltip; when expanded, restore full text labels.
+   - Define animation (simple width transition) and persistence (store preference in `localStorage` or `useState` with default expanded).
+
+3. **Implementation Steps**
+   - Add `useState` (and `useEffect` for persistence) in `Sidebar` to track `isCollapsed`.
+   - Apply conditional classes: collapsed width (e.g., `w-16`) vs expanded (`w-64`), adjust nav items to show icon-only vs icon+label.
+   - Ensure `<nav className="flex-1 p-2">…</nav>` becomes a container that can hide text while keeping accessibility (aria-labels/tooltips).
+   - Update layout wrapper (`src/app/layout.tsx`) if necessary to accommodate the new sidebar widths without layout shift.
+   - Success: Sidebar can toggle between collapsed/expanded smoothly, nav links remain functional, keyboard navigation unaffected.
+
+4. **QA & Deployment**
+   - Run `npm run lint` + `npm run build`.
+   - Manually verify in browser (dev server) that collapsing frees visible space and persists after reload.
+   - Deploy to Vercel prod + alias once confirmed.
+
 ## Phase 5: Performance & Native Feel
 
 **Task 14: Profiling & Baseline Metrics**
@@ -447,6 +470,7 @@ User still sees Follow-up/Status/Documents stacked beneath Notes on production e
 - Executor note (Dec 1 PM): User wants both company and TMA imports to default to no status (“nothing”) plus fix TMA detail scrolling so notes are reachable; implementation underway as part of Task 20.
 - Executor note (Dec 1 Eve): Status defaults cleared (DB + importers + UI), follow-up reset flow updated, and TMA detail/list/importer now support empty labels, document uploads, and scrollable notes panel.
 - Executor note (Dec 2 AM): Verified `TmaDetail` still relied on `lg` breakpoint for two-column layout; bumped breakpoint down to `md` so Follow-up/Status/Documents stay in the right rail on standard laptop widths. Built + linted to confirm.
+- Executor note (Dec 2 Midday): Sidebar now collapses to icon rail with persistent toggle + localStorage state, freeing horizontal space as requested. Lint/build clean; ready for deploy.
 
 ---
 
