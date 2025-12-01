@@ -118,30 +118,37 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
     row["Kurzprofil"] ||
     row["Profil"];
   const city =
+    row["Ort geschäftlich"] ||
+    row["Ort geschaeftlich"] ||
+    row["Ort (geschäftlich)"] ||
+    row["Ort privat"] ||
+    row["Ort (privat)"] ||
     row["Ort"] ||
     row["Wohnort"] ||
     row["Stadt"] ||
     row["City"] ||
-    row["Ort (privat)"] ||
-    row["Wohnort (privat)"] ||
-    row["Ort geschäftlich"] ||
-    row["Ort geschaeftlich"] ||
     row["Region privat"];
   const street =
+    row["Straße geschäftlich"] ||
+    row["Strasse geschäftlich"] ||
+    row["Straße privat"] ||
+    row["Strasse privat"] ||
+    row["Straße"] ||
+    row["Strasse"] ||
     row["Adresse"] ||
     row["Adresse (privat)"] ||
     row["Adresse (geschäftlich)"] ||
-    row["Strasse"] ||
-    row["Straße"] ||
     row["Street"] ||
     row["Address"];
   const postalCode =
+    row["Postleitzahl geschäftlich"] ||
+    row["Postleitzahl privat"] ||
+    row["PLZ (geschäftlich)"] ||
+    row["PLZ (privat)"] ||
     row["PLZ"] ||
     row["Postleitzahl"] ||
     row["Zip"] ||
-    row["Postal Code"] ||
-    row["PLZ (privat)"] ||
-    row["PLZ (geschäftlich)"];
+    row["Postal Code"];
 
   return {
     first_name: firstName,
