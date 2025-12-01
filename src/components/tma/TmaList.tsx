@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import Image from "next/image";
 import type { TmaCandidate } from "@/lib/types";
 import { Tag } from "@/components/ui/tag";
 import { CantonTag } from "@/components/ui/CantonTag";
@@ -31,13 +32,35 @@ export const TmaList = memo(function TmaList({ candidates, activeId, onSelect }:
                 isActive ? "border-gray-200 bg-white shadow" : "border-transparent bg-white/70 hover:border-gray-200",
               ].join(" ")}
             >
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-900">
-                  {candidate.first_name} {candidate.last_name}
-                </p>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  {candidate.claimer ? (
+                    <div className="h-6 w-6 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
+                      {candidate.claimer.avatar_url ? (
+                        <Image
+                          src={candidate.claimer.avatar_url}
+                          alt={candidate.claimer.full_name || "Claimer"}
+                          width={24}
+                          height={24}
+                          unoptimized
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-gray-500">
+                          {candidate.claimer.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "??"}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="h-6 w-6 flex-shrink-0 rounded-full border-2 border-dashed border-orange-300 bg-orange-50" title="Unclaimed" />
+                  )}
+                  <p className="text-sm font-semibold text-gray-900 truncate">
+                    {candidate.first_name} {candidate.last_name}
+                  </p>
+                </div>
                 <Tag
                   status={undefined}
-                  className="bg-gray-100 text-gray-500 border-gray-200"
+                  className="bg-gray-100 text-gray-500 border-gray-200 flex-shrink-0"
                   style={
                     candidate.status
                       ? {
