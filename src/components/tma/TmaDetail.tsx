@@ -170,7 +170,7 @@ export function TmaDetail({
         </div>
       </div>
 
-      <div className="grid flex-1 gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid flex-1 gap-6 px-6 py-6 md:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex h-full flex-col gap-6">
           <Panel title="Notes" description="Autosaves automatically" className="flex-1">
             <Textarea

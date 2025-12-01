@@ -304,6 +304,29 @@
    - Follow-up and documents remain accessible but secondary.
    - CSV importer is reachable via the new action menu without occupying constant space.
 
+#### Action Plan (Dec 2 – TMA Layout Mismatch)
+User still sees Follow-up/Status/Documents stacked beneath Notes on production even after redeploying the right-rail layout. Need to verify whether the build is serving stale assets or if the component reverted unintentionally.
+
+1. **Diagnose Layout Source of Truth**
+   - Inspect `main` HEAD locally and confirm `TmaDetail` template uses the intended grid with right column (check git log + file contents).
+   - Pull latest from origin to detect any intervening commits (e.g., user revert). Success: local diff shows expected layout; otherwise align with user.
+
+2. **Confirm Build Artifact**
+   - Run `npm run build` and inspect `.next/server/app/tma/page.js` (or use `next dev`) to ensure generated markup matches local source.
+   - If correct, issue may be caching/CDN—plan to purge Vercel cache or bump versioned asset (e.g., add query param or re-deploy with `--force`). Success: identify whether bundle mismatch vs code mismatch.
+
+3. **Browser Verification**
+   - Start local dev server, navigate to `/tma`, and verify UI behavior manually (notes height, side panels). Capture screenshot for comparison.
+   - If local matches expectation but prod does not, consider enabling `vercel deploy --prebuilt` to ensure latest build or add log statement to confirm runtime version.
+
+4. **Fallback Implementation**
+   - If production build still shows center column after redeploy, refactor layout CSS to use more explicit structure (e.g., wrapping left column content with `flex-1` and right column `w-[340px]`). Possibly rename classes to avoid stale CSS caches.
+   - Add small visual marker (version tag) temporarily so user can confirm they see new code; remove after verification.
+
+5. **Deployment & Validation**
+   - After fix/caching strategy, redeploy to Vercel prod and alias as usual.
+   - Ask user to hard refresh again; if still mismatched, prepare plan for deeper cache purge (e.g., `vercel rm` + redeploy) or rename component chunk to break cache.
+
 ## Phase 5: Performance & Native Feel
 
 **Task 14: Profiling & Baseline Metrics**
@@ -423,6 +446,7 @@
 - Task 20 scoped: TMA (talent) mode will mirror company CRM with separate data model, CSV import, doc uploads, and candidate-specific labels (A/B/C) + canton filters + follow-ups.
 - Executor note (Dec 1 PM): User wants both company and TMA imports to default to no status (“nothing”) plus fix TMA detail scrolling so notes are reachable; implementation underway as part of Task 20.
 - Executor note (Dec 1 Eve): Status defaults cleared (DB + importers + UI), follow-up reset flow updated, and TMA detail/list/importer now support empty labels, document uploads, and scrollable notes panel.
+- Executor note (Dec 2 AM): Verified `TmaDetail` still relied on `lg` breakpoint for two-column layout; bumped breakpoint down to `md` so Follow-up/Status/Documents stay in the right rail on standard laptop widths. Built + linted to confirm.
 
 ---
 
