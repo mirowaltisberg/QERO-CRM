@@ -134,7 +134,7 @@ export function TmaDetail({
   return (
     <section className="flex h-full flex-col overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
+        <div className="min-w-0">
           {/* Claimed status */}
           <div className="flex items-center gap-2 mb-1">
             {claimer ? (
@@ -202,6 +202,17 @@ export function TmaDetail({
             )}
             {candidate.canton && <CantonTag canton={candidate.canton} size="md" />}
           </div>
+          {(candidate.city || candidate.postal_code || candidate.street) && (
+            <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+              {(candidate.city || candidate.postal_code) && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  <span className="text-gray-400">📍</span>
+                  {[candidate.postal_code, candidate.city].filter(Boolean).join(" ")}
+                </span>
+              )}
+              {candidate.street && <span className="text-gray-600">{candidate.street}</span>}
+            </div>
+          )}
           <div className="mt-3 max-w-sm">
             <label className="text-xs uppercase text-gray-400">Role / Position</label>
             <Input

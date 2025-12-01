@@ -53,6 +53,9 @@ export interface TmaCandidate {
   canton: string | null;
   status: TmaStatus | null; // Quality: A (Top), B (Ok), C (Flop)
   activity: TmaActivity | null; // Activity: active, inactive
+  city: string | null;
+  street: string | null;
+  postal_code: string | null;
   position_title: string | null;
   notes: string | null;
   follow_up_at: string | null;

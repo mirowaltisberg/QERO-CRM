@@ -117,6 +117,31 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
     row["Short-Profile"] ||
     row["Kurzprofil"] ||
     row["Profil"];
+  const city =
+    row["Ort"] ||
+    row["Wohnort"] ||
+    row["Stadt"] ||
+    row["City"] ||
+    row["Ort (privat)"] ||
+    row["Wohnort (privat)"] ||
+    row["Ort geschäftlich"] ||
+    row["Ort geschaeftlich"] ||
+    row["Region privat"];
+  const street =
+    row["Adresse"] ||
+    row["Adresse (privat)"] ||
+    row["Adresse (geschäftlich)"] ||
+    row["Strasse"] ||
+    row["Straße"] ||
+    row["Street"] ||
+    row["Address"];
+  const postalCode =
+    row["PLZ"] ||
+    row["Postleitzahl"] ||
+    row["Zip"] ||
+    row["Postal Code"] ||
+    row["PLZ (privat)"] ||
+    row["PLZ (geschäftlich)"];
 
   return {
     first_name: firstName,
@@ -124,6 +149,9 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
     phone: (row["Telefon"] || row["Phone"] || "").trim() || null,
     email: (row["Email"] || row["E-Mail"] || "").trim() || null,
     canton: formatCanton(cantonSource),
+    city: city?.trim() || null,
+    street: street?.trim() || null,
+    postal_code: postalCode?.trim() || null,
     position_title: position?.trim() || null,
     short_profile_url: shortProfile?.trim() || null,
     status,

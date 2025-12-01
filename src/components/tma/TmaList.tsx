@@ -99,24 +99,31 @@ export const TmaList = memo(function TmaList({
                 </Tag>
               </div>
               <div className="mt-1 flex items-center justify-between text-xs text-gray-500 gap-2">
-                <div className="flex items-center gap-2 truncate">
-                  <p className="truncate">
+                <div className="flex flex-col gap-1 truncate">
+                  <p className="truncate text-gray-600">
                     {candidate.position_title?.trim() ||
                       candidate.email ||
                       "No details"}
                   </p>
-                  {candidate.activity && (
-                    <span
-                      className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                      style={{
-                        backgroundColor: `${TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].bg}20`,
-                        color: TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].text,
-                        borderColor: `${TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].border}40`,
-                      }}
-                    >
-                      {TMA_ACTIVITY_LABELS[candidate.activity as TmaActivity]}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                    {candidate.city && (
+                      <span className="font-medium text-gray-700 truncate">
+                        {candidate.postal_code ? `${candidate.postal_code} ${candidate.city}` : candidate.city}
+                      </span>
+                    )}
+                    {candidate.activity && (
+                      <span
+                        className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                        style={{
+                          backgroundColor: `${TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].bg}20`,
+                          color: TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].text,
+                          borderColor: `${TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].border}40`,
+                        }}
+                      >
+                        {TMA_ACTIVITY_LABELS[candidate.activity as TmaActivity]}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <CantonTag canton={candidate.canton} size="md" />
               </div>
