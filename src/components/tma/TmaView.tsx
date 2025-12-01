@@ -35,6 +35,8 @@ export function TmaView({ initialCandidates }: Props) {
     cantonFilter,
     sortOption,
     setSortOption,
+    searchQuery,
+    setSearchQuery,
   } = useTmaCandidates({ initialCandidates });
   const [importOpen, setImportOpen] = useState(false);
 
@@ -52,7 +54,13 @@ export function TmaView({ initialCandidates }: Props) {
 
   return (
     <div className="flex h-full">
-      <TmaList candidates={candidates} activeId={activeCandidate?.id ?? null} onSelect={selectCandidate} />
+      <TmaList 
+        candidates={candidates} 
+        activeId={activeCandidate?.id ?? null} 
+        onSelect={selectCandidate}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
       <div className="flex flex-1 flex-col overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-3">
           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">

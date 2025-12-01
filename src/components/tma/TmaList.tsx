@@ -11,14 +11,31 @@ interface Props {
   candidates: TmaCandidate[];
   activeId: string | null;
   onSelect: (id: string) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
-export const TmaList = memo(function TmaList({ candidates, activeId, onSelect }: Props) {
+export const TmaList = memo(function TmaList({ 
+  candidates, 
+  activeId, 
+  onSelect,
+  searchQuery,
+  onSearchChange,
+}: Props) {
   return (
     <aside className="flex h-full w-80 flex-col border-r border-gray-200 bg-gray-50">
       <header className="border-b border-gray-200 px-4 py-3">
         <p className="text-xs uppercase tracking-wide text-gray-400">TMA</p>
         <p className="text-sm font-semibold text-gray-900">{candidates.length} candidates</p>
+        <div className="mt-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search candidates..."
+            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0"
+          />
+        </div>
       </header>
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {candidates.map((candidate) => {

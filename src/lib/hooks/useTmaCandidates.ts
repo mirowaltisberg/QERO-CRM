@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TmaCandidate } from "@/lib/types";
 import type { TmaStatus } from "@/lib/utils/constants";
+import { createClient } from "@/lib/supabase/client";
 
 interface UseTmaCandidatesOptions {
   initialCandidates?: TmaCandidate[];
@@ -21,14 +22,81 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   const [cantonFilter, setCantonFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TmaStatus | "all">("all");
   const [sortOption, setSortOption] = useState<"recent" | "oldest" | "name">("recent");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Realtime subscription
+  useEffect(() => {
+    const supabase = createClient();
+    
+    const channel = supabase
+      .channel("tma_changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "tma_candidates",
+        },
+        async (payload) => {
+          if (payload.eventType === "INSERT") {
+            // Fetch the new candidate with claimer info
+            const { data } = await supabase
+              .from("tma_candidates")
+              .select(`*, claimer:profiles!claimed_by(id, full_name, avatar_url)`)
+              .eq("id", payload.new.id)
+              .single();
+            if (data) {
+              setCandidates((prev) => [data, ...prev]);
+            }
+          } else if (payload.eventType === "UPDATE") {
+            // Fetch the updated candidate with claimer info
+            const { data } = await supabase
+              .from("tma_candidates")
+              .select(`*, claimer:profiles!claimed_by(id, full_name, avatar_url)`)
+              .eq("id", payload.new.id)
+              .single();
+            if (data) {
+              setCandidates((prev) =>
+                prev.map((c) => (c.id === data.id ? data : c))
+              );
+            }
+          } else if (payload.eventType === "DELETE") {
+            setCandidates((prev) =>
+              prev.filter((c) => c.id !== payload.old.id)
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const filteredCandidates = useMemo(() => {
     return candidates.filter((candidate) => {
       if (statusFilter !== "all" && candidate.status !== statusFilter) return false;
       if (cantonFilter && candidate.canton !== cantonFilter) return false;
+      
+      // Search filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const searchableFields = [
+          candidate.first_name,
+          candidate.last_name,
+          candidate.email,
+          candidate.phone,
+          candidate.position_title,
+          candidate.canton,
+        ].filter(Boolean).join(" ").toLowerCase();
+        
+        if (!searchableFields.includes(query)) return false;
+      }
+      
       return true;
     });
-  }, [candidates, cantonFilter, statusFilter]);
+  }, [candidates, cantonFilter, statusFilter, searchQuery]);
 
   const availableCantons = useMemo(() => {
     return Array.from(
@@ -223,6 +291,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     error,
     cantonFilter,
     statusFilter,
+    searchQuery,
     selectCandidate,
     refreshCandidates,
     updateStatus,
@@ -234,6 +303,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     setCantonFilter,
     clearCantonFilter: () => setCantonFilter(null),
     setStatusFilter,
+    setSearchQuery,
     availableCantons,
     sortOption,
     setSortOption,
