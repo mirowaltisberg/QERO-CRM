@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TmaCandidate } from "@/lib/types";
 import type { TmaStatus } from "@/lib/utils/constants";
-import { createClient } from "@/lib/supabase/client";
 
 interface UseTmaCandidatesOptions {
   initialCandidates?: TmaCandidate[];
@@ -24,54 +23,8 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   const [sortOption, setSortOption] = useState<"recent" | "oldest" | "name">("recent");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Realtime subscription + polling fallback
+  // Auto-refresh every 5 seconds to keep data in sync across users
   useEffect(() => {
-    const supabase = createClient();
-    
-    // Set up realtime subscription
-    const channel = supabase
-      .channel("tma_changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "tma_candidates",
-        },
-        async (payload) => {
-          console.log("Realtime event received:", payload.eventType);
-          if (payload.eventType === "INSERT") {
-            const { data } = await supabase
-              .from("tma_candidates")
-              .select(`*, claimer:profiles!claimed_by(id, full_name, avatar_url)`)
-              .eq("id", payload.new.id)
-              .single();
-            if (data) {
-              setCandidates((prev) => [data, ...prev]);
-            }
-          } else if (payload.eventType === "UPDATE") {
-            const { data } = await supabase
-              .from("tma_candidates")
-              .select(`*, claimer:profiles!claimed_by(id, full_name, avatar_url)`)
-              .eq("id", payload.new.id)
-              .single();
-            if (data) {
-              setCandidates((prev) =>
-                prev.map((c) => (c.id === data.id ? data : c))
-              );
-            }
-          } else if (payload.eventType === "DELETE") {
-            setCandidates((prev) =>
-              prev.filter((c) => c.id !== payload.old.id)
-            );
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log("Realtime subscription status:", status);
-      });
-
-    // Polling fallback - refresh every 10 seconds
     const pollInterval = setInterval(async () => {
       try {
         const response = await fetch("/api/tma");
@@ -80,12 +33,11 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
           setCandidates(json.data);
         }
       } catch (err) {
-        console.error("Polling error:", err);
+        // Silently fail - will retry on next interval
       }
-    }, 10000); // 10 seconds
+    }, 5000); // 5 seconds
 
     return () => {
-      supabase.removeChannel(channel);
       clearInterval(pollInterval);
     };
   }, []);
