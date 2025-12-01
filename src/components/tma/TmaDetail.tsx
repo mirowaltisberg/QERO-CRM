@@ -120,7 +120,7 @@ export function TmaDetail({
     .slice(0, 2) || "??";
 
   return (
-    <section className="flex h-full flex-col overflow-y-auto">
+    <section className="flex h-full flex-col overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
           {/* Claimed status */}
@@ -229,8 +229,8 @@ export function TmaDetail({
         </div>
       </div>
 
-      <div className="grid flex-1 gap-6 px-6 py-6 md:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex h-full flex-col gap-6">
+      <div className="grid flex-1 gap-6 px-6 py-6 md:grid-cols-[minmax(0,1fr)_320px] overflow-hidden min-h-0">
+        <div className="flex h-full flex-col gap-6 overflow-hidden min-h-0">
           <NotesPanel
             entityId={candidate.id}
             entityType="tma"

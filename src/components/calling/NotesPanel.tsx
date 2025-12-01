@@ -93,9 +93,9 @@ export const NotesPanel = memo(function NotesPanel({
   }
 
   return (
-    <Panel title="Notes" description="Team notes with attribution" className="flex-1 flex flex-col">
+    <Panel title="Notes" description="Team notes with attribution" className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* New note input */}
-      <div className="mb-4">
+      <div className="mb-4 flex-shrink-0">
         <Textarea
           value={newNote}
           onChange={(e) => setNewNote(e.target.value)}
@@ -114,8 +114,8 @@ export const NotesPanel = memo(function NotesPanel({
         </div>
       </div>
 
-      {/* Notes list */}
-      <div className="flex-1 overflow-y-auto space-y-3">
+      {/* Notes list - scrollable */}
+      <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
         {loading ? (
           <p className="text-sm text-gray-400">Loading notes...</p>
         ) : notes.length === 0 ? (

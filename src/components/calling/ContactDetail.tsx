@@ -62,7 +62,7 @@ export const ContactDetail = memo(function ContactDetail({
 
   return (
     <>
-      <section className="flex flex-1 flex-col gap-4 p-6">
+      <section className="flex flex-1 flex-col gap-4 p-6 overflow-hidden">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-400">Now calling</p>
