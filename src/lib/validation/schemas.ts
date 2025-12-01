@@ -32,6 +32,7 @@ const baseContactSchema = z.object({
   follow_up_at: z.string().datetime().optional().nullable(),
   follow_up_note: optionalTextSchema,
   notes: optionalTextSchema,
+  team_id: z.string().uuid().optional().nullable(),
 });
 
 export const ContactCreateSchema = baseContactSchema.extend({
@@ -78,6 +79,7 @@ const tmaBaseSchema = z.object({
   cv_url: z.string().url().optional().nullable(),
   references_url: z.string().url().optional().nullable(),
   short_profile_url: z.string().url().optional().nullable(),
+  team_id: z.string().uuid().optional().nullable(),
 });
 
 export const TmaCreateSchema = tmaBaseSchema.extend({

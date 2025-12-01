@@ -35,11 +35,12 @@ CREATE INDEX IF NOT EXISTS idx_profiles_id ON profiles(id);
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, phone)
+  INSERT INTO public.profiles (id, full_name, phone, team_id)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
-    COALESCE(NEW.raw_user_meta_data->>'phone', '')
+    COALESCE(NEW.raw_user_meta_data->>'phone', ''),
+    (NEW.raw_user_meta_data->>'team_id')::UUID
   );
   RETURN NEW;
 END;

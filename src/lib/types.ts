@@ -6,6 +6,26 @@
 import type { ContactStatus, CallOutcome, TmaStatus } from "./utils/constants";
 
 /**
+ * Organization - Top-level entity
+ */
+export interface Organization {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+/**
+ * Team - Industry vertical (Elektro, Holz, Gartenbau, etc.)
+ */
+export interface Team {
+  id: string;
+  organization_id: string;
+  name: string;
+  color: string | null;
+  created_at: string;
+}
+
+/**
  * Contact - A person/company to call
  */
 export interface Contact {
@@ -20,6 +40,7 @@ export interface Contact {
   follow_up_note: string | null;
   last_call: string | null; // ISO timestamp
   notes: string | null;
+  team_id: string | null; // Which industry vertical this contact belongs to
   created_at: string; // ISO timestamp
 }
 
@@ -38,6 +59,7 @@ export interface TmaCandidate {
   cv_url: string | null;
   references_url: string | null;
   short_profile_url: string | null;
+  team_id: string | null; // Which industry vertical this candidate belongs to
   created_at: string;
 }
 

@@ -29,6 +29,7 @@ const RegisterSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   fullName: z.string().min(2, "Full name is required"),
   phone: phoneSchema,
+  teamId: z.string().uuid("Please select a valid team"),
 });
 
 const LoginSchema = z.object({
@@ -47,6 +48,7 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
     password: formData.get("password") as string,
     fullName: formData.get("fullName") as string,
     phone: formData.get("phone") as string,
+    teamId: formData.get("teamId") as string,
   };
 
   const parsed = RegisterSchema.safeParse(rawData);
@@ -67,6 +69,7 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
       data: {
         full_name: parsed.data.fullName,
         phone: parsed.data.phone,
+        team_id: parsed.data.teamId,
       },
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://qero-crm.vercel.app"}/auth/callback`,
     },
@@ -80,6 +83,21 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
   }
 
   return { success: true };
+}
+
+export async function getTeams(): Promise<Array<{ id: string; name: string; color: string | null }>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("teams")
+    .select("id, name, color")
+    .order("name");
+
+  if (error) {
+    console.error("Error fetching teams:", error);
+    return [];
+  }
+
+  return data || [];
 }
 
 export async function signIn(formData: FormData): Promise<AuthResult> {
@@ -174,7 +192,10 @@ export async function getProfile() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("*")
+    .select(`
+      *,
+      team:teams(id, name, color)
+    `)
     .eq("id", user.id)
     .single();
 

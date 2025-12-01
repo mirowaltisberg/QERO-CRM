@@ -727,6 +727,152 @@ Reviewed original requirements against plan. Changes made:
 
 ---
 
+### Task 22: Multi-Team Architecture by Industry Vertical (Future)
+
+**Background / Goal**
+- QERO supports multiple **teams** organized by **industry vertical** (the type of companies they call).
+- Current verticals: **Holz**, **Metall/Plattenleger**, **Gartenbau**, **Sanitär Heizung**, **Elektro**
+- Each team member sees the same companies within their vertical and shares notes with teammates.
+- Notes display author attribution (avatar + name) so everyone knows who wrote what.
+- During registration, users select which team/vertical they belong to.
+
+**Core Concepts**
+| Entity | Description | Example |
+|--------|-------------|---------|
+| **Organization** | Top-level company | "QERO AG" |
+| **Team** | Industry vertical / department | "Elektro", "Gartenbau", "Holz" |
+| **User (Profile)** | Belongs to one team; notes attributed to them | Miro (Elektro team) |
+| **Contact** | A company being called; belongs to one team | "Müller Elektro AG" → Elektro team |
+
+**Data Model Changes**
+
+```sql
+-- Organizations (top-level, for future multi-org support)
+CREATE TABLE organizations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Teams (industry verticals)
+CREATE TABLE teams (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,           -- e.g., "Elektro", "Gartenbau", "Holz"
+  color TEXT,                   -- Optional color for UI badge
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Seed initial teams
+INSERT INTO teams (organization_id, name, color) VALUES
+  ('<org_id>', 'Holz', '#8B4513'),
+  ('<org_id>', 'Metall/Plattenleger', '#708090'),
+  ('<org_id>', 'Gartenbau', '#228B22'),
+  ('<org_id>', 'Sanitär Heizung', '#4169E1'),
+  ('<org_id>', 'Elektro', '#FFD700');
+
+-- Update profiles to belong to a team
+ALTER TABLE profiles ADD COLUMN team_id UUID REFERENCES teams(id) ON DELETE SET NULL;
+
+-- Update contacts to belong to a team (each company is assigned to one vertical)
+ALTER TABLE contacts ADD COLUMN team_id UUID REFERENCES teams(id) ON DELETE SET NULL;
+
+-- Contact notes (replaces single notes field, enables multi-author attribution)
+CREATE TABLE contact_notes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_contact_notes_contact ON contact_notes(contact_id);
+CREATE INDEX idx_contact_notes_author ON contact_notes(author_id);
+CREATE INDEX idx_contact_notes_created ON contact_notes(created_at DESC);
+
+-- Same for TMA candidates (if they're also team-scoped)
+ALTER TABLE tma_candidates ADD COLUMN team_id UUID REFERENCES teams(id) ON DELETE SET NULL;
+
+CREATE TABLE tma_notes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  candidate_id UUID NOT NULL REFERENCES tma_candidates(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS policies
+-- Contacts: users can only see contacts in their team
+CREATE POLICY "Team members can view team contacts" ON contacts
+  FOR SELECT USING (
+    team_id = (SELECT team_id FROM profiles WHERE id = auth.uid())
+  );
+
+CREATE POLICY "Team members can update team contacts" ON contacts
+  FOR UPDATE USING (
+    team_id = (SELECT team_id FROM profiles WHERE id = auth.uid())
+  );
+
+-- Notes: users can view notes on contacts they have access to
+CREATE POLICY "Team members can view contact notes" ON contact_notes
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM contacts c
+      WHERE c.id = contact_notes.contact_id
+        AND c.team_id = (SELECT team_id FROM profiles WHERE id = auth.uid())
+    )
+  );
+
+-- Notes: users can only insert notes as themselves
+CREATE POLICY "Users can insert own notes" ON contact_notes
+  FOR INSERT WITH CHECK (author_id = auth.uid());
+```
+
+**UI Changes**
+
+1. **Registration Flow**
+   - After email/password, show **team selector** dropdown:
+     - Holz
+     - Metall/Plattenleger
+     - Gartenbau
+     - Sanitär Heizung
+     - Elektro
+   - Store `team_id` in `profiles` on signup.
+
+2. **Notes Panel (ContactDetail / TmaDetail)**
+   - Replace single `<Textarea>` with a **list of note entries**.
+   - Each entry shows: `[Avatar] [Author Name] · [Timestamp]` above the note content.
+   - **New note input** at bottom; on submit, creates `contact_notes` row with `author_id = current user`.
+   - Display notes in reverse chronological order (newest first).
+
+3. **Company/Contact Views**
+   - Contacts automatically filtered by user's `team_id` via RLS.
+   - No manual filtering needed – users only see companies in their vertical.
+
+4. **Sidebar / Navigation**
+   - Show current team name + color badge next to user avatar.
+   - (Future) Admin users could switch teams or view all.
+
+5. **CSV Import**
+   - When importing contacts, auto-assign `team_id` based on the importing user's team.
+
+**Implementation Phases**
+
+| Phase | Scope | Effort |
+|-------|-------|--------|
+| **Phase A** | Add `organizations`, `teams` tables; seed 5 verticals; add `team_id` to `profiles`; update registration UI with team selector | Medium |
+| **Phase B** | Add `team_id` to `contacts`; update RLS; update CSV import to assign team | Medium |
+| **Phase C** | Create `contact_notes` table; migrate existing notes; update Notes UI with author avatars | Medium |
+| **Phase D** | Apply same pattern to TMA candidates (`tma_notes`) | Low |
+
+**Success Criteria**
+- Users select their industry vertical (team) during registration.
+- Team members see only contacts assigned to their team.
+- Notes display author avatar + name; multiple teammates can add notes to the same contact.
+- CSV imports auto-assign contacts to the importer's team.
+
+---
+
 ## Lessons
 
 1. **npm naming restrictions**: Cannot use capital letters in project names. Created project with lowercase name then copied files.

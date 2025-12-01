@@ -1,21 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { signUp } from "@/lib/auth/actions";
+import { signUp, getTeams } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
+
+interface Team {
+  id: string;
+  name: string;
+  color: string | null;
+}
 
 export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<string>("");
+
+  useEffect(() => {
+    getTeams().then(setTeams);
+  }, []);
 
   async function handleSubmit(formData: FormData) {
+    if (!selectedTeam) {
+      setError("Please select your team");
+      return;
+    }
+    
     setLoading(true);
     setError(null);
 
+    formData.set("teamId", selectedTeam);
     const result = await signUp(formData);
     
     if (result.success) {
@@ -125,6 +143,28 @@ export default function RegisterPage() {
               required
               autoComplete="new-password"
             />
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Team / Vertical
+              </label>
+              <select
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 transition-colors focus:border-gray-400 focus:outline-none focus:ring-0"
+                required
+              >
+                <option value="">Select your team...</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-gray-400">
+                Which industry vertical do you work with?
+              </p>
+            </div>
 
             <Button
               type="submit"
