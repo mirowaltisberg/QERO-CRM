@@ -489,14 +489,14 @@ function generateCroppedBlob(
           return;
         }
 
-        const cropWidth = width / zoom;
-        const cropHeight = height / zoom;
-        const maxShiftX = width - cropWidth;
-        const maxShiftY = height - cropHeight;
-        const originX = ((offsetX + 1) / 2) * maxShiftX;
-        const originY = ((offsetY + 1) / 2) * maxShiftY;
+        const squareBase = Math.min(width, height);
+        const cropSize = squareBase / zoom;
+        const maxShiftX = Math.max(0, width - cropSize);
+        const maxShiftY = Math.max(0, height - cropSize);
+        const originX = clamp(((offsetX + 1) / 2) * maxShiftX, 0, maxShiftX);
+        const originY = clamp(((offsetY + 1) / 2) * maxShiftY, 0, maxShiftY);
 
-        ctx.drawImage(image, originX, originY, cropWidth, cropHeight, 0, 0, size, size);
+        ctx.drawImage(image, originX, originY, cropSize, cropSize, 0, 0, size, size);
         canvas.toBlob((blob) => {
           if (blob) resolve(blob);
           else reject(new Error("Failed to create avatar blob"));
