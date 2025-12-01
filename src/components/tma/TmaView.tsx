@@ -31,6 +31,8 @@ export function TmaView({ initialCandidates }: Props) {
     clearActivity,
     setStatusFilter,
     statusFilter,
+    setActivityFilter,
+    activityFilter,
     setCantonFilter,
     clearCantonFilter,
     availableCantons,
@@ -51,6 +53,16 @@ export function TmaView({ initialCandidates }: Props) {
         return acc;
       },
       { A: 0, B: 0, C: 0 }
+    );
+  }, [candidates]);
+  const countByActivity = useMemo(() => {
+    return candidates.reduce(
+      (acc, candidate) => {
+        if (candidate.activity === "active") acc.active += 1;
+        else if (candidate.activity === "inactive") acc.inactive += 1;
+        return acc;
+      },
+      { active: 0, inactive: 0 }
     );
   }, [candidates]);
 
@@ -94,6 +106,28 @@ export function TmaView({ initialCandidates }: Props) {
             >
               C ({countByStatus.C || 0})
             </Button>
+            <div className="mx-2 h-4 w-px bg-gray-200" />
+            <Button
+              variant={activityFilter === "all" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setActivityFilter("all")}
+            >
+              All activity
+            </Button>
+            <Button
+              variant={activityFilter === "active" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setActivityFilter("active")}
+            >
+              Active ({countByActivity.active})
+            </Button>
+            <Button
+              variant={activityFilter === "inactive" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setActivityFilter("inactive")}
+            >
+              Not active ({countByActivity.inactive})
+            </Button>
           </div>
           <div className="flex items-center gap-3 text-xs text-gray-500">
             <label className="flex items-center gap-2">
@@ -129,12 +163,13 @@ export function TmaView({ initialCandidates }: Props) {
                 className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
                 value={sortOption}
                 onChange={(event) =>
-                  setSortOption(event.target.value as "recent" | "oldest" | "name")
+                  setSortOption(event.target.value as "recent" | "oldest" | "name" | "activity")
                 }
               >
                 <option value="recent">Newest</option>
                 <option value="oldest">Oldest</option>
                 <option value="name">Name</option>
+                <option value="activity">Activity</option>
               </select>
             </label>
             {actionState.type && <span>{actionState.message}</span>}

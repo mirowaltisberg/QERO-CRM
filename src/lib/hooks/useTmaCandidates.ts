@@ -20,7 +20,8 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   const [error, setError] = useState<string | null>(null);
   const [cantonFilter, setCantonFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TmaStatus | "all">("all");
-  const [sortOption, setSortOption] = useState<"recent" | "oldest" | "name">("recent");
+  const [activityFilter, setActivityFilter] = useState<TmaActivity | "all">("all");
+  const [sortOption, setSortOption] = useState<"recent" | "oldest" | "name" | "activity">("recent");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Auto-refresh every 5 seconds to keep data in sync across users
@@ -45,6 +46,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   const filteredCandidates = useMemo(() => {
     return candidates.filter((candidate) => {
       if (statusFilter !== "all" && candidate.status !== statusFilter) return false;
+      if (activityFilter !== "all" && candidate.activity !== activityFilter) return false;
       if (cantonFilter && candidate.canton !== cantonFilter) return false;
       
       // Search filter
@@ -64,7 +66,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
       
       return true;
     });
-  }, [candidates, cantonFilter, statusFilter, searchQuery]);
+  }, [candidates, cantonFilter, statusFilter, activityFilter, searchQuery]);
 
   const availableCantons = useMemo(() => {
     return Array.from(
@@ -88,6 +90,14 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
         copy.sort((a, b) =>
           `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
         );
+        break;
+      case "activity":
+        copy.sort((a, b) => {
+          const aScore = a.activity === "active" ? 0 : 1;
+          const bScore = b.activity === "active" ? 0 : 1;
+          if (aScore !== bScore) return aScore - bScore;
+          return `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`);
+        });
         break;
       default:
         copy.sort(
@@ -300,6 +310,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     error,
     cantonFilter,
     statusFilter,
+    activityFilter,
     searchQuery,
     selectCandidate,
     refreshCandidates,
@@ -314,6 +325,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     setCantonFilter,
     clearCantonFilter: () => setCantonFilter(null),
     setStatusFilter,
+    setActivityFilter,
     setSearchQuery,
     availableCantons,
     sortOption,

@@ -5,7 +5,14 @@ import Image from "next/image";
 import type { TmaCandidate } from "@/lib/types";
 import { Tag } from "@/components/ui/tag";
 import { CantonTag } from "@/components/ui/CantonTag";
-import { TMA_STATUS_LABELS, TMA_STATUS_STYLES, type TmaStatus } from "@/lib/utils/constants";
+import { 
+  TMA_STATUS_LABELS, 
+  TMA_STATUS_STYLES, 
+  TMA_ACTIVITY_LABELS,
+  TMA_ACTIVITY_STYLES,
+  type TmaStatus,
+  type TmaActivity
+} from "@/lib/utils/constants";
 
 interface Props {
   candidates: TmaCandidate[];
@@ -92,11 +99,25 @@ export const TmaList = memo(function TmaList({
                 </Tag>
               </div>
               <div className="mt-1 flex items-center justify-between text-xs text-gray-500 gap-2">
-                <p className="truncate">
-                  {candidate.position_title?.trim() ||
-                    candidate.email ||
-                    "No details"}
-                </p>
+                <div className="flex items-center gap-2 truncate">
+                  <p className="truncate">
+                    {candidate.position_title?.trim() ||
+                      candidate.email ||
+                      "No details"}
+                  </p>
+                  {candidate.activity && (
+                    <span
+                      className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                      style={{
+                        backgroundColor: `${TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].bg}20`,
+                        color: TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].text,
+                        borderColor: `${TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].border}40`,
+                      }}
+                    >
+                      {TMA_ACTIVITY_LABELS[candidate.activity as TmaActivity]}
+                    </span>
+                  )}
+                </div>
                 <CantonTag canton={candidate.canton} size="md" />
               </div>
               {candidate.follow_up_at && (
