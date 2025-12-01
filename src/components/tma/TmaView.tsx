@@ -27,7 +27,6 @@ export function TmaView({ initialCandidates }: Props) {
     updateDocuments,
     updatePosition,
     clearStatus,
-    claimCandidate,
     setStatusFilter,
     statusFilter,
     setCantonFilter,
@@ -148,7 +147,6 @@ export function TmaView({ initialCandidates }: Props) {
             onUpdateNotes={updateNotes}
             onUpdateDocuments={updateDocuments}
             onUpdatePosition={updatePosition}
-            onClaim={claimCandidate}
           />
         </div>
       </div>

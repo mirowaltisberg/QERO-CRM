@@ -88,6 +88,7 @@ export const TmaCreateSchema = tmaBaseSchema.extend({
 
 export const TmaUpdateSchema = tmaBaseSchema.extend({
   status: z.enum(TMA_STATUS_LIST).nullable().optional(),
+  claimed_by: z.string().uuid().nullable().optional(),
 }).partial();
 
 export const TmaFilterSchema = z.object({

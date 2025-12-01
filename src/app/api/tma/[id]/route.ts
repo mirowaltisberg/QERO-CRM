@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { tmaService } from "@/lib/data/data-service";
 import { respondError, respondSuccess, formatZodError } from "@/lib/utils/api-response";
 import { TmaUpdateSchema } from "@/lib/validation/schemas";
+import { createClient } from "@/lib/supabase/server";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -51,6 +52,26 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     if (payload.follow_up_at && !payload.status) {
       payload.status = "C";
+    }
+
+    // Check if this is a document upload - auto-claim if unclaimed
+    const isDocumentUpload = payload.cv_url || payload.references_url || payload.short_profile_url;
+    if (isDocumentUpload) {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        const { data: candidate } = await supabase
+          .from("tma_candidates")
+          .select("claimed_by")
+          .eq("id", id)
+          .single();
+
+        if (candidate && !candidate.claimed_by) {
+          // Auto-claim when uploading a document
+          payload.claimed_by = user.id;
+        }
+      }
     }
 
     const updated = await tmaService.update(id, payload);

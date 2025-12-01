@@ -35,6 +35,26 @@ export async function GET(request: NextRequest, context: RouteContext) {
   return NextResponse.json({ data: notes });
 }
 
+// Patterns that indicate a trivial/non-meaningful note
+const TRIVIAL_NOTE_PATTERNS = [
+  /^c+$/i,           // "c", "cc", "ccc", etc.
+  /^cb$/i,           // "cb"
+  /^combox$/i,       // "combox"
+  /^com\s*box$/i,    // "com box"
+  /^besetzt$/i,      // "besetzt"
+  /^busy$/i,         // "busy"
+  /^na$/i,           // "na" (no answer)
+  /^n\/a$/i,         // "n/a"
+  /^-+$/,            // just dashes
+  /^\.+$/,           // just dots
+];
+
+function isMeaningfulNote(content: string): boolean {
+  const trimmed = content.trim().toLowerCase();
+  if (trimmed.length < 3) return false;
+  return !TRIVIAL_NOTE_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
 // POST /api/tma/[id]/notes - Create a new note for a TMA candidate
 export async function POST(request: NextRequest, context: RouteContext) {
   const { id: tma_id } = await context.params;
@@ -77,6 +97,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (error) {
     console.error("Failed to create TMA note:", error);
     return NextResponse.json({ error: error.message, details: error }, { status: 500 });
+  }
+
+  // Auto-claim if this is a meaningful note and candidate is unclaimed
+  if (isMeaningfulNote(parsed.data.content)) {
+    const { data: candidate } = await supabase
+      .from("tma_candidates")
+      .select("claimed_by")
+      .eq("id", tma_id)
+      .single();
+
+    if (candidate && !candidate.claimed_by) {
+      await supabase
+        .from("tma_candidates")
+        .update({ claimed_by: user.id })
+        .eq("id", tma_id);
+    }
   }
 
   return NextResponse.json({ data: note }, { status: 201 });

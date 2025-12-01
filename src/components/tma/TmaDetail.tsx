@@ -25,7 +25,6 @@ interface Props {
     payload: { cv_url?: string | null; references_url?: string | null; short_profile_url?: string | null }
   ) => Promise<void>;
   onUpdatePosition: (value: string | null) => Promise<void> | void;
-  onClaim: () => Promise<void> | void;
 }
 
 export function TmaDetail({
@@ -36,7 +35,6 @@ export function TmaDetail({
   onUpdateNotes,
   onUpdateDocuments,
   onUpdatePosition,
-  onClaim,
 }: Props) {
   const initialFollowUpDate = candidate?.follow_up_at ? new Date(candidate.follow_up_at) : null;
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
@@ -138,12 +136,9 @@ export function TmaDetail({
                 <span className="text-xs text-gray-500">{claimer.full_name}</span>
               </>
             ) : (
-              <button
-                onClick={onClaim}
-                className="text-xs text-orange-600 hover:text-orange-700 font-medium"
-              >
-                Unclaimed – Click to claim
-              </button>
+              <span className="text-xs text-orange-600 font-medium">
+                Unclaimed
+              </span>
             )}
           </div>
           <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
