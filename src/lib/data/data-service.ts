@@ -564,19 +564,33 @@ export const tmaService = {
 
   async update(id: string, data: Partial<TmaCandidate>): Promise<TmaCandidate | null> {
     const supabase = createClient();
-    const { data: updated, error } = await supabase
+    
+    // First, perform the update
+    const { error: updateError } = await supabase
       .from("tma_candidates")
       .update(data)
-      .eq("id", id)
+      .eq("id", id);
+    
+    if (updateError) {
+      console.error("Error updating TMA candidate:", updateError);
+      return null;
+    }
+    
+    // Then fetch the updated record with the claimer join
+    const { data: updated, error: fetchError } = await supabase
+      .from("tma_candidates")
       .select(`
         *,
         claimer:profiles!claimed_by(id, full_name, avatar_url)
       `)
+      .eq("id", id)
       .single();
-    if (error) {
-      console.error("Error updating TMA candidate:", error);
+    
+    if (fetchError) {
+      console.error("Error fetching updated TMA candidate:", fetchError);
       return null;
     }
+    
     return updated;
   },
 
