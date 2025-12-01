@@ -93,7 +93,7 @@ export const NotesPanel = memo(function NotesPanel({
   }
 
   return (
-    <Panel title="Notes" description="Team notes with attribution" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <Panel title="Notes" description="Team notes with attribution" className="h-full flex flex-col min-h-0 overflow-hidden">
       {/* New note input */}
       <div className="mb-4 flex-shrink-0">
         <Textarea

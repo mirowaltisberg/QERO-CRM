@@ -62,8 +62,9 @@ export const ContactDetail = memo(function ContactDetail({
 
   return (
     <>
-      <section className="flex flex-1 flex-col gap-4 p-6 overflow-hidden">
-        <div className="flex items-center justify-between">
+      <section className="flex flex-1 flex-col p-6 overflow-hidden">
+        {/* Header - fixed */}
+        <div className="flex items-center justify-between flex-shrink-0 mb-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-400">Now calling</p>
             <h1 className="text-2xl font-semibold text-gray-900">{contact.company_name}</h1>
@@ -72,26 +73,29 @@ export const ContactDetail = memo(function ContactDetail({
           <Tag status={contact.status} tone="muted" fallbackLabel="Set status" />
         </div>
 
-        <Panel
-          title="Call"
-          description="Press C to call instantly"
-          actions={
-            <Button onClick={onCall} size="lg">
-              Call {contact.contact_name?.split(" ")[0] ?? ""}
-            </Button>
-          }
-        >
-          <div className="grid gap-4 text-sm text-gray-600 md:grid-cols-3">
-            <InfoBlock label="Phone" value={displayPhone} />
-            <InfoBlock label="Email" value={displayEmail} />
-            <InfoBlock label="Canton">
-              <CantonTag canton={contact.canton} size="md" />
-            </InfoBlock>
-          </div>
-        </Panel>
+        {/* Call panel - fixed */}
+        <div className="flex-shrink-0 mb-4">
+          <Panel
+            title="Call"
+            description="Press C to call instantly"
+            actions={
+              <Button onClick={onCall} size="lg">
+                Call {contact.contact_name?.split(" ")[0] ?? ""}
+              </Button>
+            }
+          >
+            <div className="grid gap-4 text-sm text-gray-600 md:grid-cols-3">
+              <InfoBlock label="Phone" value={displayPhone} />
+              <InfoBlock label="Email" value={displayEmail} />
+              <InfoBlock label="Canton">
+                <CantonTag canton={contact.canton} size="md" />
+              </InfoBlock>
+            </div>
+          </Panel>
+        </div>
 
-        {/* Compact status + follow-up toolbar */}
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+        {/* Compact status + follow-up toolbar - fixed */}
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 flex-shrink-0 mb-4">
           <span className="text-xs text-gray-400 mr-1">Status</span>
           <Button
             size="sm"
@@ -144,14 +148,18 @@ export const ContactDetail = memo(function ContactDetail({
           />
         </div>
 
-        <NotesPanel
-          entityId={contact.id}
-          entityType="contact"
-          legacyNotes={contact.notes}
-          onSaveLegacyNotes={onSaveNotes}
-        />
+        {/* Notes panel - takes remaining space and scrolls */}
+        <div className="flex-1 min-h-0 overflow-hidden mb-4">
+          <NotesPanel
+            entityId={contact.id}
+            entityType="contact"
+            legacyNotes={contact.notes}
+            onSaveLegacyNotes={onSaveNotes}
+          />
+        </div>
 
-        <div className="flex items-center justify-between">
+        {/* Footer - fixed */}
+        <div className="flex items-center justify-between flex-shrink-0">
           <div className="text-xs text-gray-400">
             {actionMessage ?? "J/K to move • C to call • 1-5 outcomes • N focus notes"}
           </div>
