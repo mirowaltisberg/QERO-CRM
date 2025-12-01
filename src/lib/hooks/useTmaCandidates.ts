@@ -24,10 +24,11 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   const [sortOption, setSortOption] = useState<"recent" | "oldest" | "name">("recent");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Realtime subscription
+  // Realtime subscription + polling fallback
   useEffect(() => {
     const supabase = createClient();
     
+    // Set up realtime subscription
     const channel = supabase
       .channel("tma_changes")
       .on(
@@ -38,8 +39,8 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
           table: "tma_candidates",
         },
         async (payload) => {
+          console.log("Realtime event received:", payload.eventType);
           if (payload.eventType === "INSERT") {
-            // Fetch the new candidate with claimer info
             const { data } = await supabase
               .from("tma_candidates")
               .select(`*, claimer:profiles!claimed_by(id, full_name, avatar_url)`)
@@ -49,7 +50,6 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
               setCandidates((prev) => [data, ...prev]);
             }
           } else if (payload.eventType === "UPDATE") {
-            // Fetch the updated candidate with claimer info
             const { data } = await supabase
               .from("tma_candidates")
               .select(`*, claimer:profiles!claimed_by(id, full_name, avatar_url)`)
@@ -67,10 +67,26 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+      });
+
+    // Polling fallback - refresh every 10 seconds
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch("/api/tma");
+        const json = await response.json();
+        if (response.ok && json.data) {
+          setCandidates(json.data);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 10000); // 10 seconds
 
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, []);
 
