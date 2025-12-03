@@ -100,6 +100,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
           table: "contact_call_logs",
         },
         async (payload) => {
+          console.log("[Realtime] New call log received:", payload);
           // When a new call log is inserted, fetch the full data with caller info
           const newLog = payload.new as { id: string; contact_id: string; user_id: string; called_at: string };
           
@@ -119,7 +120,9 @@ export function CallingView({ initialContacts }: CallingViewProps) {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[Realtime] Subscription status:", status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
