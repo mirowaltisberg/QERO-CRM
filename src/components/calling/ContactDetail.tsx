@@ -43,6 +43,13 @@ export const ContactDetail = memo(function ContactDetail({
   const [customNote, setCustomNote] = useState(contact?.follow_up_note ?? "");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState<{ success: boolean; message: string } | null>(null);
+  const [emailPreview, setEmailPreview] = useState<{
+    recipients: string[];
+    subject: string;
+    body: string;
+    hasAttachment: boolean;
+  } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const displayPhone = contact?.phone ?? "No phone number";
   const displayEmail = contact?.email ?? "No email";
@@ -55,10 +62,38 @@ export const ContactDetail = memo(function ContactDetail({
     setIsFollowUpModalOpen(false);
   }, [customDate, customTime, customNote, onScheduleFollowUp]);
 
+  const handleOpenEmailPreview = useCallback(async () => {
+    if (!contact) return;
+    setLoadingPreview(true);
+    setEmailSent(null);
+    try {
+      const response = await fetch(`/api/contacts/${contact.id}/send-email?preview=1`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || "Vorschau konnte nicht geladen werden");
+      }
+      setEmailPreview({
+        recipients: json.data.recipients,
+        subject: json.data.subject,
+        body: json.data.body,
+        hasAttachment: json.data.hasAttachment,
+      });
+    } catch (err) {
+      setEmailSent({
+        success: false,
+        message: err instanceof Error ? err.message : "Vorschau konnte nicht geladen werden",
+      });
+    } finally {
+      setLoadingPreview(false);
+    }
+  }, [contact]);
+
   const handleSendEmail = useCallback(async () => {
     if (!contact) return;
     setSendingEmail(true);
-    setEmailSent(null);
     try {
       const response = await fetch(`/api/contacts/${contact.id}/send-email`, {
         method: "POST",
@@ -72,6 +107,7 @@ export const ContactDetail = memo(function ContactDetail({
         success: true,
         message: `E-Mail gesendet an: ${json.data.recipients.join(", ")}`,
       });
+      setEmailPreview(null);
     } catch (err) {
       setEmailSent({
         success: false,
@@ -114,12 +150,12 @@ export const ContactDetail = memo(function ContactDetail({
                   Anrufen
                 </Button>
                 <Button 
-                  onClick={handleSendEmail} 
+                  onClick={handleOpenEmailPreview} 
                   size="lg" 
                   variant="secondary"
-                  disabled={sendingEmail}
+                  disabled={loadingPreview}
                 >
-                  {sendingEmail ? "Senden..." : "E-Mail senden"}
+                  {loadingPreview ? "Laden..." : "E-Mail senden"}
                 </Button>
               </div>
             }
@@ -252,6 +288,75 @@ export const ContactDetail = memo(function ContactDetail({
             </Button>
             <Button onClick={handleCustomFollowUp}>Save follow-up</Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Email Preview Modal */}
+      <Modal open={emailPreview !== null} onClose={() => setEmailPreview(null)}>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">E-Mail Vorschau</h3>
+            <p className="text-sm text-gray-500">Überprüfe die E-Mail bevor du sie versendest.</p>
+          </div>
+          
+          {emailPreview && (
+            <>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs uppercase text-gray-400">Empfänger</label>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {emailPreview.recipients.map((email, i) => (
+                      <span key={i} className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                        {email}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs uppercase text-gray-400">Betreff</label>
+                  <p className="mt-1 text-sm font-medium text-gray-900">{emailPreview.subject}</p>
+                </div>
+                <div>
+                  <label className="text-xs uppercase text-gray-400">Nachricht</label>
+                  <div 
+                    className="mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700"
+                    dangerouslySetInnerHTML={{ __html: emailPreview.body }}
+                  />
+                </div>
+                {emailPreview.hasAttachment && (
+                  <div>
+                    <label className="text-xs uppercase text-gray-400">Anhang</label>
+                    <div className="mt-1 flex items-center gap-2 text-sm text-gray-700">
+                      <svg className="h-4 w-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                      </svg>
+                      AGB QERO AG.pdf
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {emailSent && (
+                <div className={cn(
+                  "rounded-lg px-3 py-2 text-sm",
+                  emailSent.success 
+                    ? "bg-green-50 text-green-700 border border-green-200" 
+                    : "bg-red-50 text-red-600 border border-red-200"
+                )}>
+                  {emailSent.message}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setEmailPreview(null)} disabled={sendingEmail}>
+                  Abbrechen
+                </Button>
+                <Button onClick={handleSendEmail} disabled={sendingEmail || emailSent?.success}>
+                  {sendingEmail ? "Senden..." : emailSent?.success ? "Gesendet ✓" : "Senden"}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </>

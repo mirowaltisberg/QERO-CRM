@@ -14,16 +14,6 @@ interface RouteContext {
 // Email template
 const EMAIL_SUBJECT = "Kandidatenvorschläge & AGB";
 
-const EMAIL_BODY_TEXT = `Guten Tag
-
-Im Anhang sende ich Ihnen die Kurzprofile eines oder mehrerer Kandidaten, die fachlich und persönlich sehr gut zu Ihrem Unternehmen passen.
-
-Die Unterlagen geben Ihnen einen ersten Überblick. Gerne organisiere ich bei Interesse ein persönliches Gespräch oder einen unverbindlichen Einsatz.
-
-Zusätzlich finden Sie unsere AGB im Anhang.
-
-Für Rückfragen stehe ich Ihnen jederzeit gerne zur Verfügung.`;
-
 const EMAIL_BODY_HTML = `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
 <p>Guten Tag</p>
 <p>Im Anhang sende ich Ihnen die Kurzprofile eines oder mehrerer Kandidaten, die fachlich und persönlich sehr gut zu Ihrem Unternehmen passen.</p>
@@ -34,7 +24,129 @@ const EMAIL_BODY_HTML = `<div style="font-family: Arial, sans-serif; font-size: 
 
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
 
-// POST /api/contacts/[id]/send-email - Send template email to all contact emails
+// Helper to get all emails for a contact
+async function getContactEmails(contactId: string, adminSupabase: ReturnType<typeof createAdminClient>) {
+  // Get contact
+  const { data: contact, error: contactError } = await adminSupabase
+    .from("contacts")
+    .select("id, company_name, contact_name, email")
+    .eq("id", contactId)
+    .single();
+
+  if (contactError || !contact) {
+    return { error: "Contact not found", contact: null, emails: [] };
+  }
+
+  // Get contact persons
+  const { data: persons } = await adminSupabase
+    .from("contact_persons")
+    .select("first_name, last_name, email")
+    .eq("contact_id", contactId);
+
+  // Collect all emails
+  const allEmails = new Set<string>();
+
+  // Add contact email(s) - could be comma-separated
+  if (contact.email) {
+    contact.email.split(/[,;]/).forEach((e: string) => {
+      const trimmed = e.trim().toLowerCase();
+      if (trimmed && trimmed.includes("@")) {
+        allEmails.add(trimmed);
+      }
+    });
+  }
+
+  // Add contact person emails
+  if (persons) {
+    persons.forEach((p) => {
+      if (p.email) {
+        const trimmed = p.email.trim().toLowerCase();
+        if (trimmed && trimmed.includes("@")) {
+          allEmails.add(trimmed);
+        }
+      }
+    });
+  }
+
+  return { error: null, contact, emails: Array.from(allEmails) };
+}
+
+// Helper to check if AGB PDF exists
+function checkAgbPdf(): boolean {
+  try {
+    const pdfPath = path.join(process.cwd(), "public", "files", "AGB-QERO.pdf");
+    return fs.existsSync(pdfPath);
+  } catch {
+    return false;
+  }
+}
+
+// Helper to get user signature
+async function getUserSignature(userId: string, adminSupabase: ReturnType<typeof createAdminClient>): Promise<string> {
+  const { data: profile } = await adminSupabase
+    .from("profiles")
+    .select("email_signature_html")
+    .eq("id", userId)
+    .single();
+  return profile?.email_signature_html || "";
+}
+
+// GET /api/contacts/[id]/send-email - Preview email (don't send)
+export async function GET(request: NextRequest, context: RouteContext) {
+  const { id } = await context.params;
+
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return respondError("Unauthorized", 401);
+    }
+
+    const adminSupabase = createAdminClient();
+
+    // Check if user has email account connected
+    const { data: account } = await adminSupabase
+      .from("email_accounts")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("provider", "outlook")
+      .single();
+
+    if (!account) {
+      return respondError("Bitte verbinde zuerst dein Outlook-Konto in den Einstellungen.", 404);
+    }
+
+    // Get emails
+    const { error, emails } = await getContactEmails(id, adminSupabase);
+    if (error) {
+      return respondError(error, 404);
+    }
+
+    if (emails.length === 0) {
+      return respondError("Keine E-Mail-Adressen für diesen Kontakt gefunden.", 400);
+    }
+
+    // Get signature
+    const signatureHtml = await getUserSignature(user.id, adminSupabase);
+    const fullBodyHtml = signatureHtml ? `${EMAIL_BODY_HTML}${signatureHtml}` : EMAIL_BODY_HTML;
+
+    // Check attachment
+    const hasAttachment = checkAgbPdf();
+
+    return respondSuccess({
+      recipients: emails,
+      subject: EMAIL_SUBJECT,
+      body: fullBodyHtml,
+      hasAttachment,
+    });
+  } catch (err) {
+    console.error("[Email Preview] Error:", err);
+    return respondError("Vorschau konnte nicht geladen werden", 500);
+  }
+}
+
+// POST /api/contacts/[id]/send-email - Actually send the email
 export async function POST(request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
 
@@ -62,67 +174,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const emailAccount = account as EmailAccount;
 
-    // Get contact
-    const { data: contact, error: contactError } = await adminSupabase
-      .from("contacts")
-      .select("id, company_name, contact_name, email")
-      .eq("id", id)
-      .single();
-
-    if (contactError || !contact) {
-      return respondError("Contact not found", 404);
+    // Get emails
+    const { error, emails } = await getContactEmails(id, adminSupabase);
+    if (error) {
+      return respondError(error, 404);
     }
 
-    // Get contact persons
-    const { data: persons } = await adminSupabase
-      .from("contact_persons")
-      .select("first_name, last_name, email")
-      .eq("contact_id", id);
-
-    // Collect all emails
-    const allEmails = new Set<string>();
-
-    // Add contact email(s) - could be comma-separated
-    if (contact.email) {
-      contact.email.split(/[,;]/).forEach((e: string) => {
-        const trimmed = e.trim().toLowerCase();
-        if (trimmed && trimmed.includes("@")) {
-          allEmails.add(trimmed);
-        }
-      });
-    }
-
-    // Add contact person emails
-    if (persons) {
-      persons.forEach((p) => {
-        if (p.email) {
-          const trimmed = p.email.trim().toLowerCase();
-          if (trimmed && trimmed.includes("@")) {
-            allEmails.add(trimmed);
-          }
-        }
-      });
-    }
-
-    if (allEmails.size === 0) {
+    if (emails.length === 0) {
       return respondError("Keine E-Mail-Adressen für diesen Kontakt gefunden.", 400);
     }
 
-    const emailList = Array.from(allEmails);
-
-    // Get user's signature
-    const { data: profile } = await adminSupabase
-      .from("profiles")
-      .select("email_signature_html")
-      .eq("id", user.id)
-      .single();
-
-    const signatureHtml = profile?.email_signature_html || "";
-
-    // Build full HTML body with signature
-    const fullBodyHtml = signatureHtml 
-      ? `${EMAIL_BODY_HTML}${signatureHtml}` 
-      : EMAIL_BODY_HTML;
+    // Get signature
+    const signatureHtml = await getUserSignature(user.id, adminSupabase);
+    const fullBodyHtml = signatureHtml ? `${EMAIL_BODY_HTML}${signatureHtml}` : EMAIL_BODY_HTML;
 
     // Read AGB PDF attachment
     let attachments: Array<{
@@ -160,7 +224,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         contentType: "HTML",
         content: fullBodyHtml,
       },
-      toRecipients: emailList.map((email) => ({
+      toRecipients: emails.map((email) => ({
         emailAddress: { address: email },
       })),
       attachments,
@@ -184,7 +248,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return respondSuccess({
       sent: true,
-      recipients: emailList,
+      recipients: emails,
       attachmentIncluded: attachments.length > 0,
     });
   } catch (err) {
