@@ -66,7 +66,7 @@ const EMAIL_SIGNATURE_HTML = `
   <p style="margin: 8px 0;"><a href="https://www.qero.ch/team/miro-waltisberg" style="color: #333;">Mehr Über mich</a></p>
   <br>
   <a href="https://www.qero.ch" target="_blank">
-    <img src="https://qero-crm.vercel.app/qero-logo-email.png" alt="QERO - vermittelt Timing." style="max-width: 280px; height: auto;" />
+    <img src="https://qero-crm.vercel.app/qero-logo-email.png" alt="QERO - vermittelt Timing." style="max-width: 180px; height: auto;" />
   </a>
   <br><br>
   <p style="margin: 0; font-size: 12px; color: #666;">
