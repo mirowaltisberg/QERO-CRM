@@ -22,6 +22,32 @@ const EMAIL_BODY_HTML = `<div style="font-family: Arial, sans-serif; font-size: 
 <p>Für Rückfragen stehe ich Ihnen jederzeit gerne zur Verfügung.</p>
 </div>`;
 
+// Default signature (same as in settings/signature/route.ts)
+const DEFAULT_SIGNATURE_HTML = `
+<br><br>
+<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+  <p style="margin: 0;">Freundliche Grüsse</p>
+  <br>
+  <p style="margin: 0; font-weight: bold;">Miró Maximilian Waltisberg</p>
+  <p style="margin: 0;">Personalberater</p>
+  <br>
+  <table style="font-size: 14px; color: #333;">
+    <tr><td style="padding-right: 12px;">Tel. M</td><td><a href="tel:+41772896446" style="color: #333; text-decoration: none;">+41 77 289 64 46</a></td></tr>
+    <tr><td style="padding-right: 12px;">Tel. D</td><td><a href="tel:+41585105764" style="color: #333; text-decoration: none;">+41 58 510 57 64</a></td></tr>
+    <tr><td style="padding-right: 12px;">E-Mail</td><td><a href="mailto:m.waltisberg@qero.ch" style="color: #333; text-decoration: none;">m.waltisberg@qero.ch</a></td></tr>
+  </table>
+  <p style="margin: 8px 0;"><a href="https://www.qero.ch/team/miro-waltisberg" style="color: #333;">Mehr Über mich</a></p>
+  <br>
+  <a href="https://www.qero.ch" target="_blank">
+    <img src="https://www.qero.ch/images/qero-logo-email.png" alt="QERO - vermittelt Timing." style="max-width: 280px; height: auto;" />
+  </a>
+  <br><br>
+  <p style="margin: 0; font-size: 12px; color: #666;">
+    QERO AG | Ifangstrasse 91 | 8153 Rümlang | Tel <a href="tel:+41585105757" style="color: #666; text-decoration: none;">+41 58 510 57 57</a> | <a href="mailto:info@qero.ch" style="color: #666; text-decoration: none;">info@qero.ch</a> | <a href="https://www.qero.ch" style="color: #666; text-decoration: none;">www.qero.ch</a>
+  </p>
+</div>
+`;
+
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
 
 // Helper to get all emails for a contact
@@ -81,14 +107,16 @@ function checkAgbPdf(): boolean {
   }
 }
 
-// Helper to get user signature
+// Helper to get user signature - returns default if not customized
 async function getUserSignature(userId: string, adminSupabase: ReturnType<typeof createAdminClient>): Promise<string> {
   const { data: profile } = await adminSupabase
     .from("profiles")
     .select("email_signature_html")
     .eq("id", userId)
     .single();
-  return profile?.email_signature_html || "";
+  
+  // Return user's signature if set, otherwise return default
+  return profile?.email_signature_html || DEFAULT_SIGNATURE_HTML;
 }
 
 // GET /api/contacts/[id]/send-email - Preview email (don't send)
@@ -127,9 +155,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return respondError("Keine E-Mail-Adressen für diesen Kontakt gefunden.", 400);
     }
 
-    // Get signature
+    // Get signature (will use default if not customized)
     const signatureHtml = await getUserSignature(user.id, adminSupabase);
-    const fullBodyHtml = signatureHtml ? `${EMAIL_BODY_HTML}${signatureHtml}` : EMAIL_BODY_HTML;
+    const fullBodyHtml = `${EMAIL_BODY_HTML}${signatureHtml}`;
 
     // Check attachment
     const hasAttachment = checkAgbPdf();
@@ -184,9 +212,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return respondError("Keine E-Mail-Adressen für diesen Kontakt gefunden.", 400);
     }
 
-    // Get signature
+    // Get signature (will use default if not customized)
     const signatureHtml = await getUserSignature(user.id, adminSupabase);
-    const fullBodyHtml = signatureHtml ? `${EMAIL_BODY_HTML}${signatureHtml}` : EMAIL_BODY_HTML;
+    const fullBodyHtml = `${EMAIL_BODY_HTML}${signatureHtml}`;
 
     // Read AGB PDF attachment
     let attachments: Array<{
