@@ -13,8 +13,8 @@ interface CallingViewProps {
   initialContacts: Contact[];
 }
 
-// Minimum time (ms) a contact must be viewed before logging a call
-const MIN_VIEW_TIME_MS = 20000; // 20 seconds
+// Time (ms) to wait after pressing call before logging
+const CALL_LOG_DELAY_MS = 20000; // 20 seconds
 
 export function CallingView({ initialContacts }: CallingViewProps) {
   const {
@@ -42,10 +42,11 @@ export function CallingView({ initialContacts }: CallingViewProps) {
   // Track call logs for contacts (contactId -> latest call log)
   const [callLogs, setCallLogs] = useState<Record<string, ContactCallLog>>({});
   
-  // Timer for tracking how long current contact has been active
-  const viewStartTimeRef = useRef<number | null>(null);
-  const [isEligibleForLog, setIsEligibleForLog] = useState(false);
-  const eligibilityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Track pending call log (waiting for 20 seconds to pass)
+  const pendingCallRef = useRef<{
+    contactId: string;
+    timerId: NodeJS.Timeout;
+  } | null>(null);
 
   // Fetch call logs for all contacts on mount and when contacts change
   useEffect(() => {
@@ -131,43 +132,28 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     };
   }, []);
 
-  // Reset timer when active contact changes
+  // Cancel pending call log if contact changes
   useEffect(() => {
-    // Clear previous timer
-    if (eligibilityTimerRef.current) {
-      clearTimeout(eligibilityTimerRef.current);
-      eligibilityTimerRef.current = null;
+    if (pendingCallRef.current && pendingCallRef.current.contactId !== activeContact?.id) {
+      // User switched contacts before 20 seconds - cancel the log
+      clearTimeout(pendingCallRef.current.timerId);
+      pendingCallRef.current = null;
     }
-    
-    // Reset eligibility
-    setIsEligibleForLog(false);
-    
-    if (activeContact) {
-      // Record when this contact became active
-      viewStartTimeRef.current = Date.now();
-      
-      // Set timer to mark eligible after 20 seconds
-      eligibilityTimerRef.current = setTimeout(() => {
-        setIsEligibleForLog(true);
-      }, MIN_VIEW_TIME_MS);
-    } else {
-      viewStartTimeRef.current = null;
-    }
-    
-    // Cleanup on unmount or contact change
-    return () => {
-      if (eligibilityTimerRef.current) {
-        clearTimeout(eligibilityTimerRef.current);
-      }
-    };
   }, [activeContact?.id]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingCallRef.current) {
+        clearTimeout(pendingCallRef.current.timerId);
+      }
+    };
+  }, []);
+
   // Log a call to the API
-  const logCall = useCallback(async () => {
-    if (!activeContact || !isEligibleForLog) return;
-    
+  const logCallToApi = useCallback(async (contactId: string) => {
     try {
-      const res = await fetch(`/api/contacts/${activeContact.id}/call-logs`, {
+      const res = await fetch(`/api/contacts/${contactId}/call-logs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -175,17 +161,17 @@ export function CallingView({ initialContacts }: CallingViewProps) {
       if (res.ok) {
         const json = await res.json();
         if (json.data && !json.data.duplicate) {
-          // Update local state with new call log (also handled by realtime, but this is faster)
+          // Update local state with new call log
           setCallLogs((prev) => ({
             ...prev,
-            [activeContact.id]: json.data,
+            [contactId]: json.data,
           }));
         }
       }
     } catch (err) {
       console.error("Error logging call:", err);
     }
-  }, [activeContact, isEligibleForLog]);
+  }, []);
 
   const actionMessage = useMemo(() => {
     if (actionState.type && actionState.message) {
@@ -198,13 +184,28 @@ export function CallingView({ initialContacts }: CallingViewProps) {
   const handleCall = useCallback(() => {
     if (!activeContact?.phone) return;
     
-    // Log the call if eligible
-    logCall();
+    // Cancel any existing pending call log
+    if (pendingCallRef.current) {
+      clearTimeout(pendingCallRef.current.timerId);
+      pendingCallRef.current = null;
+    }
+    
+    // Start 20 second timer - if user stays on this contact, log the call
+    const contactId = activeContact.id;
+    const timerId = setTimeout(() => {
+      // Check if still on the same contact
+      if (pendingCallRef.current?.contactId === contactId) {
+        logCallToApi(contactId);
+        pendingCallRef.current = null;
+      }
+    }, CALL_LOG_DELAY_MS);
+    
+    pendingCallRef.current = { contactId, timerId };
     
     // Open phone dialer
     const tel = activeContact.phone.replace(/\s+/g, "");
     window.location.href = `tel:${tel}`;
-  }, [activeContact, logCall]);
+  }, [activeContact, logCallToApi]);
 
   const handleOutcome = async (outcome: Parameters<typeof logCallOutcome>[0]) => {
     await logCallOutcome(outcome);
