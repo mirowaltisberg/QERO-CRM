@@ -221,7 +221,7 @@ export function EmailView({ account }: Props) {
           // Create a thread-like structure for display
           const liveThread: EmailThread = {
             id: threadId,
-            account_id: "",
+            account_id: account?.id || "",
             graph_conversation_id: json.data.conversationId || threadId,
             subject: json.data.subject || "(No subject)",
             snippet: json.data.bodyPreview || "",
@@ -245,7 +245,7 @@ export function EmailView({ account }: Props) {
               sender_name: json.data.from?.emailAddress?.name || "",
               recipients: json.data.toRecipients?.map((r: { emailAddress?: { address?: string } }) => r.emailAddress?.address).filter(Boolean) || [],
               cc: json.data.ccRecipients?.map((r: { emailAddress?: { address?: string } }) => r.emailAddress?.address).filter(Boolean) || [],
-              bcc: [],
+              bcc: json.data.bccRecipients?.map((r: { emailAddress?: { address?: string } }) => r.emailAddress?.address).filter(Boolean) || [],
               subject: json.data.subject || "(No subject)",
               body_preview: json.data.bodyPreview || "",
               body_html: json.data.body?.contentType === "html" ? json.data.body.content : null,

@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // Fetch full message from Graph API
-    const messageUrl = `${GRAPH_BASE_URL}/me/messages/${graphMessageId}?$select=id,conversationId,subject,body,bodyPreview,from,toRecipients,ccRecipients,isRead,hasAttachments,receivedDateTime,sentDateTime`;
+    const messageUrl = `${GRAPH_BASE_URL}/me/messages/${graphMessageId}?$select=id,conversationId,subject,body,bodyPreview,from,toRecipients,ccRecipients,bccRecipients,isRead,hasAttachments,receivedDateTime,sentDateTime`;
 
     const response = await fetch(messageUrl, {
       headers: {
