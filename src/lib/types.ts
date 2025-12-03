@@ -337,3 +337,20 @@ export interface EmailFilters {
   linked_tma_id?: string;
 }
 
+
+/**
+ * Contact Call Log - Record of when a contact was called and by whom
+ */
+export interface ContactCallLog {
+  id: string;
+  contact_id: string;
+  user_id: string;
+  called_at: string;
+  created_at: string;
+  // Joined from profiles
+  caller?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
+}
