@@ -77,6 +77,26 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
     fetchEmailAccount();
   }, []);
 
+  // Fetch signature on mount
+  useEffect(() => {
+    async function fetchSignature() {
+      try {
+        const response = await fetch("/api/settings/signature");
+        const json = await response.json();
+        if (response.ok && json.data) {
+          setSignatureText(json.data.signature_text || "");
+          setSignatureHtml(json.data.signature_html || "");
+          setIsDefaultSignature(json.data.is_default);
+        }
+      } catch (err) {
+        console.error("Failed to fetch signature:", err);
+      } finally {
+        setSignatureLoading(false);
+      }
+    }
+    fetchSignature();
+  }, []);
+
   // Handle OAuth callback messages
   useEffect(() => {
     const emailConnected = searchParams.get("email_connected");
