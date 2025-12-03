@@ -44,6 +44,26 @@ export interface Contact {
   created_at: string; // ISO timestamp
 }
 
+export interface ContactPerson {
+  id: string;
+  contact_id: string;
+  first_name: string;
+  last_name: string;
+  role: string | null;
+  mobile: string | null;
+  direct_phone: string | null;
+  email: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+  updated_by_profile?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
+}
+
 export interface TmaCandidate {
   id: string;
   first_name: string;

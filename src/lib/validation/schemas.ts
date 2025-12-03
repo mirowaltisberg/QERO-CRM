@@ -62,6 +62,15 @@ export const ContactFilterSchema = z.object({
   pageSize: z.number().int().min(1).max(1000).optional(),
 });
 
+export const ContactPersonSchema = z.object({
+  first_name: z.string().trim().min(1, 'First name is required'),
+  last_name: z.string().trim().min(1, 'Last name is required'),
+  role: optionalTextSchema,
+  mobile: phoneSchema,
+  direct_phone: phoneSchema,
+  email: emailSchema,
+});
+
 export const CallLogCreateSchema = z.object({
   contact_id: z.string().trim().min(1, 'contact_id is required'),
   outcome: z.enum(CALL_OUTCOME_LIST, {
@@ -144,6 +153,7 @@ export const TmaFilterSchema = z.object({
 });
 
 export type ContactCreateInput = z.infer<typeof ContactCreateSchema>;
+export type ContactPersonInput = z.infer<typeof ContactPersonSchema>;
 export type ContactUpdateInput = z.infer<typeof ContactUpdateSchema>;
 export type ContactFilterInput = z.infer<typeof ContactFilterSchema>;
 export type CallLogCreateInput = z.infer<typeof CallLogCreateSchema>;
