@@ -177,14 +177,14 @@ export function CallingView({ initialContacts }: CallingViewProps) {
   }, [activeContact]);
 
   // Wrapper for saving notes - logs call if one was initiated
-  const handleSaveNotes = useCallback(async (notes: string) => {
+  const handleSaveNotes = useCallback(async (notes: string | null) => {
     if (!activeContact) return;
     
     // Save the notes first
     await updateNotes(notes);
     
     // If a call was initiated for this contact, log it now
-    if (callInitiatedForContact === activeContact.id) {
+    if (callInitiatedForContact === activeContact.id && notes) {
       await logCallToApi(activeContact.id);
       setCallInitiatedForContact(null); // Reset after logging
     }
