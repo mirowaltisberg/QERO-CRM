@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { CantonTag } from "@/components/ui/CantonTag";
-import type { Contact } from "@/lib/types";
+import type { Contact, ContactCallLog } from "@/lib/types";
 import { memo, useCallback, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
@@ -17,6 +17,7 @@ interface ContactListProps {
   onClearCantonFilter?: () => void;
   activeCantonFilter?: string | null;
   availableCantons?: string[];
+  callLogs?: Record<string, ContactCallLog>;
 }
 
 // Memoized list item to prevent re-renders
@@ -27,6 +28,7 @@ const ContactListItem = memo(function ContactListItem({
   onFilterByCanton,
   onClearCantonFilter,
   activeCantonFilter,
+  callLog,
 }: {
   contact: Contact;
   isActive: boolean;
@@ -34,6 +36,7 @@ const ContactListItem = memo(function ContactListItem({
   onFilterByCanton?: (canton: string | null) => void;
   onClearCantonFilter?: () => void;
   activeCantonFilter?: string | null;
+  callLog?: ContactCallLog | null;
 }) {
   const handleClick = useCallback(() => {
     onSelect(contact.id);
@@ -76,16 +79,58 @@ const ContactListItem = memo(function ContactListItem({
           onClick={handleCantonClick}
         />
       </div>
-      <p className="mt-1 text-xs text-gray-400">
-        {contact.last_call
-          ? `Last call ${formatDate(contact.last_call)}`
-          : "Never logged"}
-      </p>
+      <CallLogDisplay callLog={callLog} />
     </button>
   );
 });
 
-const ITEM_HEIGHT = 88; // Approximate height of each contact item
+// Component to display the call log info
+const CallLogDisplay = memo(function CallLogDisplay({
+  callLog,
+}: {
+  callLog?: ContactCallLog | null;
+}) {
+  if (!callLog) {
+    return (
+      <p className="mt-1 text-xs text-gray-400">
+        Noch kein Call protokolliert
+      </p>
+    );
+  }
+
+  const callerName = callLog.caller?.full_name || "Unbekannt";
+  const callerInitials = callerName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  
+  const avatarUrl = callLog.caller?.avatar_url;
+  const relativeTime = formatRelativeTime(callLog.called_at);
+
+  return (
+    <div className="mt-1 flex items-center gap-1.5">
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt={callerName}
+          className="h-4 w-4 rounded-full object-cover"
+        />
+      ) : (
+        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gray-200 text-[8px] font-medium text-gray-600">
+          {callerInitials}
+        </span>
+      )}
+      <p className="text-xs text-gray-500">
+        <span className="font-medium">{callerName.split(" ")[0]}</span>
+        <span className="text-gray-400"> · {relativeTime}</span>
+      </p>
+    </div>
+  );
+});
+
+const ITEM_HEIGHT = 94; // Slightly taller to accommodate call log info
 
 export const ContactList = memo(function ContactList({
   contacts,
@@ -97,6 +142,7 @@ export const ContactList = memo(function ContactList({
   onClearCantonFilter,
   activeCantonFilter,
   availableCantons = [],
+  callLogs = {},
 }: ContactListProps) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
@@ -216,6 +262,7 @@ export const ContactList = memo(function ContactList({
                     onFilterByCanton={onFilterByCanton}
                     onClearCantonFilter={onClearCantonFilter}
                     activeCantonFilter={activeCantonFilter}
+                    callLog={callLogs[contact.id]}
                   />
                 </div>
               );
@@ -227,13 +274,28 @@ export const ContactList = memo(function ContactList({
   );
 });
 
-function formatDate(value: string) {
+function formatRelativeTime(isoDate: string): string {
   try {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
+    const date = new Date(isoDate);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "gerade eben";
+    if (diffMins < 60) return `vor ${diffMins} Min.`;
+    if (diffHours < 24) return `vor ${diffHours} Std.`;
+    if (diffDays === 1) return "gestern";
+    if (diffDays < 7) return `vor ${diffDays} Tagen`;
+    
+    // Format as date for older entries
+    return date.toLocaleDateString("de-CH", {
       day: "numeric",
-    }).format(new Date(value));
+      month: "short",
+    });
   } catch {
-    return value;
+    return isoDate;
   }
 }
+

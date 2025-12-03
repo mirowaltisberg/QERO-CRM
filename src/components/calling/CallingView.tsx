@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { ContactList } from "./ContactList";
 import { ContactDetail } from "./ContactDetail";
-import type { Contact } from "@/lib/types";
+import type { Contact, ContactCallLog } from "@/lib/types";
 import { useContacts } from "@/lib/hooks/useContacts";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { KEYBOARD_SHORTCUTS } from "@/lib/utils/constants";
@@ -11,6 +11,9 @@ import { KEYBOARD_SHORTCUTS } from "@/lib/utils/constants";
 interface CallingViewProps {
   initialContacts: Contact[];
 }
+
+// Minimum time (ms) a contact must be viewed before logging a call
+const MIN_VIEW_TIME_MS = 20000; // 20 seconds
 
 export function CallingView({ initialContacts }: CallingViewProps) {
   const {
@@ -35,6 +38,113 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     clearCantonFilter,
   } = useContacts({ initialContacts });
 
+  // Track call logs for contacts (contactId -> latest call log)
+  const [callLogs, setCallLogs] = useState<Record<string, ContactCallLog>>({});
+  
+  // Timer for tracking how long current contact has been active
+  const viewStartTimeRef = useRef<number | null>(null);
+  const [isEligibleForLog, setIsEligibleForLog] = useState(false);
+  const eligibilityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch call logs for all contacts on mount and when contacts change
+  useEffect(() => {
+    async function fetchCallLogs() {
+      if (contacts.length === 0) return;
+      
+      try {
+        // Fetch latest call log for each contact in parallel (batch of 10)
+        const batchSize = 10;
+        const logs: Record<string, ContactCallLog> = {};
+        
+        for (let i = 0; i < contacts.length; i += batchSize) {
+          const batch = contacts.slice(i, i + batchSize);
+          const results = await Promise.all(
+            batch.map(async (contact) => {
+              try {
+                const res = await fetch(`/api/contacts/${contact.id}/call-logs`);
+                if (res.ok) {
+                  const json = await res.json();
+                  return { contactId: contact.id, log: json.data };
+                }
+              } catch {
+                // Ignore errors for individual contacts
+              }
+              return { contactId: contact.id, log: null };
+            })
+          );
+          
+          results.forEach(({ contactId, log }) => {
+            if (log) {
+              logs[contactId] = log;
+            }
+          });
+        }
+        
+        setCallLogs(logs);
+      } catch (err) {
+        console.error("Error fetching call logs:", err);
+      }
+    }
+    
+    fetchCallLogs();
+  }, [contacts]);
+
+  // Reset timer when active contact changes
+  useEffect(() => {
+    // Clear previous timer
+    if (eligibilityTimerRef.current) {
+      clearTimeout(eligibilityTimerRef.current);
+      eligibilityTimerRef.current = null;
+    }
+    
+    // Reset eligibility
+    setIsEligibleForLog(false);
+    
+    if (activeContact) {
+      // Record when this contact became active
+      viewStartTimeRef.current = Date.now();
+      
+      // Set timer to mark eligible after 20 seconds
+      eligibilityTimerRef.current = setTimeout(() => {
+        setIsEligibleForLog(true);
+      }, MIN_VIEW_TIME_MS);
+    } else {
+      viewStartTimeRef.current = null;
+    }
+    
+    // Cleanup on unmount or contact change
+    return () => {
+      if (eligibilityTimerRef.current) {
+        clearTimeout(eligibilityTimerRef.current);
+      }
+    };
+  }, [activeContact?.id]);
+
+  // Log a call to the API
+  const logCall = useCallback(async () => {
+    if (!activeContact || !isEligibleForLog) return;
+    
+    try {
+      const res = await fetch(`/api/contacts/${activeContact.id}/call-logs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data && !json.data.duplicate) {
+          // Update local state with new call log
+          setCallLogs((prev) => ({
+            ...prev,
+            [activeContact.id]: json.data,
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Error logging call:", err);
+    }
+  }, [activeContact, isEligibleForLog]);
+
   const actionMessage = useMemo(() => {
     if (actionState.type && actionState.message) {
       return actionState.message;
@@ -43,11 +153,16 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     return null;
   }, [actionState, error]);
 
-  const handleCall = () => {
+  const handleCall = useCallback(() => {
     if (!activeContact?.phone) return;
+    
+    // Log the call if eligible
+    logCall();
+    
+    // Open phone dialer
     const tel = activeContact.phone.replace(/\s+/g, "");
     window.location.href = `tel:${tel}`;
-  };
+  }, [activeContact, logCall]);
 
   const handleOutcome = async (outcome: Parameters<typeof logCallOutcome>[0]) => {
     await logCallOutcome(outcome);
@@ -131,6 +246,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         onClearCantonFilter={clearCantonFilter}
         activeCantonFilter={cantonFilter}
         availableCantons={uniqueCantons}
+        callLogs={callLogs}
       />
       <ContactDetail
         key={activeContact?.id ?? "empty"}
