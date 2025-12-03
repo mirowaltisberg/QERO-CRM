@@ -7,6 +7,7 @@ import type { Contact, ContactCallLog } from "@/lib/types";
 import { useContacts } from "@/lib/hooks/useContacts";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { KEYBOARD_SHORTCUTS } from "@/lib/utils/constants";
+import { createClient } from "@/lib/supabase/client";
 
 interface CallingViewProps {
   initialContacts: Contact[];
@@ -89,6 +90,47 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     fetchCallLogs();
   }, [contacts]);
 
+  // Real-time subscription for call logs
+  useEffect(() => {
+    const supabase = createClient();
+    
+    // Subscribe to INSERT events on contact_call_logs
+    const channel = supabase
+      .channel("call-logs-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "contact_call_logs",
+        },
+        async (payload) => {
+          // When a new call log is inserted, fetch the full data with caller info
+          const newLog = payload.new as { id: string; contact_id: string; user_id: string; called_at: string };
+          
+          try {
+            const res = await fetch(`/api/contacts/${newLog.contact_id}/call-logs`);
+            if (res.ok) {
+              const json = await res.json();
+              if (json.data) {
+                setCallLogs((prev) => ({
+                  ...prev,
+                  [newLog.contact_id]: json.data,
+                }));
+              }
+            }
+          } catch (err) {
+            console.error("Error fetching updated call log:", err);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // Reset timer when active contact changes
   useEffect(() => {
     // Clear previous timer
@@ -133,7 +175,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
       if (res.ok) {
         const json = await res.json();
         if (json.data && !json.data.duplicate) {
-          // Update local state with new call log
+          // Update local state with new call log (also handled by realtime, but this is faster)
           setCallLogs((prev) => ({
             ...prev,
             [activeContact.id]: json.data,
@@ -263,4 +305,3 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     </div>
   );
 }
-
