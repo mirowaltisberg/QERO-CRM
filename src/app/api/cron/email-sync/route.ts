@@ -12,6 +12,7 @@ const MESSAGES_PER_FOLDER = 25;
 interface GraphMessage {
   id: string;
   conversationId: string;
+  internetMessageId?: string; // RFC 2822 Message-ID - same for sent and received copies
   subject: string | null;
   bodyPreview: string;
   body?: { contentType: string; content: string };
@@ -123,7 +124,7 @@ export async function GET(request: NextRequest) {
 
 async function fetchMessages(accessToken: string, folder: string, limit: number): Promise<GraphMessage[]> {
   // Only fetch essential fields (no body - too slow)
-  const url = `${GRAPH_BASE_URL}/me/mailFolders/${folder}/messages?$top=${limit}&$orderby=receivedDateTime desc&$select=id,conversationId,subject,bodyPreview,from,toRecipients,isRead,hasAttachments,receivedDateTime,sentDateTime`;
+  const url = `${GRAPH_BASE_URL}/me/mailFolders/${folder}/messages?$top=${limit}&$orderby=receivedDateTime desc&$select=id,conversationId,internetMessageId,subject,bodyPreview,from,toRecipients,isRead,hasAttachments,receivedDateTime,sentDateTime`;
 
   try {
     const res = await fetch(url, {
@@ -198,12 +199,33 @@ async function upsertMessage(
     threadId = newThread.id;
   }
 
+  // Check if message already exists by graph_message_id
+  const { data: existingMsg } = await adminSupabase
+    .from("email_messages")
+    .select("id")
+    .eq("graph_message_id", msg.id)
+    .single();
+
+  if (existingMsg) return false; // Already exists
+
+  // Also check by internet_message_id to avoid sent/received duplicates
+  if (msg.internetMessageId) {
+    const { data: duplicateMsg } = await adminSupabase
+      .from("email_messages")
+      .select("id")
+      .eq("internet_message_id", msg.internetMessageId)
+      .single();
+
+    if (duplicateMsg) return false; // Duplicate (sent/received copy)
+  }
+
   // Insert message (body will be fetched on-demand when user opens it)
   const { error } = await adminSupabase
     .from("email_messages")
     .insert({
       thread_id: threadId,
       graph_message_id: msg.id,
+      internet_message_id: msg.internetMessageId || null,
       sender_email: msg.from?.emailAddress?.address || emailAccount.mailbox,
       sender_name: msg.from?.emailAddress?.name || emailAccount.mailbox.split("@")[0],
       recipients: msg.toRecipients?.map((r) => r.emailAddress?.address).filter(Boolean) || [],

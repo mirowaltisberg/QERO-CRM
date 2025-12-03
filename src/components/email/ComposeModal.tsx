@@ -85,13 +85,33 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [showCc, setShowCc] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [signatureText, setSignatureText] = useState(EMAIL_SIGNATURE);
+  const [signatureHtml, setSignatureHtml] = useState(EMAIL_SIGNATURE_HTML);
+
+  // Fetch user's signature on mount
+  useEffect(() => {
+    async function fetchSignature() {
+      try {
+        const response = await fetch("/api/settings/signature");
+        const json = await response.json();
+        if (response.ok && json.data) {
+          setSignatureText(json.data.signature_text || EMAIL_SIGNATURE);
+          setSignatureHtml(json.data.signature_html || EMAIL_SIGNATURE_HTML);
+        }
+      } catch (err) {
+        console.error("Failed to fetch signature:", err);
+        // Keep defaults on error
+      }
+    }
+    fetchSignature();
+  }, []);
 
   // Reset form when modal opens/closes
   useEffect(() => {
     if (open) {
       // Pre-fill signature for new emails (not replies)
       if (!replyTo) {
-        setBody(EMAIL_SIGNATURE);
+        setBody(signatureText);
       }
     } else {
       setTo("");
@@ -206,10 +226,12 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
 
       // Build HTML body - replace plain text signature with HTML version
       let htmlBody = body;
-      if (htmlBody.includes("--\nFreundliche Grüsse")) {
+      // Look for signature separator (two newlines followed by --)
+      const sigSeparatorIdx = htmlBody.indexOf("\n\n--\n");
+      if (sigSeparatorIdx !== -1) {
         // Split at signature and use HTML version
-        const parts = htmlBody.split("--\nFreundliche Grüsse");
-        htmlBody = `<div>${parts[0].replace(/\n/g, "<br>")}</div>${EMAIL_SIGNATURE_HTML}`;
+        const messageBody = htmlBody.substring(0, sigSeparatorIdx);
+        htmlBody = `<div>${messageBody.replace(/\n/g, "<br>")}</div>${signatureHtml}`;
       } else {
         htmlBody = `<div>${body.replace(/\n/g, "<br>")}</div>`;
       }

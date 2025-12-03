@@ -37,6 +37,7 @@ export async function POST() {
 interface GraphMessage {
   id: string;
   conversationId: string;
+  internetMessageId?: string; // RFC 2822 Message-ID - same for sent and received copies
   subject: string | null;
   bodyPreview: string;
   body?: { contentType: string; content: string };
@@ -145,7 +146,7 @@ async function bulkSync(page: number) {
 
 // Fetch with body preview only (faster for regular sync)
 async function fetchMessages(accessToken: string, folder: string, limit: number): Promise<GraphMessage[]> {
-  const url = `${GRAPH_BASE_URL}/me/mailFolders/${folder}/messages?$top=${limit}&$orderby=receivedDateTime desc&$select=id,conversationId,subject,bodyPreview,body,from,toRecipients,isRead,hasAttachments,receivedDateTime,sentDateTime`;
+  const url = `${GRAPH_BASE_URL}/me/mailFolders/${folder}/messages?$top=${limit}&$orderby=receivedDateTime desc&$select=id,conversationId,internetMessageId,subject,bodyPreview,body,from,toRecipients,isRead,hasAttachments,receivedDateTime,sentDateTime`;
   
   try {
     const res = await fetch(url, {
@@ -163,7 +164,7 @@ async function fetchMessages(accessToken: string, folder: string, limit: number)
 // Fetch with FULL body content
 async function fetchMessagesWithBody(accessToken: string, folder: string, limit: number, skip: number): Promise<GraphMessage[]> {
   // Include body in the select
-  const url = `${GRAPH_BASE_URL}/me/mailFolders/${folder}/messages?$top=${limit}&$skip=${skip}&$orderby=receivedDateTime desc&$select=id,conversationId,subject,bodyPreview,body,from,toRecipients,isRead,hasAttachments,receivedDateTime,sentDateTime`;
+  const url = `${GRAPH_BASE_URL}/me/mailFolders/${folder}/messages?$top=${limit}&$skip=${skip}&$orderby=receivedDateTime desc&$select=id,conversationId,internetMessageId,subject,bodyPreview,body,from,toRecipients,isRead,hasAttachments,receivedDateTime,sentDateTime`;
   
   try {
     const res = await fetch(url, {

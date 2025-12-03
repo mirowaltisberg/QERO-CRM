@@ -50,6 +50,12 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
   const [emailAccount, setEmailAccount] = useState<EmailAccount | null>(null);
   const [emailLoading, setEmailLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
+  // Signature state
+  const [signatureText, setSignatureText] = useState("");
+  const [signatureHtml, setSignatureHtml] = useState("");
+  const [signatureLoading, setSignatureLoading] = useState(true);
+  const [savingSignature, setSavingSignature] = useState(false);
+  const [isDefaultSignature, setIsDefaultSignature] = useState(true);
 
   const supabase = createClient();
 
@@ -102,6 +108,54 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
       router.replace("/settings", { scroll: false });
     }
   }, [searchParams, router]);
+
+  // Signature handlers
+  async function handleSaveSignature() {
+    setSavingSignature(true);
+    try {
+      const response = await fetch("/api/settings/signature", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signature_text: signatureText,
+          signature_html: signatureHtml,
+        }),
+      });
+      if (response.ok) {
+        setMessage({ type: "success", text: "Signature saved!" });
+        setIsDefaultSignature(false);
+      } else {
+        throw new Error("Failed to save signature");
+      }
+    } catch (err) {
+      console.error("Save signature error:", err);
+      setMessage({ type: "error", text: "Failed to save signature." });
+    } finally {
+      setSavingSignature(false);
+    }
+  }
+
+  async function handleResetSignature() {
+    if (!confirm("Reset to default signature?")) return;
+    setSavingSignature(true);
+    try {
+      const response = await fetch("/api/settings/signature", { method: "DELETE" });
+      const json = await response.json();
+      if (response.ok && json.data) {
+        setSignatureText(json.data.signature_text || "");
+        setSignatureHtml(json.data.signature_html || "");
+        setIsDefaultSignature(true);
+        setMessage({ type: "success", text: "Signature reset to default!" });
+      } else {
+        throw new Error("Failed to reset signature");
+      }
+    } catch (err) {
+      console.error("Reset signature error:", err);
+      setMessage({ type: "error", text: "Failed to reset signature." });
+    } finally {
+      setSavingSignature(false);
+    }
+  }
 
   async function handleDisconnectEmail() {
     if (!confirm("Disconnect your Outlook account? This will remove all synced emails.")) return;
@@ -477,6 +531,70 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
           </div>
         )}
       </Panel>
+
+
+      {/* Email Signature */}
+      {emailAccount && (
+        <Panel title="Email Signature" description="Customize your email signature">
+          {signatureLoading ? (
+            <div className="flex items-center gap-3 text-sm text-gray-500">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+              Loading...
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium uppercase text-gray-400">
+                  Plain Text (shown in compose)
+                </label>
+                <textarea
+                  value={signatureText}
+                  onChange={(e) => setSignatureText(e.target.value)}
+                  rows={8}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  placeholder="Enter your signature..."
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium uppercase text-gray-400">
+                  HTML (used when sending)
+                </label>
+                <textarea
+                  value={signatureHtml}
+                  onChange={(e) => setSignatureHtml(e.target.value)}
+                  rows={10}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-mono text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  placeholder="Enter HTML signature..."
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-500">
+                  {isDefaultSignature ? "Using default signature" : "Custom signature"}
+                </div>
+                <div className="flex gap-2">
+                  {!isDefaultSignature && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleResetSignature}
+                      disabled={savingSignature}
+                    >
+                      Reset to Default
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={handleSaveSignature}
+                    disabled={savingSignature}
+                  >
+                    {savingSignature ? "Saving..." : "Save Signature"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </Panel>
+      )}
 
       {/* Danger Zone */}
       <Panel title="Sign Out" description="Sign out of your account">
