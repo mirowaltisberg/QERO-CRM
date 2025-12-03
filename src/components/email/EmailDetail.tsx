@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
 import type { EmailThread, EmailMessage } from "@/lib/types";
@@ -205,21 +205,97 @@ function MessageBubble({ message, isLast }: MessageBubbleProps) {
 
 // Component to fetch and display attachments
 function AttachmentsList({ messageId }: { messageId: string }) {
-  // For now, just show a placeholder - in a full implementation, 
-  // we'd fetch the attachments list from our DB or Graph API
+  const [attachments, setAttachments] = useState<Array<{
+    id: string;
+    name: string;
+    contentType: string;
+    size: number;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchAttachments() {
+      try {
+        const res = await fetch(`/api/email/attachments/list?messageId=${encodeURIComponent(messageId)}`);
+        if (!res.ok) {
+          throw new Error("Failed to load attachments");
+        }
+        const json = await res.json();
+        setAttachments(json.data?.attachments || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAttachments();
+  }, [messageId]);
+
+  if (loading) {
+    return (
+      <div className="text-xs text-gray-400">Loading attachments...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-xs text-red-500">{error}</div>
+    );
+  }
+
+  if (attachments.length === 0) {
+    return (
+      <div className="text-xs text-gray-400">No downloadable attachments</div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap gap-2">
-      <a
-        href={`/api/email/attachments/list?messageId=${encodeURIComponent(messageId)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-      >
-        <DownloadIcon className="h-3.5 w-3.5" />
-        View attachments
-      </a>
+      {attachments.map((att) => (
+        <a
+          key={att.id}
+          href={`/api/email/attachments/${encodeURIComponent(att.id)}?messageId=${encodeURIComponent(messageId)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
+          title={`${att.name} (${formatFileSize(att.size)})`}
+        >
+          <FileIcon contentType={att.contentType} />
+          <span className="max-w-[150px] truncate">{att.name}</span>
+          <span className="text-gray-400">({formatFileSize(att.size)})</span>
+        </a>
+      ))}
     </div>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function FileIcon({ contentType }: { contentType: string }) {
+  const iconClass = "h-3.5 w-3.5";
+  
+  if (contentType.startsWith("image/")) {
+    return (
+      <svg className={iconClass} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+      </svg>
+    );
+  }
+  
+  if (contentType === "application/pdf") {
+    return (
+      <svg className={cn(iconClass, "text-red-500")} fill="currentColor" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zm-2.5 9.5c0 .83-.67 1.5-1.5 1.5h-1v2H7v-6h2c.83 0 1.5.67 1.5 1.5v1zm5 0c0 .83-.67 1.5-1.5 1.5h-1v2h-1v-6h2c.83 0 1.5.67 1.5 1.5v1zm4-1.5h-1v1h1v1h-1v2h-1v-6h2v2z" />
+      </svg>
+    );
+  }
+
+  return <DownloadIcon className={iconClass} />;
 }
 
 function sanitizeHtml(html: string): string {
