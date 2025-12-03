@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { ContactList } from "./ContactList";
 import { ContactDetail } from "./ContactDetail";
 import type { Contact, ContactCallLog } from "@/lib/types";
@@ -128,7 +128,6 @@ export function CallingView({ initialContacts }: CallingViewProps) {
 
   // Reset call initiated state when switching contacts
   useEffect(() => {
-    // Don't reset if we're switching to the same contact or no contact
     if (activeContact?.id !== callInitiatedForContact) {
       setCallInitiatedForContact(null);
     }
@@ -145,7 +144,6 @@ export function CallingView({ initialContacts }: CallingViewProps) {
       if (res.ok) {
         const json = await res.json();
         if (json.data && !json.data.duplicate) {
-          // Update local state with new call log
           setCallLogs((prev) => ({
             ...prev,
             [contactId]: json.data,
@@ -176,19 +174,15 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     window.location.href = `tel:${tel}`;
   }, [activeContact]);
 
-  // Wrapper for saving notes - logs call if one was initiated
-  const handleSaveNotes = useCallback(async (notes: string | null) => {
-    if (!activeContact) return;
+  // When a new note is added, log the call if one was initiated
+  const handleNoteAdded = useCallback(async () => {
+    if (!activeContact || !callInitiatedForContact) return;
     
-    // Save the notes first
-    await updateNotes(notes);
-    
-    // If a call was initiated for this contact, log it now
-    if (callInitiatedForContact === activeContact.id && notes) {
+    if (callInitiatedForContact === activeContact.id) {
       await logCallToApi(activeContact.id);
-      setCallInitiatedForContact(null); // Reset after logging
+      setCallInitiatedForContact(null);
     }
-  }, [activeContact, callInitiatedForContact, updateNotes, logCallToApi]);
+  }, [activeContact, callInitiatedForContact, logCallToApi]);
 
   const handleOutcome = async (outcome: Parameters<typeof logCallOutcome>[0]) => {
     await logCallOutcome(outcome);
@@ -279,13 +273,13 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         contact={activeContact}
         onCall={handleCall}
         onNext={goToNextContact}
-        onSaveNotes={handleSaveNotes}
+        onSaveNotes={updateNotes}
         actionMessage={actionMessage}
         onUpdateStatus={updateStatus}
         onScheduleFollowUp={scheduleFollowUp}
         onClearFollowUp={clearFollowUp}
         onClearStatus={clearStatus}
-        
+        onNoteAdded={handleNoteAdded}
       />
     </div>
   );
