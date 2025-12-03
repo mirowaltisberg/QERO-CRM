@@ -1,0 +1,197 @@
+import { NextRequest } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { respondError, respondSuccess } from "@/lib/utils/api-response";
+import { ensureValidToken } from "@/lib/email/graph-client";
+import type { EmailAccount } from "@/lib/email/graph-client";
+import * as fs from "fs";
+import * as path from "path";
+
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+// Email template
+const EMAIL_SUBJECT = "Kandidatenvorschläge & AGB";
+
+const EMAIL_BODY_TEXT = `Guten Tag
+
+Im Anhang sende ich Ihnen die Kurzprofile eines oder mehrerer Kandidaten, die fachlich und persönlich sehr gut zu Ihrem Unternehmen passen.
+
+Die Unterlagen geben Ihnen einen ersten Überblick. Gerne organisiere ich bei Interesse ein persönliches Gespräch oder einen unverbindlichen Einsatz.
+
+Zusätzlich finden Sie unsere AGB im Anhang.
+
+Für Rückfragen stehe ich Ihnen jederzeit gerne zur Verfügung.`;
+
+const EMAIL_BODY_HTML = `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+<p>Guten Tag</p>
+<p>Im Anhang sende ich Ihnen die Kurzprofile eines oder mehrerer Kandidaten, die fachlich und persönlich sehr gut zu Ihrem Unternehmen passen.</p>
+<p>Die Unterlagen geben Ihnen einen ersten Überblick. Gerne organisiere ich bei Interesse ein persönliches Gespräch oder einen unverbindlichen Einsatz.</p>
+<p>Zusätzlich finden Sie unsere AGB im Anhang.</p>
+<p>Für Rückfragen stehe ich Ihnen jederzeit gerne zur Verfügung.</p>
+</div>`;
+
+const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
+
+// POST /api/contacts/[id]/send-email - Send template email to all contact emails
+export async function POST(request: NextRequest, context: RouteContext) {
+  const { id } = await context.params;
+
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return respondError("Unauthorized", 401);
+    }
+
+    const adminSupabase = createAdminClient();
+
+    // Get email account with tokens
+    const { data: account, error: accountError } = await adminSupabase
+      .from("email_accounts")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("provider", "outlook")
+      .single();
+
+    if (accountError || !account) {
+      return respondError("Bitte verbinde zuerst dein Outlook-Konto in den Einstellungen.", 404);
+    }
+
+    const emailAccount = account as EmailAccount;
+
+    // Get contact
+    const { data: contact, error: contactError } = await adminSupabase
+      .from("contacts")
+      .select("id, company_name, contact_name, email")
+      .eq("id", id)
+      .single();
+
+    if (contactError || !contact) {
+      return respondError("Contact not found", 404);
+    }
+
+    // Get contact persons
+    const { data: persons } = await adminSupabase
+      .from("contact_persons")
+      .select("first_name, last_name, email")
+      .eq("contact_id", id);
+
+    // Collect all emails
+    const allEmails = new Set<string>();
+
+    // Add contact email(s) - could be comma-separated
+    if (contact.email) {
+      contact.email.split(/[,;]/).forEach((e: string) => {
+        const trimmed = e.trim().toLowerCase();
+        if (trimmed && trimmed.includes("@")) {
+          allEmails.add(trimmed);
+        }
+      });
+    }
+
+    // Add contact person emails
+    if (persons) {
+      persons.forEach((p) => {
+        if (p.email) {
+          const trimmed = p.email.trim().toLowerCase();
+          if (trimmed && trimmed.includes("@")) {
+            allEmails.add(trimmed);
+          }
+        }
+      });
+    }
+
+    if (allEmails.size === 0) {
+      return respondError("Keine E-Mail-Adressen für diesen Kontakt gefunden.", 400);
+    }
+
+    const emailList = Array.from(allEmails);
+
+    // Get user's signature
+    const { data: profile } = await adminSupabase
+      .from("profiles")
+      .select("email_signature_html")
+      .eq("id", user.id)
+      .single();
+
+    const signatureHtml = profile?.email_signature_html || "";
+
+    // Build full HTML body with signature
+    const fullBodyHtml = signatureHtml 
+      ? `${EMAIL_BODY_HTML}${signatureHtml}` 
+      : EMAIL_BODY_HTML;
+
+    // Read AGB PDF attachment
+    let attachments: Array<{
+      "@odata.type": string;
+      name: string;
+      contentType: string;
+      contentBytes: string;
+    }> = [];
+
+    try {
+      const pdfPath = path.join(process.cwd(), "public", "files", "AGB-QERO.pdf");
+      if (fs.existsSync(pdfPath)) {
+        const pdfBuffer = fs.readFileSync(pdfPath);
+        const pdfBase64 = pdfBuffer.toString("base64");
+        attachments.push({
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          name: "AGB QERO AG.pdf",
+          contentType: "application/pdf",
+          contentBytes: pdfBase64,
+        });
+      } else {
+        console.warn("[Send Email] AGB PDF not found at:", pdfPath);
+      }
+    } catch (fileErr) {
+      console.error("[Send Email] Error reading AGB PDF:", fileErr);
+    }
+
+    // Get access token
+    const accessToken = await ensureValidToken(emailAccount);
+
+    // Build the message payload
+    const message = {
+      subject: EMAIL_SUBJECT,
+      body: {
+        contentType: "HTML",
+        content: fullBodyHtml,
+      },
+      toRecipients: emailList.map((email) => ({
+        emailAddress: { address: email },
+      })),
+      attachments,
+    };
+
+    // Send via Graph API
+    const response = await fetch(`${GRAPH_BASE_URL}/me/sendMail`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Send Email] Graph API error:", response.status, errorText);
+      return respondError(`E-Mail konnte nicht gesendet werden: ${response.status}`, 500);
+    }
+
+    return respondSuccess({
+      sent: true,
+      recipients: emailList,
+      attachmentIncluded: attachments.length > 0,
+    });
+  } catch (err) {
+    console.error("[Send Email] Error:", err);
+    return respondError(
+      err instanceof Error ? err.message : "E-Mail konnte nicht gesendet werden",
+      500
+    );
+  }
+}

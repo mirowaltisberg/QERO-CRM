@@ -41,6 +41,8 @@ export const ContactDetail = memo(function ContactDetail({
   const [customDate, setCustomDate] = useState(() => getDefaultDateISO());
   const [customTime, setCustomTime] = useState("09:00");
   const [customNote, setCustomNote] = useState(contact?.follow_up_note ?? "");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState<{ success: boolean; message: string } | null>(null);
 
   const displayPhone = contact?.phone ?? "No phone number";
   const displayEmail = contact?.email ?? "No email";
@@ -52,6 +54,33 @@ export const ContactDetail = memo(function ContactDetail({
     await onScheduleFollowUp({ date, note: customNote.trim() || undefined });
     setIsFollowUpModalOpen(false);
   }, [customDate, customTime, customNote, onScheduleFollowUp]);
+
+  const handleSendEmail = useCallback(async () => {
+    if (!contact) return;
+    setSendingEmail(true);
+    setEmailSent(null);
+    try {
+      const response = await fetch(`/api/contacts/${contact.id}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || "E-Mail konnte nicht gesendet werden");
+      }
+      setEmailSent({
+        success: true,
+        message: `E-Mail gesendet an: ${json.data.recipients.join(", ")}`,
+      });
+    } catch (err) {
+      setEmailSent({
+        success: false,
+        message: err instanceof Error ? err.message : "E-Mail konnte nicht gesendet werden",
+      });
+    } finally {
+      setSendingEmail(false);
+    }
+  }, [contact]);
 
   if (!contact) {
     return (
@@ -77,12 +106,22 @@ export const ContactDetail = memo(function ContactDetail({
         {/* Call panel - fixed */}
         <div className="flex-shrink-0 mb-4">
           <Panel
-            title="Call"
-            description="Press C to call instantly"
+            title="Kontakt"
+            description="Anrufen oder E-Mail senden"
             actions={
-              <Button onClick={onCall} size="lg">
-                Call {contact.contact_name?.split(" ")[0] ?? ""}
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={onCall} size="lg">
+                  Anrufen
+                </Button>
+                <Button 
+                  onClick={handleSendEmail} 
+                  size="lg" 
+                  variant="secondary"
+                  disabled={sendingEmail}
+                >
+                  {sendingEmail ? "Senden..." : "E-Mail senden"}
+                </Button>
+              </div>
             }
           >
             <div className="grid gap-4 text-sm text-gray-600 md:grid-cols-3">
@@ -92,6 +131,16 @@ export const ContactDetail = memo(function ContactDetail({
                 <CantonTag canton={contact.canton} size="md" />
               </InfoBlock>
             </div>
+            {emailSent && (
+              <div className={cn(
+                "mt-3 rounded-lg px-3 py-2 text-sm",
+                emailSent.success 
+                  ? "bg-green-50 text-green-700 border border-green-200" 
+                  : "bg-red-50 text-red-600 border border-red-200"
+              )}>
+                {emailSent.message}
+              </div>
+            )}
           </Panel>
         </div>
 
