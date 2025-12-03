@@ -13,9 +13,6 @@ interface CallingViewProps {
   initialContacts: Contact[];
 }
 
-// Time (ms) to wait after pressing call before logging
-const CALL_LOG_DELAY_MS = 20000; // 20 seconds
-
 export function CallingView({ initialContacts }: CallingViewProps) {
   const {
     contacts,
@@ -42,11 +39,8 @@ export function CallingView({ initialContacts }: CallingViewProps) {
   // Track call logs for contacts (contactId -> latest call log)
   const [callLogs, setCallLogs] = useState<Record<string, ContactCallLog>>({});
   
-  // Track pending call log (waiting for 20 seconds to pass)
-  const pendingCallRef = useRef<{
-    contactId: string;
-    timerId: NodeJS.Timeout;
-  } | null>(null);
+  // Track if a call was initiated for the current contact (waiting for note)
+  const [callInitiatedForContact, setCallInitiatedForContact] = useState<string | null>(null);
 
   // Fetch call logs for all contacts on mount and when contacts change
   useEffect(() => {
@@ -132,23 +126,13 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     };
   }, []);
 
-  // Cancel pending call log if contact changes
+  // Reset call initiated state when switching contacts
   useEffect(() => {
-    if (pendingCallRef.current && pendingCallRef.current.contactId !== activeContact?.id) {
-      // User switched contacts before 20 seconds - cancel the log
-      clearTimeout(pendingCallRef.current.timerId);
-      pendingCallRef.current = null;
+    // Don't reset if we're switching to the same contact or no contact
+    if (activeContact?.id !== callInitiatedForContact) {
+      setCallInitiatedForContact(null);
     }
   }, [activeContact?.id]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (pendingCallRef.current) {
-        clearTimeout(pendingCallRef.current.timerId);
-      }
-    };
-  }, []);
 
   // Log a call to the API
   const logCallToApi = useCallback(async (contactId: string) => {
@@ -184,28 +168,27 @@ export function CallingView({ initialContacts }: CallingViewProps) {
   const handleCall = useCallback(() => {
     if (!activeContact?.phone) return;
     
-    // Cancel any existing pending call log
-    if (pendingCallRef.current) {
-      clearTimeout(pendingCallRef.current.timerId);
-      pendingCallRef.current = null;
-    }
-    
-    // Start 20 second timer - if user stays on this contact, log the call
-    const contactId = activeContact.id;
-    const timerId = setTimeout(() => {
-      // Check if still on the same contact
-      if (pendingCallRef.current?.contactId === contactId) {
-        logCallToApi(contactId);
-        pendingCallRef.current = null;
-      }
-    }, CALL_LOG_DELAY_MS);
-    
-    pendingCallRef.current = { contactId, timerId };
+    // Mark that a call was initiated for this contact
+    setCallInitiatedForContact(activeContact.id);
     
     // Open phone dialer
     const tel = activeContact.phone.replace(/\s+/g, "");
     window.location.href = `tel:${tel}`;
-  }, [activeContact, logCallToApi]);
+  }, [activeContact]);
+
+  // Wrapper for saving notes - logs call if one was initiated
+  const handleSaveNotes = useCallback(async (notes: string) => {
+    if (!activeContact) return;
+    
+    // Save the notes first
+    await updateNotes(notes);
+    
+    // If a call was initiated for this contact, log it now
+    if (callInitiatedForContact === activeContact.id) {
+      await logCallToApi(activeContact.id);
+      setCallInitiatedForContact(null); // Reset after logging
+    }
+  }, [activeContact, callInitiatedForContact, updateNotes, logCallToApi]);
 
   const handleOutcome = async (outcome: Parameters<typeof logCallOutcome>[0]) => {
     await logCallOutcome(outcome);
@@ -296,12 +279,13 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         contact={activeContact}
         onCall={handleCall}
         onNext={goToNextContact}
-        onSaveNotes={updateNotes}
+        onSaveNotes={handleSaveNotes}
         actionMessage={actionMessage}
         onUpdateStatus={updateStatus}
         onScheduleFollowUp={scheduleFollowUp}
         onClearFollowUp={clearFollowUp}
         onClearStatus={clearStatus}
+        callInitiated={callInitiatedForContact === activeContact?.id}
       />
     </div>
   );
