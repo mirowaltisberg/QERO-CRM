@@ -58,6 +58,17 @@ export const TMA_STATUS_STYLES: Record<TmaStatus, { bg: string; text: string; bo
   C: { bg: "#F34B4B", text: "#5D0C0C", border: "#F34B4B" },
 };
 
+export const ROLE_COLOR_SWATCHES = [
+  "#2563EB",
+  "#10B981",
+  "#F59E0B",
+  "#EC4899",
+  "#8B5CF6",
+  "#14B8A6",
+  "#F97316",
+  "#6B7280",
+] as const;
+
 /**
  * TMA Activity Status (Active/Not Active)
  */

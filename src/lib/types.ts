@@ -52,6 +52,7 @@ export interface TmaCandidate {
   email: string | null;
   canton: string | null;
   status: TmaStatus | null; // Quality: A (Top), B (Ok), C (Flop)
+  status_tags: TmaStatus[]; // Multi-select A/B/C
   activity: TmaActivity | null; // Activity: active, inactive
   city: string | null;
   street: string | null;
@@ -66,12 +67,26 @@ export interface TmaCandidate {
   team_id: string | null; // Which industry vertical this candidate belongs to
   created_at: string;
   claimed_by: string | null;
+  // Coordinates for location search
+  latitude: number | null;
+  longitude: number | null;
+  // Computed distance (only present in radius search results)
+  distance_km?: number;
   // Joined from profiles when fetched
   claimer?: {
     id: string;
     full_name: string;
     avatar_url: string | null;
   } | null;
+}
+
+export interface TmaRole {
+  id: string;
+  team_id: string;
+  name: string;
+  color: string;
+  note: string | null;
+  created_at: string;
 }
 
 /**
@@ -180,6 +195,9 @@ export interface TmaFilters {
   search?: string;
   page?: number;
   pageSize?: number;
+  // Location-based search
+  locationQuery?: string;
+  radiusKm?: number;
 }
 
 /**
@@ -212,5 +230,90 @@ export interface DashboardStats {
     count: number;
   }>;
   followUps: Contact[];
+}
+
+// ============================================
+// EMAIL INTEGRATION TYPES
+// ============================================
+
+export type EmailProvider = "outlook";
+
+export interface EmailAccount {
+  id: string;
+  user_id: string;
+  provider: EmailProvider;
+  mailbox: string;
+  token_expires_at: string | null;
+  last_sync_at: string | null;
+  sync_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type EmailFolder = "inbox" | "sent" | "drafts" | "archive" | "trash";
+
+export interface EmailThread {
+  id: string;
+  account_id: string;
+  graph_conversation_id: string;
+  subject: string | null;
+  snippet: string | null;
+  folder: EmailFolder;
+  participants: string[];
+  is_read: boolean;
+  is_starred: boolean;
+  has_attachments: boolean;
+  last_message_at: string | null;
+  linked_contact_id: string | null;
+  linked_tma_id: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  messages?: EmailMessage[];
+  linked_contact?: Contact | null;
+  linked_tma?: TmaCandidate | null;
+}
+
+export interface EmailMessage {
+  id: string;
+  thread_id: string;
+  graph_message_id: string;
+  sender_email: string;
+  sender_name: string | null;
+  recipients: string[];
+  cc: string[] | null;
+  bcc: string[] | null;
+  subject: string | null;
+  body_preview: string | null;
+  body_html: string | null;
+  body_text: string | null;
+  is_read: boolean;
+  is_draft: boolean;
+  has_attachments: boolean;
+  sent_at: string | null;
+  received_at: string | null;
+  created_at: string;
+  // Joined data
+  attachments?: EmailAttachment[];
+}
+
+export interface EmailAttachment {
+  id: string;
+  message_id: string;
+  graph_attachment_id: string;
+  name: string;
+  content_type: string | null;
+  size_bytes: number | null;
+  storage_path: string | null;
+  created_at: string;
+}
+
+export interface EmailFilters {
+  folder?: EmailFolder;
+  is_read?: boolean;
+  is_starred?: boolean;
+  search?: string;
+  linked_contact_id?: string;
+  linked_tma_id?: string;
 }
 

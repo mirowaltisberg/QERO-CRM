@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { NotesPanel } from "@/components/calling/NotesPanel";
-import type { TmaCandidate } from "@/lib/types";
+import { RoleDropdown } from "./RoleDropdown";
+import type { TmaCandidate, TmaRole } from "@/lib/types";
 import { 
   TMA_STATUS_LIST, 
   TMA_STATUS_LABELS, 
@@ -25,8 +26,14 @@ import { cn } from "@/lib/utils/cn";
 
 interface Props {
   candidate: TmaCandidate | null;
-  onUpdateStatus: (status: TmaStatus) => Promise<void> | void;
-  onClearStatus: () => Promise<void> | void;
+  roles: TmaRole[];
+  rolesLoading: boolean;
+  onCreateRole: (payload: { name: string; color: string; note?: string | null }) => Promise<TmaRole>;
+  onUpdateRoleMetadata: (id: string, payload: Partial<Pick<TmaRole, "name" | "color" | "note">>) => Promise<TmaRole>;
+  onDeleteRole: (id: string) => Promise<void>;
+  onRefreshRoles: () => Promise<void>;
+  onToggleStatusTag: (status: TmaStatus) => Promise<void> | void;
+  onClearStatusTags: () => Promise<void> | void;
   onUpdateActivity: (activity: TmaActivity) => Promise<void> | void;
   onClearActivity: () => Promise<void> | void;
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
@@ -36,12 +43,31 @@ interface Props {
   ) => Promise<void>;
   onUpdatePosition: (value: string | null) => Promise<void> | void;
   onUpdateAddress: (payload: { city: string | null; street: string | null; postal_code: string | null }) => Promise<void> | void;
+  onUpdatePhone: (value: string | null) => Promise<void> | void;
+}
+
+const STATUS_ORDER: TmaStatus[] = ["A", "B", "C"];
+
+function getStatusTags(candidate: TmaCandidate | null) {
+  if (!candidate) return [];
+  if (candidate.status_tags && candidate.status_tags.length > 0) return sortStatusTags(candidate.status_tags);
+  return candidate.status ? [candidate.status] : [];
+}
+
+function sortStatusTags(tags: TmaStatus[]) {
+  return [...tags].sort((a, b) => STATUS_ORDER.indexOf(a) - STATUS_ORDER.indexOf(b));
 }
 
 export function TmaDetail({
   candidate,
-  onUpdateStatus,
-  onClearStatus,
+  roles,
+  rolesLoading,
+  onCreateRole,
+  onUpdateRoleMetadata,
+  onDeleteRole,
+  onRefreshRoles,
+  onToggleStatusTag,
+  onClearStatusTags,
   onUpdateActivity,
   onClearActivity,
   onScheduleFollowUp,
@@ -49,6 +75,7 @@ export function TmaDetail({
   onUpdateDocuments,
   onUpdatePosition,
   onUpdateAddress,
+  onUpdatePhone,
 }: Props) {
   const initialFollowUpDate = candidate?.follow_up_at ? new Date(candidate.follow_up_at) : null;
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
@@ -60,16 +87,20 @@ export function TmaDetail({
   );
   const [followUpNote, setFollowUpNote] = useState(candidate?.follow_up_note ?? "");
   const [uploading, setUploading] = useState<"cv" | "references" | "short_profile" | null>(null);
-  const [position, setPosition] = useState(() => candidate?.position_title ?? "");
   const [city, setCity] = useState(() => candidate?.city ?? "");
   const [street, setStreet] = useState(() => candidate?.street ?? "");
   const [postalCode, setPostalCode] = useState(() => candidate?.postal_code ?? "");
-  const handlePositionBlur = useCallback(async () => {
-    if (!candidate) return;
-    const trimmed = position.trim();
-    if (trimmed === (candidate.position_title?.trim() ?? "")) return;
-    await onUpdatePosition(trimmed.length ? trimmed : null);
-  }, [candidate, onUpdatePosition, position]);
+  const [phone, setPhone] = useState(() => candidate?.phone ?? "");
+  const handleRoleSelect = useCallback(
+    async (roleName: string | null) => {
+      if (!candidate) return;
+      const current = candidate.position_title?.trim() || null;
+      const next = roleName?.trim() || null;
+      if (current === next) return;
+      await onUpdatePosition(next);
+    },
+    [candidate, onUpdatePosition]
+  );
 
   const handleAddressBlur = useCallback(async () => {
     if (!candidate) return;
@@ -87,6 +118,13 @@ export function TmaDetail({
     }
     await onUpdateAddress(payload);
   }, [candidate, city, street, postalCode, onUpdateAddress]);
+
+  const handlePhoneBlur = useCallback(async () => {
+    if (!candidate) return;
+    const trimmed = phone.trim() || null;
+    if (trimmed === (candidate.phone ?? null)) return;
+    await onUpdatePhone(trimmed);
+  }, [candidate, phone, onUpdatePhone]);
 
   const handleQuickFollowUp = async () => {
     if (!candidate) return;
@@ -136,6 +174,14 @@ export function TmaDetail({
   );
 
   const phoneLink = useMemo(() => candidate?.phone?.replace(/\s+/g, ""), [candidate?.phone]);
+  const statusTags = useMemo(() => getStatusTags(candidate), [candidate]);
+  const activeRole = useMemo(() => {
+    if (!candidate?.position_title) return null;
+    const normalized = candidate.position_title.trim().toLowerCase();
+    return roles.find((role) => role.name.trim().toLowerCase() === normalized) ?? null;
+  }, [candidate, roles]);
+  const roleLabel = candidate?.position_title?.trim() ?? null;
+  const roleColor = activeRole?.color ?? "#4B5563";
 
   if (!candidate) {
     return (
@@ -154,7 +200,7 @@ export function TmaDetail({
     .slice(0, 2) || "??";
 
   return (
-    <section className="flex h-full flex-col overflow-hidden">
+    <section className="flex h-full flex-col overflow-y-auto">
       <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           {/* Claimed status */}
@@ -213,16 +259,33 @@ export function TmaDetail({
               </a>
             )}
             {candidate.phone && (
-              <button
-                onClick={() => {
-                  if (phoneLink) window.open(`tel:${phoneLink}`, "_self");
-                }}
-                className="inline-flex rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700 hover:border-gray-400"
+              <a
+                href={`tel:${phoneLink}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700 hover:border-gray-400 hover:text-gray-900"
               >
-                Call {candidate.phone}
-              </button>
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                {candidate.phone}
+              </a>
             )}
             {candidate.canton && <CantonTag canton={candidate.canton} size="md" />}
+            {roleLabel && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium"
+                style={{
+                  borderColor: `${roleColor}40`,
+                  backgroundColor: `${roleColor}14`,
+                  color: roleColor,
+                }}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: roleColor }}
+                />
+                {roleLabel}
+              </span>
+            )}
           </div>
           {(candidate.city || candidate.postal_code || candidate.street) && (
             <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
@@ -238,13 +301,18 @@ export function TmaDetail({
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs uppercase text-gray-400">Role / Position</label>
-              <Input
-                value={position}
-                onChange={(event) => setPosition(event.target.value)}
-                onBlur={handlePositionBlur}
-                placeholder="e.g. Montage-Elektriker"
-                className="mt-1"
-              />
+              <div className="mt-1">
+                <RoleDropdown
+                  value={candidate.position_title}
+                  roles={roles}
+                  loading={rolesLoading}
+                  onSelect={handleRoleSelect}
+                  onCreateRole={onCreateRole}
+                  onUpdateRole={onUpdateRoleMetadata}
+                  onDeleteRole={onDeleteRole}
+                  onRefreshRoles={onRefreshRoles}
+                />
+              </div>
             </div>
             <div>
               <label className="text-xs uppercase text-gray-400">City</label>
@@ -276,25 +344,53 @@ export function TmaDetail({
                 className="mt-1"
               />
             </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs uppercase text-gray-400">Phone</label>
+              <div className="mt-1 flex gap-2">
+                <Input
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  onBlur={handlePhoneBlur}
+                  placeholder="e.g. +41 79 123 45 67"
+                  className="flex-1"
+                />
+                {phone && (
+                  <a
+                    href={`tel:${phone.replace(/\s+/g, "")}`}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 text-sm font-medium text-green-700 hover:bg-green-100 hover:border-green-300 transition-colors"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                    Call
+                  </a>
+                )}
+              </div>
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Quality Status (A/B/C) */}
-          <Tag
-            status={undefined}
-            className="bg-gray-100 text-gray-500 border-gray-200"
-            style={
-              candidate.status
-                ? {
-                    backgroundColor: `${TMA_STATUS_STYLES[candidate.status as TmaStatus].bg}20`,
-                    color: TMA_STATUS_STYLES[candidate.status as TmaStatus].text,
-                    borderColor: `${TMA_STATUS_STYLES[candidate.status as TmaStatus].border}50`,
-                  }
-                : undefined
-            }
-          >
-            {candidate.status ? TMA_STATUS_LABELS[candidate.status as TmaStatus] : "Quality"}
-          </Tag>
+          {statusTags.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {statusTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 rounded-full border bg-white/80 px-2.5 py-1 text-[11px] font-medium"
+                  style={{
+                    color: TMA_STATUS_STYLES[tag].text,
+                    borderColor: `${TMA_STATUS_STYLES[tag].border}60`,
+                    backgroundColor: `${TMA_STATUS_STYLES[tag].bg}10`,
+                  }}
+                >
+                  <span>{tag}</span>
+                  <span className="text-gray-400">{TMA_STATUS_LABELS[tag]}</span>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">Quality not set</span>
+          )}
           {/* Activity Status (Active/Not Active) */}
           <Tag
             status={undefined}
@@ -314,10 +410,10 @@ export function TmaDetail({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden px-6 py-6">
-        <div className="grid h-full min-h-0 gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex-1 px-6 py-6">
+        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
           {/* Left column - Notes */}
-          <div className="flex h-full flex-col gap-6 overflow-hidden min-h-0">
+          <div className="flex flex-col gap-6">
             <NotesPanel
               entityId={candidate.id}
               entityType="tma"
@@ -327,7 +423,7 @@ export function TmaDetail({
           </div>
 
           {/* Right column - Status, Activity, Documents */}
-          <div className="flex flex-col gap-6 overflow-y-auto pr-1">
+          <div className="flex flex-col gap-6">
             <Panel title="Follow-up" description="Stay on top of next actions">
             <div className="space-y-4 text-sm text-gray-600">
               <div>
@@ -348,15 +444,15 @@ export function TmaDetail({
             </div>
           </Panel>
 
-          <Panel title="Quality" description="Rate candidate quality">
+          <Panel title="Quality" description="Assign one or multiple quality tags">
             <div className="flex flex-wrap gap-2">
               {TMA_STATUS_LIST.map((status) => (
                 <button
                   key={status}
-                  onClick={() => onUpdateStatus(status)}
+                  onClick={() => onToggleStatusTag(status)}
                   className={cn(
                     "rounded-xl border px-3 py-2 text-left text-sm transition",
-                    candidate.status === status
+                    statusTags.includes(status)
                       ? "border-gray-900 bg-gray-900 text-white"
                       : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"
                   )}
@@ -364,9 +460,9 @@ export function TmaDetail({
                   <p className="font-medium">{TMA_STATUS_LABELS[status]}</p>
                 </button>
               ))}
-              {candidate.status && (
+              {statusTags.length > 0 && (
                 <button
-                  onClick={onClearStatus}
+                  onClick={onClearStatusTags}
                   className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600"
                 >
                   Clear

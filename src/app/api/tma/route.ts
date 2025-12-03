@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     const filters = filtersResult.data;
     if (filters.status) {
-      query = query.eq("status", filters.status);
+      query = query.contains("status_tags", [filters.status]);
     }
     if (filters.canton) {
       query = query.eq("canton", filters.canton);

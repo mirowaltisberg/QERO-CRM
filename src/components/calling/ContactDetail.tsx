@@ -75,23 +75,23 @@ export const ContactDetail = memo(function ContactDetail({
 
         {/* Call panel - fixed */}
         <div className="flex-shrink-0 mb-4">
-          <Panel
-            title="Call"
-            description="Press C to call instantly"
-            actions={
-              <Button onClick={onCall} size="lg">
-                Call {contact.contact_name?.split(" ")[0] ?? ""}
-              </Button>
-            }
-          >
-            <div className="grid gap-4 text-sm text-gray-600 md:grid-cols-3">
-              <InfoBlock label="Phone" value={displayPhone} />
-              <InfoBlock label="Email" value={displayEmail} />
-              <InfoBlock label="Canton">
-                <CantonTag canton={contact.canton} size="md" />
-              </InfoBlock>
-            </div>
-          </Panel>
+        <Panel
+          title="Call"
+          description="Press C to call instantly"
+          actions={
+            <Button onClick={onCall} size="lg">
+              Call {contact.contact_name?.split(" ")[0] ?? ""}
+            </Button>
+          }
+        >
+          <div className="grid gap-4 text-sm text-gray-600 md:grid-cols-3">
+            <InfoBlock label="Phone" value={displayPhone} />
+            <InfoBlock label="Email" value={displayEmail} />
+            <InfoBlock label="Canton">
+              <CantonTag canton={contact.canton} size="md" />
+            </InfoBlock>
+          </div>
+        </Panel>
         </div>
 
         {/* Compact status + follow-up toolbar - fixed */}

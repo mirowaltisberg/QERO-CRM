@@ -52,13 +52,39 @@ CREATE TABLE tma_candidates (
   status TEXT DEFAULT NULL CHECK (
     status IS NULL OR status IN ('A', 'B', 'C')
   ),
+  status_tags TEXT[] DEFAULT ARRAY[]::TEXT[],
   position_title TEXT,
   notes TEXT,
   follow_up_at TIMESTAMPTZ,
   follow_up_note TEXT,
   cv_url TEXT,
   references_url TEXT,
+  city TEXT,
+  street TEXT,
+  postal_code TEXT,
+  claimed_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
   short_profile_url TEXT,
+  normalized_email TEXT GENERATED ALWAYS AS (
+    CASE
+      WHEN email IS NULL OR length(btrim(email)) = 0 THEN NULL
+      ELSE lower(btrim(email))
+    END
+  ) STORED,
+  dedupe_key TEXT GENERATED ALWAYS AS (
+    CASE
+      WHEN first_name IS NULL OR last_name IS NULL THEN NULL
+      WHEN COALESCE(
+        NULLIF(regexp_replace(COALESCE(phone, ''), '[^0-9]+', '', 'g'), ''),
+        NULLIF(upper(regexp_replace(COALESCE(postal_code, ''), '\\s+', '', 'g')), '')
+      ) IS NULL THEN NULL
+      ELSE lower(btrim(first_name)) || '|' || lower(btrim(last_name)) || '|' ||
+        COALESCE(
+          NULLIF(regexp_replace(COALESCE(phone, ''), '[^0-9]+', '', 'g'), ''),
+          NULLIF(upper(regexp_replace(COALESCE(postal_code, ''), '\\s+', '', 'g')), '')
+        )
+    END
+  ) STORED,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -66,6 +92,30 @@ CREATE INDEX idx_tma_status ON tma_candidates(status);
 CREATE INDEX idx_tma_canton ON tma_candidates(canton);
 CREATE INDEX idx_tma_created_at ON tma_candidates(created_at DESC);
 CREATE INDEX idx_tma_follow_up_at ON tma_candidates(follow_up_at);
+CREATE INDEX idx_tma_status_tags ON tma_candidates USING GIN (status_tags);
+CREATE UNIQUE INDEX tma_candidates_normalized_email_key
+  ON tma_candidates (normalized_email)
+  WHERE normalized_email IS NOT NULL;
+CREATE UNIQUE INDEX tma_candidates_dedupe_key
+  ON tma_candidates (dedupe_key)
+  WHERE dedupe_key IS NOT NULL;
+
+-- ================================================
+-- TMA ROLES TABLE
+-- Stores reusable, color-coded role presets
+-- ================================================
+CREATE TABLE tma_roles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#4B5563',
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  slug TEXT GENERATED ALWAYS AS (
+    regexp_replace(lower(trim(name)), '\s+', ' ', 'g')
+  ) STORED,
+  CONSTRAINT tma_roles_team_slug_key UNIQUE (team_id, slug)
+);
 
 -- Full-text search index for company and contact names
 CREATE INDEX idx_contacts_search ON contacts 

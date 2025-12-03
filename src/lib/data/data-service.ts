@@ -511,7 +511,7 @@ export const tmaService = {
       .order("created_at", { ascending: false });
 
     if (filters?.status) {
-      query = query.eq("status", filters.status);
+      query = query.contains("status_tags", [filters.status]);
     }
     if (filters?.canton) {
       query = query.eq("canton", filters.canton);
@@ -550,9 +550,15 @@ export const tmaService = {
 
   async create(data: TmaCreateInput): Promise<TmaCandidate> {
     const supabase = createClient();
+    const statusTags = data.status_tags ?? (data.status ? [data.status] : []);
+    const payload = {
+      ...data,
+      status_tags: statusTags,
+      status: statusTags[0] ?? data.status ?? null,
+    };
     const { data: created, error } = await supabase
       .from("tma_candidates")
-      .insert(data)
+      .insert(payload)
       .select()
       .single();
     if (error) {
@@ -564,11 +570,17 @@ export const tmaService = {
 
   async update(id: string, data: Partial<TmaCandidate>): Promise<TmaCandidate | null> {
     const supabase = createClient();
+    const payload: Partial<TmaCandidate> = { ...data };
+    if (payload.status_tags) {
+      payload.status = payload.status_tags[0] ?? null;
+    } else if (payload.status !== undefined && payload.status_tags === undefined) {
+      payload.status_tags = payload.status ? [payload.status] as TmaStatus[] : [];
+    }
     
     // First, perform the update
     const { error: updateError } = await supabase
       .from("tma_candidates")
-      .update(data)
+      .update(payload)
       .eq("id", id);
     
     if (updateError) {
@@ -609,6 +621,7 @@ export const tmaService = {
       ids.map((id) =>
         this.update(id, {
           status,
+          status_tags: status ? [status] as TmaStatus[] : [],
           ...(status !== "C" ? { follow_up_at: null, follow_up_note: null } : {}),
         })
       )

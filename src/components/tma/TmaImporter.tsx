@@ -5,6 +5,7 @@ import Papa from "papaparse";
 import type { SwissCanton, TmaStatus } from "@/lib/utils/constants";
 import { SWISS_CANTONS } from "@/lib/utils/constants";
 import type { TmaCreateInput } from "@/lib/validation/schemas";
+import { dedupeCandidateRows } from "@/lib/tma/dedupe";
 
 interface CsvRow {
   [key: string]: string;
@@ -35,7 +36,7 @@ export function TmaImporter({ onImportComplete }: Props) {
           return;
         }
 
-        const uniqueRows = dedupeCandidates(parsedRows);
+        const uniqueRows = dedupeCandidateRows(parsedRows);
 
         try {
         const response = await fetch("/api/tma/import", {
@@ -96,7 +97,8 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
   const lastName = (row["Nachname"] || row["Last Name"] || "").trim();
   if (!firstName || !lastName) return null;
 
-  const status = normalizeStatus(row["Status"] || row["Kategorie"]);
+  const statusTags = normalizeStatusTags(row["Status"] || row["Kategorie"]);
+  const status = statusTags[0] ?? null;
   const cantonSource =
     row["Kantonskürzel"] ||
     row["Kantonskuerzel"] ||
@@ -155,11 +157,27 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
     row["Zip"] ||
     row["Postal Code"];
 
+  const phone =
+    row["Telefon geschäftlich"] ||
+    row["Telefon geschaeftlich"] ||
+    row["Telefon privat"] ||
+    row["Mobiltelefon"] ||
+    row["Handy"] ||
+    row["Mobile"] ||
+    row["Telefon"] ||
+    row["Phone"] ||
+    row["Tel"] ||
+    row["Tel."] ||
+    row["Telefonnummer"] ||
+    row["Phone Number"] ||
+    row["Mobile Phone"] ||
+    row["Cell Phone"];
+
   return {
     first_name: firstName,
     last_name: lastName,
-    phone: (row["Telefon"] || row["Phone"] || "").trim() || null,
-    email: (row["Email"] || row["E-Mail"] || "").trim() || null,
+    phone: phone?.trim() || null,
+    email: (row["Email"] || row["E-Mail"] || row["E-Mail-Adresse"] || "").trim() || null,
     canton: formatCanton(cantonSource),
     city: city?.trim() || null,
     street: street?.trim() || null,
@@ -167,15 +185,20 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
     position_title: position?.trim() || null,
     short_profile_url: shortProfile?.trim() || null,
     status,
+    status_tags: statusTags,
     activity: null, // Default to null, can be set manually later
     notes: (row["Notizen"] || row["Notes"] || "").trim() || null,
   };
 }
 
-function normalizeStatus(value: string | undefined): TmaStatus | null {
-  const upper = (value || "").toUpperCase().trim();
-  if (upper === "A" || upper === "B" || upper === "C") return upper as TmaStatus;
-  return null;
+function normalizeStatusTags(value: string | undefined): TmaStatus[] {
+  if (!value) return [];
+  const matches = value.toUpperCase().match(/[ABC]/g) || [];
+  const deduped = Array.from(new Set(matches.filter((token) => token === "A" || token === "B" || token === "C")));
+  const order = ["A", "B", "C"] as const;
+  return deduped.sort(
+    (a, b) => order.indexOf(a as (typeof order)[number]) - order.indexOf(b as (typeof order)[number])
+  ) as TmaStatus[];
 }
 
 const CANTON_NAME_MAP: Record<string, SwissCanton> = {
@@ -239,23 +262,5 @@ function formatCanton(value: string | undefined): SwissCanton | null {
   }
 
   return null;
-}
-
-function dedupeCandidates(rows: TmaCreateInput[]) {
-  const seen = new Set<string>();
-  const unique: TmaCreateInput[] = [];
-  for (const row of rows) {
-    const phoneKey = (row.phone ?? "").replace(/\D/g, "");
-    const key = [
-      row.first_name.trim().toLowerCase(),
-      row.last_name.trim().toLowerCase(),
-      phoneKey,
-      row.email?.trim().toLowerCase() ?? "",
-    ].join("|");
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(row);
-  }
-  return unique;
 }
 

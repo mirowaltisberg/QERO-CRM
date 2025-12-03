@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Panel } from "@/components/ui/panel";
 import { signOut } from "@/lib/auth/actions";
 import { motion } from "framer-motion";
 import { Modal } from "@/components/ui/modal";
+import type { EmailAccount } from "@/lib/types";
 
 interface Profile {
   id: string;
@@ -28,6 +29,7 @@ interface SettingsFormProps {
 
 export function SettingsForm({ user, profile }: SettingsFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [fullName, setFullName] = useState(profile?.full_name || "");
@@ -44,7 +46,81 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
     height: number;
   } | null>(null);
 
+  // Email integration state
+  const [emailAccount, setEmailAccount] = useState<EmailAccount | null>(null);
+  const [emailLoading, setEmailLoading] = useState(true);
+  const [disconnecting, setDisconnecting] = useState(false);
+
   const supabase = createClient();
+
+  // Fetch email account status on mount
+  useEffect(() => {
+    async function fetchEmailAccount() {
+      try {
+        const response = await fetch("/api/email/account");
+        const json = await response.json();
+        if (response.ok && json.data) {
+          setEmailAccount(json.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch email account:", err);
+      } finally {
+        setEmailLoading(false);
+      }
+    }
+    fetchEmailAccount();
+  }, []);
+
+  // Handle OAuth callback messages
+  useEffect(() => {
+    const emailConnected = searchParams.get("email_connected");
+    const error = searchParams.get("error");
+
+    if (emailConnected === "true") {
+      setMessage({ type: "success", text: "Outlook connected successfully!" });
+      // Refresh email account status
+      fetch("/api/email/account")
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.data) setEmailAccount(json.data);
+        });
+      // Clean URL
+      router.replace("/settings", { scroll: false });
+    } else if (error) {
+      const errorMessages: Record<string, string> = {
+        config: "Email integration is not configured. Contact support.",
+        missing_params: "OAuth parameters missing. Please try again.",
+        expired_state: "OAuth session expired. Please try again.",
+        invalid_state: "Invalid OAuth state. Please try again.",
+        token_exchange: "Failed to authenticate with Microsoft.",
+        user_info: "Failed to get user info from Microsoft.",
+        db_error: "Failed to save email account.",
+        access_denied: "Access was denied. Please grant permissions.",
+        unknown: "An unknown error occurred.",
+      };
+      setMessage({ type: "error", text: errorMessages[error] || `Error: ${error}` });
+      router.replace("/settings", { scroll: false });
+    }
+  }, [searchParams, router]);
+
+  async function handleDisconnectEmail() {
+    if (!confirm("Disconnect your Outlook account? This will remove all synced emails.")) return;
+    setDisconnecting(true);
+    try {
+      const response = await fetch("/api/email/auth/disconnect", { method: "POST" });
+      if (response.ok) {
+        setEmailAccount(null);
+        setMessage({ type: "success", text: "Outlook disconnected." });
+      } else {
+        throw new Error("Failed to disconnect");
+      }
+    } catch (err) {
+      console.error("Disconnect error:", err);
+      setMessage({ type: "error", text: "Failed to disconnect email account." });
+    } finally {
+      setDisconnecting(false);
+    }
+  }
 
   const openCropper = useCallback((file: File) => {
     const objectUrl = URL.createObjectURL(file);
@@ -342,6 +418,66 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
         </form>
       </Panel>
 
+      {/* Email Integration */}
+      <Panel title="Email Integration" description="Connect your Outlook account to send and receive emails">
+        {emailLoading ? (
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+            Loading...
+          </div>
+        ) : emailAccount ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+                <OutlookIcon className="h-5 w-5 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{emailAccount.mailbox}</p>
+                <p className="text-xs text-gray-500">
+                  {emailAccount.last_sync_at
+                    ? `Last synced ${formatRelativeTime(emailAccount.last_sync_at)}`
+                    : "Not synced yet"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                  Connected
+                </span>
+              </div>
+            </div>
+            {emailAccount.sync_error && (
+              <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+                Sync error: {emailAccount.sync_error}
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleDisconnectEmail}
+                disabled={disconnecting}
+              >
+                {disconnecting ? "Disconnecting..." : "Disconnect"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Connect your Microsoft 365 / Outlook account to send and receive emails directly from QERO.
+            </p>
+            <a
+              href="/api/email/auth/connect"
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:border-gray-300"
+            >
+              <OutlookIcon className="h-5 w-5 text-blue-600" />
+              Connect Outlook
+            </a>
+          </div>
+        )}
+      </Panel>
+
       {/* Danger Zone */}
       <Panel title="Sign Out" description="Sign out of your account">
         <form action={signOut}>
@@ -508,5 +644,28 @@ function generateCroppedBlob(
     image.onerror = () => reject(new Error("Failed to load image"));
     image.src = url;
   });
+}
+
+function formatRelativeTime(isoDate: string): string {
+  const date = new Date(isoDate);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
+function OutlookIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M7.88 12.04q0 .45-.11.87-.1.41-.33.74-.22.33-.58.52-.37.2-.87.2t-.85-.2q-.35-.21-.57-.55-.22-.33-.33-.75-.1-.42-.1-.86t.1-.87q.1-.43.34-.76.22-.34.59-.54.36-.2.87-.2t.86.2q.35.21.57.55.22.34.31.77.1.43.1.88zM24 12v9.38q0 .46-.33.8-.33.32-.8.32H7.13q-.46 0-.8-.33-.32-.33-.32-.8V18H1q-.41 0-.7-.3-.3-.29-.3-.7V7q0-.41.3-.7Q.58 6 1 6h6.5V2.55q0-.44.3-.75.3-.3.75-.3h12.9q.44 0 .75.3.3.3.3.75V12zm-6-8.25v3h3v-3zm0 4.5v3h3v-3zm0 4.5v1.83l3.05-1.83zm-5.25-9v3h3.75v-3zm0 4.5v3h3.75v-3zm0 4.5v2.03l2.41 1.5 1.34-.8v-2.73zM9 3.75V6h2l.13.01.12.04v-2.3zM5.98 15.98q.9 0 1.6-.3.7-.32 1.19-.86.48-.55.73-1.28.25-.74.25-1.61 0-.83-.25-1.55-.24-.71-.71-1.24t-1.15-.83q-.68-.3-1.55-.3-.92 0-1.64.3-.71.3-1.2.85-.5.54-.75 1.3-.25.74-.25 1.63 0 .85.26 1.56.26.72.74 1.23.48.52 1.17.81.69.3 1.56.3zM7.5 21h12.39L12 16.08V17q0 .41-.3.7-.29.3-.7.3H7.5zm15-.13v-7.24l-5.9 3.54Z" />
+    </svg>
+  );
 }
 

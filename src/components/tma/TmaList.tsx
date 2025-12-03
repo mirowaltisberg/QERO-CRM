@@ -3,10 +3,8 @@
 import { memo } from "react";
 import Image from "next/image";
 import type { TmaCandidate } from "@/lib/types";
-import { Tag } from "@/components/ui/tag";
 import { CantonTag } from "@/components/ui/CantonTag";
 import { 
-  TMA_STATUS_LABELS, 
   TMA_STATUS_STYLES, 
   TMA_ACTIVITY_LABELS,
   TMA_ACTIVITY_STYLES,
@@ -47,6 +45,12 @@ export const TmaList = memo(function TmaList({
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {candidates.map((candidate) => {
           const isActive = candidate.id === activeId;
+          const statusTags =
+            candidate.status_tags && candidate.status_tags.length > 0
+              ? candidate.status_tags
+              : candidate.status
+              ? [candidate.status]
+              : [];
           return (
             <button
               key={candidate.id}
@@ -82,21 +86,25 @@ export const TmaList = memo(function TmaList({
                     {candidate.first_name} {candidate.last_name}
                   </p>
                 </div>
-                <Tag
-                  status={undefined}
-                  className="bg-gray-100 text-gray-500 border-gray-200 flex-shrink-0"
-                  style={
-                    candidate.status
-                      ? {
-                          backgroundColor: `${TMA_STATUS_STYLES[candidate.status as TmaStatus].bg}20`,
-                          color: TMA_STATUS_STYLES[candidate.status as TmaStatus].text,
-                          borderColor: `${TMA_STATUS_STYLES[candidate.status as TmaStatus].border}50`,
-                        }
-                      : undefined
-                  }
-                >
-                  {candidate.status ? TMA_STATUS_LABELS[candidate.status as TmaStatus] : "Set status"}
-                </Tag>
+                <div className="flex flex-wrap gap-1 justify-end">
+                  {statusTags.length > 0 ? (
+                    statusTags.map((tag) => (
+                      <span
+                        key={`${candidate.id}-${tag}`}
+                        className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                        style={{
+                          backgroundColor: `${TMA_STATUS_STYLES[tag as TmaStatus].bg}20`,
+                          color: TMA_STATUS_STYLES[tag as TmaStatus].text,
+                          borderColor: `${TMA_STATUS_STYLES[tag as TmaStatus].border}40`,
+                        }}
+                      >
+                        {tag}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[10px] text-gray-400">Set status</span>
+                  )}
+                </div>
               </div>
               <div className="mt-1 flex items-center justify-between text-xs text-gray-500 gap-2">
                 <div className="flex flex-col gap-1 truncate">
@@ -109,6 +117,14 @@ export const TmaList = memo(function TmaList({
                     {candidate.city && (
                       <span className="font-medium text-gray-700 truncate">
                         {candidate.postal_code ? `${candidate.postal_code} ${candidate.city}` : candidate.city}
+                      </span>
+                    )}
+                    {candidate.distance_km !== undefined && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                        <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        </svg>
+                        {candidate.distance_km} km
                       </span>
                     )}
                     {candidate.activity && (

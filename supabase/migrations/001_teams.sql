@@ -69,7 +69,7 @@ CREATE POLICY "Anyone can view teams" ON teams FOR SELECT USING (true);
 CREATE POLICY "Anyone can view organizations" ON organizations FOR SELECT USING (true);
 
 -- Contacts: users can only see contacts in their team
--- First drop existing policies if any
+-- First drop existing policies if any 
 DROP POLICY IF EXISTS "Team members can view team contacts" ON contacts;
 DROP POLICY IF EXISTS "Team members can update team contacts" ON contacts;
 DROP POLICY IF EXISTS "Team members can insert team contacts" ON contacts;
