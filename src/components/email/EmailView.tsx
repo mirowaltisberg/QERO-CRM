@@ -233,6 +233,8 @@ export function EmailView({ account }: Props) {
             is_starred: false,
             has_attachments: json.data.hasAttachments || false,
             last_message_at: json.data.receivedDateTime || json.data.sentDateTime,
+            linked_contact_id: null,
+            linked_tma_id: null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             messages: [{
