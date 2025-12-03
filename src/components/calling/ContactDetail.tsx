@@ -24,6 +24,7 @@ interface ContactDetailProps {
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
   onClearFollowUp: () => Promise<void> | void;
   onClearStatus: () => Promise<void> | void;
+  onNoteAdded?: () => void;
   
 }
 
@@ -37,6 +38,7 @@ export const ContactDetail = memo(function ContactDetail({
   onScheduleFollowUp,
   onClearFollowUp,
   onClearStatus,
+  onNoteAdded,
 }: ContactDetailProps) {
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [customDate, setCustomDate] = useState(() => getDefaultDateISO());
@@ -248,6 +250,7 @@ export const ContactDetail = memo(function ContactDetail({
             entityType="contact"
             legacyNotes={contact.notes}
             onSaveLegacyNotes={onSaveNotes}
+            onNoteAdded={onNoteAdded}
           />
         </div>
 

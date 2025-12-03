@@ -14,6 +14,7 @@ interface NotesPanelProps {
   entityType: "contact" | "tma";
   legacyNotes?: string | null; // Old single-field notes (for backward compat)
   onSaveLegacyNotes?: (value: string | null) => Promise<void>;
+  onNoteAdded?: () => void;
   currentUserId?: string;
 }
 
@@ -22,6 +23,7 @@ export const NotesPanel = memo(function NotesPanel({
   entityType,
   legacyNotes,
   onSaveLegacyNotes,
+  onNoteAdded,
   currentUserId,
 }: NotesPanelProps) {
   const [notes, setNotes] = useState<NoteType[]>([]);
@@ -71,6 +73,7 @@ export const NotesPanel = memo(function NotesPanel({
       if (data.data) {
         setNotes((prev) => [data.data, ...prev]);
         setNewNote("");
+        onNoteAdded?.();
       }
     } catch (error) {
       console.error("Failed to add note:", error);
