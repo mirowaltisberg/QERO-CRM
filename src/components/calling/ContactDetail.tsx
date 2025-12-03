@@ -24,7 +24,7 @@ interface ContactDetailProps {
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
   onClearFollowUp: () => Promise<void> | void;
   onClearStatus: () => Promise<void> | void;
-  callInitiated?: boolean;
+  
 }
 
 export const ContactDetail = memo(function ContactDetail({
@@ -37,7 +37,6 @@ export const ContactDetail = memo(function ContactDetail({
   onScheduleFollowUp,
   onClearFollowUp,
   onClearStatus,
-  callInitiated,
 }: ContactDetailProps) {
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [customDate, setCustomDate] = useState(() => getDefaultDateISO());
@@ -242,16 +241,6 @@ export const ContactDetail = memo(function ContactDetail({
         </div>
 
         {/* Notes panel - takes remaining space and scrolls */}
-        {/* Call initiated indicator */}
-        {callInitiated && (
-          <div className="mb-3 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">
-            <span className="flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span>Call gestartet – füge eine Notiz hinzu um den Call zu protokollieren</span>
-          </div>
-        )}
 
         <div className="flex-1 min-h-0 overflow-hidden mb-4">
           <NotesPanel

@@ -285,7 +285,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         onScheduleFollowUp={scheduleFollowUp}
         onClearFollowUp={clearFollowUp}
         onClearStatus={clearStatus}
-        callInitiated={callInitiatedForContact === activeContact?.id}
+        
       />
     </div>
   );
