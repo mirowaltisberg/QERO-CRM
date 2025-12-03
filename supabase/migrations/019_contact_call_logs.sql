@@ -48,3 +48,6 @@ FOR INSERT WITH CHECK (
 CREATE POLICY "Users can delete own call logs" ON contact_call_logs
 FOR DELETE USING (user_id = auth.uid());
 
+
+-- Enable Realtime for this table
+ALTER PUBLICATION supabase_realtime ADD TABLE contact_call_logs;
