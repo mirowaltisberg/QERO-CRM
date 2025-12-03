@@ -13,16 +13,21 @@ interface Props {
   threads: LiveResultThread[];
   selectedId: string | null;
   loading: boolean;
+  loadingMore: boolean;
   syncing: boolean;
   error: string | null;
   searchQuery: string;
+  searchSource: "db" | "graph" | null;
   folder: EmailFolder;
   mailbox: string;
   lastSyncAt: string | null;
+  hasMore: boolean;
+  total: number;
   onSearchChange: (query: string) => void;
   onSelect: (id: string, isLiveResult?: boolean, graphMessageId?: string) => void;
   onSync: () => void;
   onToggleStar: (id: string, starred: boolean) => void;
+  onLoadMore: () => void;
 }
 
 const FOLDER_LABELS: Record<EmailFolder, string> = {
@@ -37,16 +42,21 @@ export const EmailList = memo(function EmailList({
   threads,
   selectedId,
   loading,
+  loadingMore,
   syncing,
   error,
   searchQuery,
+  searchSource,
   folder,
   mailbox,
   lastSyncAt,
+  hasMore,
+  total,
   onSearchChange,
   onSelect,
   onSync,
   onToggleStar,
+  onLoadMore,
 }: Props) {
   // Use client-side only rendering for relative times to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
