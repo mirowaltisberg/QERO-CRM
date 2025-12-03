@@ -4,10 +4,9 @@ import { respondError, respondSuccess } from "@/lib/utils/api-response";
 import { ensureValidToken, type EmailAccount } from "@/lib/email/graph-client";
 
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
-const CRON_SECRET = process.env.CRON_SECRET;
 
-// Reduced limits to fit in Vercel timeout
-const MESSAGES_PER_FOLDER = 20; // Reduced from 50
+// Cron secret for authentication (set in Vercel env vars)
+const CRON_SECRET = process.env.CRON_SECRET;
 
 interface GraphMessage {
   id: string;
@@ -23,98 +22,99 @@ interface GraphMessage {
   sentDateTime: string | null;
 }
 
-async function handleSync(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const secret = searchParams.get("secret");
-
+// GET /api/cron/email-sync
+// Called by Vercel Cron (uses Authorization header) or external service (uses ?secret=xxx)
+export async function GET(request: NextRequest) {
+  // Verify cron secret - check both Vercel header and query param
   if (!CRON_SECRET) {
-    return respondError("CRON_SECRET not configured", 500);
+    console.error("[Cron Sync] CRON_SECRET not configured");
+    return respondError("Cron not configured", 500);
   }
 
-  if (secret !== CRON_SECRET) {
+  // Vercel Cron sends: Authorization: Bearer <CRON_SECRET>
+  const authHeader = request.headers.get("authorization");
+  const headerSecret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  
+  // External cron sends: ?secret=xxx
+  const { searchParams } = new URL(request.url);
+  const querySecret = searchParams.get("secret");
+
+  if (headerSecret !== CRON_SECRET && querySecret !== CRON_SECRET) {
+    console.error("[Cron Sync] Invalid secret");
     return respondError("Unauthorized", 401);
   }
-
-  const startTime = Date.now();
 
   try {
     const adminSupabase = createAdminClient();
 
-    const { data: accounts } = await adminSupabase
+    // Get ALL email accounts (sync for all users)
+    const { data: accounts, error: accountsError } = await adminSupabase
       .from("email_accounts")
       .select("*")
       .eq("provider", "outlook");
 
-    if (!accounts || accounts.length === 0) {
-      return respondSuccess({ message: "No accounts", duration: Date.now() - startTime });
+    if (accountsError) {
+      console.error("[Cron Sync] Failed to fetch accounts:", accountsError);
+      return respondError("Failed to fetch accounts", 500);
     }
 
-    let totalCreated = 0;
+    if (!accounts || accounts.length === 0) {
+      return respondSuccess({ message: "No email accounts to sync", synced: 0 });
+    }
+
+    console.log(`[Cron Sync] Syncing ${accounts.length} account(s)`);
+
+    const results: Array<{ mailbox: string; newMessages: number; error?: string }> = [];
 
     for (const account of accounts) {
       const emailAccount = account as EmailAccount;
-      
       try {
         const accessToken = await ensureValidToken(emailAccount);
 
-        // Fetch in parallel
-        const [inboxMessages, sentMessages] = await Promise.all([
-          fetchMessages(accessToken, "inbox", MESSAGES_PER_FOLDER),
-          fetchMessages(accessToken, "sentitems", MESSAGES_PER_FOLDER),
-        ]);
+        // Fetch 50 newest from inbox and sent
+        const inboxMessages = await fetchMessages(accessToken, "inbox", 50);
+        const sentMessages = await fetchMessages(accessToken, "sentitems", 50);
 
-        // Process messages
-        const allMessages = [
-          ...inboxMessages.map(m => ({ ...m, _folder: "inbox" as const })),
-          ...sentMessages.map(m => ({ ...m, _folder: "sent" as const })),
-        ];
-
-        // Batch check existing messages
-        const messageIds = allMessages.map(m => m.id);
-        const { data: existingMessages } = await adminSupabase
-          .from("email_messages")
-          .select("graph_message_id")
-          .in("graph_message_id", messageIds);
-
-        const existingIds = new Set(existingMessages?.map(m => m.graph_message_id) || []);
-        const newMessages = allMessages.filter(m => !existingIds.has(m.id));
-
-        // Only process new messages
-        for (const msg of newMessages) {
-          const created = await upsertMessage(adminSupabase, emailAccount, msg, msg._folder);
-          if (created) totalCreated++;
+        let created = 0;
+        for (const msg of inboxMessages) {
+          const r = await upsertMessage(adminSupabase, emailAccount, msg, "inbox");
+          if (r.messageCreated) created++;
+        }
+        for (const msg of sentMessages) {
+          const r = await upsertMessage(adminSupabase, emailAccount, msg, "sent");
+          if (r.messageCreated) created++;
         }
 
+        // Update last sync time
         await adminSupabase
           .from("email_accounts")
           .update({ last_sync_at: new Date().toISOString(), sync_error: null })
           .eq("id", emailAccount.id);
 
+        results.push({ mailbox: emailAccount.mailbox, newMessages: created });
+        console.log(`[Cron Sync] ${emailAccount.mailbox}: ${created} new messages`);
       } catch (err) {
-        console.error(`[Cron] ${emailAccount.mailbox} error:`, err);
+        const errorMsg = err instanceof Error ? err.message : "Unknown error";
+        console.error(`[Cron Sync] Error for ${emailAccount.mailbox}:`, err);
+
+        // Store error in account
         await adminSupabase
           .from("email_accounts")
-          .update({ sync_error: err instanceof Error ? err.message : "Error" })
+          .update({ sync_error: errorMsg })
           .eq("id", emailAccount.id);
+
+        results.push({ mailbox: emailAccount.mailbox, newMessages: 0, error: errorMsg });
       }
     }
 
     return respondSuccess({
-      synced: accounts.length,
-      newMessages: totalCreated,
-      duration: Date.now() - startTime,
+      message: `Synced ${accounts.length} account(s)`,
+      results,
     });
   } catch (err) {
-    return respondError(err instanceof Error ? err.message : "Failed", 500);
+    console.error("[Cron Sync] Unexpected error:", err);
+    return respondError(err instanceof Error ? err.message : "Sync failed", 500);
   }
-}
-
-export async function GET(request: NextRequest) {
-  return handleSync(request);
-}
-
-export async function POST(request: NextRequest) {
-  return handleSync(request);
 }
 
 async function fetchMessages(accessToken: string, folder: string, limit: number): Promise<GraphMessage[]> {
@@ -123,12 +123,16 @@ async function fetchMessages(accessToken: string, folder: string, limit: number)
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
-      signal: AbortSignal.timeout(8000), // 8 second timeout
+      signal: AbortSignal.timeout(20000),
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error(`[Cron Sync] Fetch ${folder} failed:`, res.status);
+      return [];
+    }
     const data = await res.json();
     return data.value || [];
-  } catch {
+  } catch (err) {
+    console.error(`[Cron Sync] Fetch ${folder} error:`, err);
     return [];
   }
 }
@@ -136,10 +140,10 @@ async function fetchMessages(accessToken: string, folder: string, limit: number)
 async function upsertMessage(
   adminSupabase: ReturnType<typeof createAdminClient>,
   emailAccount: EmailAccount,
-  msg: GraphMessage & { _folder: "inbox" | "sent" },
+  msg: GraphMessage,
   folder: "inbox" | "sent"
-): Promise<boolean> {
-  // Find or create thread
+): Promise<{ threadCreated: boolean; messageCreated: boolean }> {
+  // Check/create thread
   const { data: existingThread } = await adminSupabase
     .from("email_threads")
     .select("id")
@@ -182,11 +186,32 @@ async function upsertMessage(
       .select("id")
       .single();
 
-    if (error) return false;
+    if (error) return { threadCreated: false, messageCreated: false };
     threadId = newThread.id;
   }
 
-  // Insert message
+  // Check if message exists
+  const { data: existingMsg } = await adminSupabase
+    .from("email_messages")
+    .select("id")
+    .eq("graph_message_id", msg.id)
+    .single();
+
+  if (existingMsg) {
+    // Update existing message with full body if we have it now
+    if (msg.body?.content) {
+      await adminSupabase
+        .from("email_messages")
+        .update({
+          body_html: msg.body.contentType === "html" ? msg.body.content : null,
+          body_text: msg.body.contentType === "text" ? msg.body.content : null,
+        })
+        .eq("id", existingMsg.id);
+    }
+    return { threadCreated: !existingThread, messageCreated: false };
+  }
+
+  // Create new message with full body
   const { error } = await adminSupabase
     .from("email_messages")
     .insert({
@@ -207,5 +232,5 @@ async function upsertMessage(
       sent_at: msg.sentDateTime,
     });
 
-  return !error;
+  return { threadCreated: !existingThread, messageCreated: !error };
 }
