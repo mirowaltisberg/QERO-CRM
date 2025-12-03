@@ -121,10 +121,10 @@ export async function POST(request: NextRequest) {
 
       let existingCandidateId: string | null = null;
 
-      // First try to find by normalized name
+      // First try to find by normalized name - fetch full record to check existing values
       const { data: existingRows, error: lookupError } = await writer
         .from("tma_candidates")
-        .select("id")
+        .select("id, phone, email, canton, city, street, postal_code, position_title, short_profile_url, cv_url, references_url, status_tags, latitude, longitude")
         .ilike("first_name", normalizedFirstName)
         .ilike("last_name", normalizedLastName)
         .limit(1);
@@ -141,7 +141,9 @@ export async function POST(request: NextRequest) {
       }
 
       if (existingCandidateId) {
-        const updatePayload = buildUpdatePayload(candidateWithCoords);
+        // Only update fields that are currently empty in the existing record
+        const existingRecord = existingRows![0];
+        const updatePayload = buildUpdatePayload(candidateWithCoords, existingRecord);
 
         if (Object.keys(updatePayload).length === 0) {
           console.log(`[TMA Import] Row ${i} skipped - no new fields to update`);
@@ -188,23 +190,41 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function buildUpdatePayload(candidate: TmaImportPayloadWithCoords) {
+function buildUpdatePayload(
+  candidate: TmaImportPayloadWithCoords,
+  existingRecord?: Record<string, unknown>
+) {
   const payload: Partial<TmaImportPayloadWithCoords> = {};
   for (const field of UPSERT_MUTABLE_FIELDS) {
-    const value = candidate[field];
-    if (value === undefined) continue;
+    const newValue = candidate[field];
+    if (newValue === undefined) continue;
+
+    // Check if existing record already has a value for this field
+    if (existingRecord) {
+      const existingValue = existingRecord[field];
+      // Skip if existing record already has a non-empty value
+      if (existingValue !== null && existingValue !== undefined) {
+        if (field === "status_tags") {
+          if (Array.isArray(existingValue) && existingValue.length > 0) continue;
+        } else if (typeof existingValue === "string" && existingValue.trim() !== "") {
+          continue;
+        } else if (typeof existingValue === "number") {
+          continue;
+        }
+      }
+    }
+
     if (field === "status_tags") {
-      if (Array.isArray(value) && value.length > 0) {
-        payload.status_tags = value;
+      if (Array.isArray(newValue) && newValue.length > 0) {
+        payload.status_tags = newValue;
       }
       continue;
     }
-    // Allow null for coordinates (to clear them if needed)
-    if (field !== "latitude" && field !== "longitude") {
-      if (value === null) continue;
-      if (typeof value === "string" && value.trim() === "") continue;
-    }
-    (payload as Record<string, unknown>)[field] = value;
+    // Skip empty values from CSV
+    if (newValue === null) continue;
+    if (typeof newValue === "string" && newValue.trim() === "") continue;
+    
+    (payload as Record<string, unknown>)[field] = newValue;
   }
   return payload;
 }
