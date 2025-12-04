@@ -79,65 +79,40 @@ const MessageCard = memo(function MessageCard({
   const parsedContent = useMemo(() => {
     if (!message.content) return null;
     
+    const text = message.content;
     const parts: Array<{ type: "text" | "mention"; value: string }> = [];
-    let remaining = message.content;
     
-    // Normalize function for matching
-    const normalize = (s: string) => s.toLowerCase().replace(/['']/g, "'").replace(/[""]/g, '"');
+    // Get all member names sorted by length (longest first)
+    const allNames = Array.from(memberNamesMap.values()).sort((a, b) => b.length - a.length);
     
-    while (remaining.length > 0) {
-      const atIndex = remaining.indexOf("@");
-      
-      if (atIndex === -1) {
-        parts.push({ type: "text", value: remaining });
-        break;
+    // Build regex pattern for all names + everyone
+    const namePatterns = ["everyone", ...allNames].map(name => {
+      // Escape special regex chars but keep the name readable
+      return name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    });
+    
+    // Match @name (case insensitive)
+    const mentionRegex = new RegExp("(@(?:" + namePatterns.join("|") + "))(?![A-Za-zÀ-ÿ'])", "gi");
+    
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = mentionRegex.exec(text)) !== null) {
+      // Add text before the match
+      if (match.index > lastIndex) {
+        parts.push({ type: "text", value: text.slice(lastIndex, match.index) });
       }
-      
-      if (atIndex > 0) {
-        parts.push({ type: "text", value: remaining.slice(0, atIndex) });
-      }
-      
-      const afterAt = remaining.slice(atIndex + 1);
-      const normalizedAfterAt = normalize(afterAt);
-      let foundMatch = false;
-      
-      // Check for @everyone first
-      if (normalizedAfterAt.startsWith("everyone")) {
-        const afterName = afterAt.slice(8);
-        if (afterName.length === 0 || /^[\s.,!?;:]/.test(afterName) || !/^[A-Za-zÀ-ÿ']/.test(afterName)) {
-          parts.push({ type: "mention", value: "@everyone" });
-          remaining = afterAt.slice(8);
-          foundMatch = true;
-        }
-      }
-      
-      if (!foundMatch) {
-        // Sort by length (longest first) to match full names before partial
-        const sortedNames = Array.from(memberNamesMap.keys()).sort((a, b) => b.length - a.length);
-        
-        for (const normalizedName of sortedNames) {
-          if (normalizedAfterAt.startsWith(normalizedName)) {
-            const nameLength = normalizedName.length;
-            const afterName = afterAt.slice(nameLength);
-            // Check word boundary - allow space, punctuation, or end of string
-            if (afterName.length === 0 || /^[\s.,!?;:\n]/.test(afterName)) {
-              const originalName = afterAt.slice(0, nameLength);
-              parts.push({ type: "mention", value: "@" + originalName });
-              remaining = afterAt.slice(nameLength);
-              foundMatch = true;
-              break;
-            }
-          }
-        }
-      }
-      
-      if (!foundMatch) {
-        parts.push({ type: "text", value: "@" });
-        remaining = afterAt;
-      }
+      // Add the mention
+      parts.push({ type: "mention", value: match[1] });
+      lastIndex = match.index + match[1].length;
     }
     
-    return parts.length > 0 ? parts : [{ type: "text" as const, value: message.content }];
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push({ type: "text", value: text.slice(lastIndex) });
+    }
+    
+    return parts.length > 0 ? parts : [{ type: "text" as const, value: text }];
   }, [message.content, memberNamesMap]);
 
   const role = getDisplayRole(sender?.full_name, sender?.team);
