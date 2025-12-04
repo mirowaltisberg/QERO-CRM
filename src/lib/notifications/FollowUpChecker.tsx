@@ -18,7 +18,7 @@ const CHECK_INTERVAL = 60000; // 60 seconds
 export function FollowUpChecker() {
   const { addNotification } = useNotifications();
   const router = useRouter();
-  const checkedRef = useRef(false);
+  const initialCheckDone = useRef(false);
 
   const getShownFollowups = useCallback((): Set<string> => {
     if (typeof window === "undefined") return new Set();
@@ -56,20 +56,34 @@ export function FollowUpChecker() {
   }, []);
 
   const checkFollowups = useCallback(async () => {
+    console.log("[FollowUp Checker] Checking for due follow-ups...");
+    
     try {
       const res = await fetch("/api/followups");
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.log("[FollowUp Checker] API error:", res.status);
+        return;
+      }
       
       const json = await res.json();
       const followups: FollowUp[] = json.data || [];
+      
+      console.log("[FollowUp Checker] Found", followups.length, "due follow-ups");
+      
+      if (followups.length === 0) return;
       
       const shown = getShownFollowups();
       
       for (const followup of followups) {
         const key = `${followup.type}-${followup.id}`;
-        if (shown.has(key)) continue;
         
-        // Show notification
+        if (shown.has(key)) {
+          console.log("[FollowUp Checker] Already shown:", key);
+          continue;
+        }
+        
+        console.log("[FollowUp Checker] Showing notification for:", followup.name);
+        
         addNotification({
           type: "followup",
           title: "Follow-up fällig",
@@ -86,21 +100,23 @@ export function FollowUpChecker() {
         markAsShown(key);
       }
     } catch (err) {
-      console.error("Follow-up check error:", err);
+      console.error("[FollowUp Checker] Error:", err);
     }
   }, [addNotification, router, getShownFollowups, markAsShown]);
 
+  // Initial check after app loads
   useEffect(() => {
-    // Initial check after a short delay (let app load)
-    if (!checkedRef.current) {
-      checkedRef.current = true;
-      const timeout = setTimeout(checkFollowups, 2000);
-      return () => clearTimeout(timeout);
-    }
+    if (initialCheckDone.current) return;
+    initialCheckDone.current = true;
+    
+    console.log("[FollowUp Checker] Initial check in 2 seconds...");
+    const timeout = setTimeout(checkFollowups, 2000);
+    return () => clearTimeout(timeout);
   }, [checkFollowups]);
 
+  // Periodic checks
   useEffect(() => {
-    // Periodic check
+    console.log("[FollowUp Checker] Setting up interval check every", CHECK_INTERVAL / 1000, "seconds");
     const interval = setInterval(checkFollowups, CHECK_INTERVAL);
     return () => clearInterval(interval);
   }, [checkFollowups]);
