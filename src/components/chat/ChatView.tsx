@@ -6,6 +6,8 @@ import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 import { createClient } from "@/lib/supabase/client";
 import { chatCache } from "@/lib/chat-cache";
+import { useNotifications } from "@/lib/notifications/NotificationContext";
+import { useRouter } from "next/navigation";
 import type { ChatRoom, ChatMessage, ChatMember } from "@/lib/types";
 
 export const ChatView = memo(function ChatView() {
@@ -21,9 +23,16 @@ export const ChatView = memo(function ChatView() {
   const activeRoomRef = useRef<ChatRoom | null>(null);
   const membersRef = useRef<ChatMember[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const currentUserIdRef = useRef<string>("");
+  const roomsRef = useRef<ChatRoom[]>([]);
+  
+  const { addNotification } = useNotifications();
+  const router = useRouter();
 
   useEffect(() => { activeRoomRef.current = activeRoom; }, [activeRoom]);
   useEffect(() => { membersRef.current = members; }, [members]);
+  useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
+  useEffect(() => { roomsRef.current = rooms; }, [rooms]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -114,11 +123,36 @@ export const ChatView = memo(function ChatView() {
         
         console.log("[Chat] New message detected:", payload.new);
         
-        const newRecord = payload.new as { room_id: string; sender_id: string };
+        const newRecord = payload.new as { room_id: string; sender_id: string; content: string };
         const currentRoom = activeRoomRef.current;
+        const myUserId = currentUserIdRef.current;
         
         // Refresh rooms list for unread counts
         fetchRooms();
+        
+        // Show notification if message is from someone else
+        if (newRecord.sender_id !== myUserId) {
+          const sender = membersRef.current.find(m => m.id === newRecord.sender_id);
+          const room = roomsRef.current.find(r => r.id === newRecord.room_id);
+          
+          // Determine room name for notification
+          let roomName = "Chat";
+          if (room?.type === "dm" && room.dm_user) {
+            roomName = room.dm_user.full_name || "Direct Message";
+          } else if (room?.name) {
+            roomName = room.name;
+          }
+          
+          addNotification({
+            type: "chat",
+            title: sender?.full_name || "Neue Nachricht",
+            message: newRecord.content?.slice(0, 100) || "Hat eine Nachricht gesendet",
+            avatar: sender?.avatar_url || undefined,
+            onClick: () => {
+              router.push("/chat");
+            },
+          });
+        }
         
         // If message is in current room and not from us, refetch messages
         if (currentRoom && newRecord.room_id === currentRoom.id) {
