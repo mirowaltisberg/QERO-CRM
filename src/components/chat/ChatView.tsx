@@ -21,7 +21,6 @@ export const ChatView = memo(function ChatView() {
   const activeRoomRef = useRef<ChatRoom | null>(null);
   const membersRef = useRef<ChatMember[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pendingMessageIds = useRef<Set<string>>(new Set()); // Track messages we sent
 
   useEffect(() => { activeRoomRef.current = activeRoom; }, [activeRoom]);
   useEffect(() => { membersRef.current = members; }, [members]);
@@ -84,13 +83,6 @@ export const ChatView = memo(function ChatView() {
     }
   }, []);
 
-  // Fetch single message with attachments
-  const fetchSingleMessage = useCallback(async (messageId: string): Promise<ChatMessage | null> => {
-    // We need to get the full message from the messages list via refetch
-    // For now, just return null and let the next fetchMessages get it
-    return null;
-  }, []);
-
   useEffect(() => {
     fetchRooms();
     fetchMembers();
@@ -104,98 +96,62 @@ export const ChatView = memo(function ChatView() {
     }
   }, [activeRoom, fetchMessages]);
 
-  // REAL-TIME SUBSCRIPTION
+  // SIMPLE REALTIME - just detect new messages and refetch
   useEffect(() => {
     const supabase = createClient();
+    let isSubscribed = true;
     
-    console.log("[Chat RT] Setting up realtime subscription...");
+    console.log("[Chat] Setting up realtime...");
     
     const channel = supabase
-      .channel("chat-global-v2")
+      .channel("chat-simple")
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
         table: "chat_messages",
-      }, async (payload) => {
-        console.log("[Chat RT] INSERT received:", payload.new);
+      }, (payload) => {
+        if (!isSubscribed) return;
         
-        const newRecord = payload.new as {
-          id: string;
-          room_id: string;
-          sender_id: string;
-          content: string;
-          mentions: string[];
-          created_at: string;
-        };
-
-        // Refresh rooms for unread counts
-        fetchRooms();
-
+        console.log("[Chat] New message detected:", payload.new);
+        
+        const newRecord = payload.new as { room_id: string; sender_id: string };
         const currentRoom = activeRoomRef.current;
         
-        // Skip if this is a message we sent (we already have it via optimistic update)
-        if (pendingMessageIds.current.has(newRecord.id)) {
-          console.log("[Chat RT] Skipping own message:", newRecord.id);
-          pendingMessageIds.current.delete(newRecord.id);
-          return;
-        }
-
-        // If message is for active room, add it
+        // Refresh rooms list for unread counts
+        fetchRooms();
+        
+        // If message is in current room and not from us, refetch messages
         if (currentRoom && newRecord.room_id === currentRoom.id) {
-          // Check if we already have this message
-          const existingMessages = messagesEndRef.current ? document.querySelectorAll(`[data-message-id="${newRecord.id}"]`) : [];
-          if (existingMessages.length > 0) {
-            console.log("[Chat RT] Message already exists in DOM");
-            return;
-          }
-
-          const sender = membersRef.current.find(m => m.id === newRecord.sender_id);
-          
-          const newMessage: ChatMessage = {
-            id: newRecord.id,
-            room_id: newRecord.room_id,
-            sender_id: newRecord.sender_id,
-            content: newRecord.content,
-            mentions: newRecord.mentions || [],
-            created_at: newRecord.created_at,
-            updated_at: newRecord.created_at,
-            sender: {
-              id: sender?.id || newRecord.sender_id,
-              full_name: sender?.full_name || "Unknown",
-              avatar_url: sender?.avatar_url || null,
-              team_id: sender?.team_id || null,
-              team: sender?.team ? { name: sender.team.name, color: sender.team.color } : null,
-            },
-            attachments: [], // Will be fetched on next full refresh
-          };
-
-          setMessages(prev => {
-            if (prev.some(m => m.id === newMessage.id)) return prev;
-            const updated = [...prev, newMessage];
-            chatCache.set(currentRoom.id, updated);
-            return updated;
-          });
-
-          // Fetch full message with attachments after a short delay
-          setTimeout(async () => {
-            const res = await fetch(`/api/chat/rooms/${currentRoom.id}/messages?limit=50`);
-            const json = await res.json();
-            if (json.data) {
-              setMessages(json.data);
-              chatCache.set(currentRoom.id, json.data);
+          // Small delay to ensure DB has committed
+          setTimeout(() => {
+            if (isSubscribed && activeRoomRef.current?.id === currentRoom.id) {
+              fetchMessages(currentRoom.id);
             }
-          }, 500);
+          }, 100);
         }
       })
       .subscribe((status) => {
-        console.log("[Chat RT] Subscription status:", status);
+        console.log("[Chat] Subscription:", status);
       });
 
     return () => {
-      console.log("[Chat RT] Cleaning up subscription");
+      console.log("[Chat] Cleaning up...");
+      isSubscribed = false;
       supabase.removeChannel(channel);
     };
-  }, [fetchRooms]);
+  }, [fetchRooms, fetchMessages]);
+
+  // Polling fallback - refresh every 5 seconds when chat is active
+  useEffect(() => {
+    if (!activeRoom) return;
+    
+    const interval = setInterval(() => {
+      fetchMessages(activeRoom.id);
+      fetchRooms();
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [activeRoom, fetchMessages, fetchRooms]);
 
   const handleSendMessage = useCallback(async (
     content: string,
@@ -204,7 +160,8 @@ export const ChatView = memo(function ChatView() {
   ) => {
     if (!activeRoom || !currentUserId) return;
 
-    const optimisticId = `optimistic-${Date.now()}`;
+    // Optimistic update
+    const optimisticId = `temp-${Date.now()}`;
     const currentMember = membersRef.current.find(m => m.id === currentUserId);
     
     const optimisticMessage: ChatMessage = {
@@ -223,12 +180,13 @@ export const ChatView = memo(function ChatView() {
         team: currentMember?.team || null,
       },
       attachments: attachments.map((a, i) => ({
-        id: `att-${i}`,
+        id: `temp-att-${i}`,
         message_id: optimisticId,
         ...a,
       })),
     };
 
+    // Add optimistic message
     setMessages(prev => [...prev, optimisticMessage]);
 
     try {
@@ -241,23 +199,25 @@ export const ChatView = memo(function ChatView() {
       const json = await res.json();
       
       if (res.ok && json.data) {
-        // Track this message ID so realtime doesn't duplicate it
-        pendingMessageIds.current.add(json.data.id);
-        
+        // Replace optimistic with real message
         setMessages(prev => {
-          const filtered = prev.filter(m => m.id !== optimisticId);
-          if (filtered.some(m => m.id === json.data.id)) return filtered;
-          const updated = [...filtered, json.data];
+          const withoutOptimistic = prev.filter(m => m.id !== optimisticId);
+          // Check if real message already exists
+          if (withoutOptimistic.some(m => m.id === json.data.id)) {
+            return withoutOptimistic;
+          }
+          const updated = [...withoutOptimistic, json.data];
           chatCache.set(activeRoom.id, updated);
           return updated;
         });
       } else {
+        // Remove optimistic on error
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
-        console.error("Failed to send message:", json.error);
+        console.error("Send failed:", json.error);
       }
     } catch (err) {
       setMessages(prev => prev.filter(m => m.id !== optimisticId));
-      console.error("Error sending message:", err);
+      console.error("Send error:", err);
     }
   }, [activeRoom, currentUserId, currentUserName]);
 
