@@ -34,6 +34,8 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     clearStatus,
     setCantonFilter,
     clearCantonFilter,
+    searchQuery,
+    setSearchQuery,
   } = useContacts({ initialContacts });
 
   // Track call logs for contacts (contactId -> latest call log)
@@ -270,6 +272,8 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         activeCantonFilter={cantonFilter}
         availableCantons={uniqueCantons}
         callLogs={callLogs}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
       <ContactDetail
         key={activeContact?.id ?? "empty"}

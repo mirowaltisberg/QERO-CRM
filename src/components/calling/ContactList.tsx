@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { CantonTag } from "@/components/ui/CantonTag";
 import type { Contact, ContactCallLog } from "@/lib/types";
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useCallback, useRef, useState, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 interface ContactListProps {
@@ -18,6 +18,8 @@ interface ContactListProps {
   activeCantonFilter?: string | null;
   availableCantons?: string[];
   callLogs?: Record<string, ContactCallLog>;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
 // Memoized list item to prevent re-renders
@@ -143,8 +145,16 @@ export const ContactList = memo(function ContactList({
   activeCantonFilter,
   availableCantons = [],
   callLogs = {},
+  searchQuery = "",
+  onSearchChange,
 }: ContactListProps) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [localSearch, setLocalSearch] = useState(searchQuery ?? "");
+  
+  // Sync local search with external searchQuery
+  useEffect(() => {
+    setLocalSearch(searchQuery ?? "");
+  }, [searchQuery]);
   const parentRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -204,6 +214,19 @@ export const ContactList = memo(function ContactList({
           </Button>
         </div>
       </header>
+      {/* Search input */}
+      <div className="border-b border-gray-200 px-4 py-2">
+        <input
+          type="text"
+          value={localSearch}
+          onChange={(e) => {
+            setLocalSearch(e.target.value);
+            onSearchChange?.(e.target.value);
+          }}
+          placeholder="Suche nach Firma, Name, E-Mail..."
+          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+      </div>
       {isPickerOpen && (
         <div className="border-b border-gray-200 px-4 py-2">
           <div className="flex flex-wrap gap-2">

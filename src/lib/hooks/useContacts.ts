@@ -23,6 +23,7 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
   const [actionState, setActionState] = useState<ActionState>({ type: null });
   const [error, setError] = useState<string | null>(null);
   const [cantonFilter, setCantonFilter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Real-time subscription for contacts
   useEffect(() => {
@@ -97,9 +98,31 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
   );
 
   const visibleContacts = useMemo(() => {
-    if (!cantonFilter) return contacts;
-    return contacts.filter((c) => c.canton === cantonFilter);
-  }, [contacts, cantonFilter]);
+    let filtered = contacts;
+    
+    // Filter by canton
+    if (cantonFilter) {
+      filtered = filtered.filter((c) => c.canton === cantonFilter);
+    }
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((c) => {
+        const searchableFields = [
+          c.company_name,
+          c.contact_name,
+          c.email,
+          c.phone,
+          c.canton,
+          c.notes,
+        ].filter(Boolean).join(" ").toLowerCase();
+        return searchableFields.includes(query);
+      });
+    }
+    
+    return filtered;
+  }, [contacts, cantonFilter, searchQuery]);
 
   const activeContact = useMemo(() => {
     if (!activeId) return visibleContacts[0] ?? null;
@@ -342,6 +365,7 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
     actionState,
     cantonFilter,
     uniqueCantons,
+    searchQuery,
     selectContact,
     goToNextContact,
     goToPreviousContact,
@@ -354,5 +378,6 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
     clearStatus,
     setCantonFilter,
     clearCantonFilter: () => setCantonFilter(null),
+    setSearchQuery,
   };
 }
