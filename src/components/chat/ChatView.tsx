@@ -14,12 +14,17 @@ export const ChatView = memo(function ChatView() {
   const [members, setMembers] = useState<ChatMember[]>([]);
   const [loading, setLoading] = useState(true);
   const activeRoomRef = useRef<ChatRoom | null>(null);
+  const membersRef = useRef<ChatMember[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Keep ref in sync
+  // Keep refs in sync
   useEffect(() => {
     activeRoomRef.current = activeRoom;
   }, [activeRoom]);
+
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
 
   // Fetch rooms on mount
   const fetchRooms = useCallback(async () => {
@@ -101,8 +106,8 @@ export const ChatView = memo(function ChatView() {
         // If message is for active room, add it directly
         const currentRoom = activeRoomRef.current;
         if (currentRoom && newRecord.room_id === currentRoom.id) {
-          // Find sender info from members
-          const sender = members.find(m => m.id === newRecord.sender_id);
+          // Find sender info from members ref
+          const sender = membersRef.current.find(m => m.id === newRecord.sender_id);
           
           const newMessage: ChatMessage = {
             id: newRecord.id,
@@ -135,7 +140,7 @@ export const ChatView = memo(function ChatView() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [members, fetchRooms]);
+  }, [fetchRooms]);
 
   const handleSendMessage = async (
     content: string,
