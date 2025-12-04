@@ -45,6 +45,7 @@ export async function GET() {
           .from("chat_messages")
           .select("id", { count: "exact", head: true })
           .eq("room_id", room.id)
+          .neq("sender_id", user.id)
           .gt("created_at", m.last_read_at || "1970-01-01");
 
         const { data: lastMessage } = await adminSupabase

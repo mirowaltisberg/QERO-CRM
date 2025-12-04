@@ -47,7 +47,7 @@ export function ChatView() {
   const fetchMessages = useCallback(async (roomId: string) => {
     setMessagesLoading(true);
     try {
-      const res = await fetch(`/api/chat/rooms/${roomId}/messages`);
+      const res = await fetch("/api/chat/rooms/" + roomId + "/messages");
       const json = await res.json();
       if (res.ok && json.data) setMessages(json.data);
     } catch (error) {
@@ -62,6 +62,26 @@ export function ChatView() {
     fetchMembers();
   }, [fetchRooms, fetchMembers]);
 
+  // Global subscription for all chat messages (to update unread counts)
+  useEffect(() => {
+    const supabase = createClient();
+    const globalChannel = supabase
+      .channel("chat-global")
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "chat_messages",
+      }, () => {
+        console.log("[Chat Global] New message, refreshing rooms");
+        fetchRooms();
+      })
+      .subscribe((status) => {
+        console.log("[Chat Global] Subscription status:", status);
+      });
+
+    return () => { supabase.removeChannel(globalChannel); };
+  }, [fetchRooms]);
+
   useEffect(() => {
     if (activeRoom) fetchMessages(activeRoom.id);
   }, [activeRoom, fetchMessages]);
@@ -70,29 +90,36 @@ export function ChatView() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Real-time subscription
+  // Real-time subscription for active room messages
   useEffect(() => {
     if (!activeRoom) return;
     const supabase = createClient();
     const channel = supabase
-      .channel(`chat-messages-${activeRoom.id}`)
+      .channel("chat-room-" + activeRoom.id)
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
         table: "chat_messages",
-        filter: `room_id=eq.${activeRoom.id}`,
-      }, async () => {
-        const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages?limit=1`);
+        filter: "room_id=eq." + activeRoom.id,
+      }, async (payload) => {
+        console.log("[Chat Room] New message:", payload);
+        const newRecord = payload.new as { id: string };
+        // Fetch messages to get the new one with sender info
+        const res = await fetch("/api/chat/rooms/" + activeRoom.id + "/messages?limit=50");
         const json = await res.json();
-        if (res.ok && json.data && json.data.length > 0) {
-          const newMessage = json.data[json.data.length - 1];
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
-          });
+        if (res.ok && json.data) {
+          const newMsg = json.data.find((m: ChatMessage) => m.id === newRecord.id);
+          if (newMsg) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+          }
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[Chat Room] Subscription status:", status);
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [activeRoom]);
@@ -104,7 +131,7 @@ export function ChatView() {
   ) => {
     if (!activeRoom) return;
     try {
-      const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages`, {
+      const res = await fetch("/api/chat/rooms/" + activeRoom.id + "/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, mentions, attachments }),
@@ -163,7 +190,7 @@ export function ChatView() {
             <h1 className="text-lg font-semibold text-gray-900">{getRoomDisplayName(activeRoom)}</h1>
             {activeRoom?.type === "dm" && activeRoom.dm_user?.team && (
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium mt-1"
-                style={{ backgroundColor: `${activeRoom.dm_user.team.color}20`, color: activeRoom.dm_user.team.color }}>
+                style={{ backgroundColor: activeRoom.dm_user.team.color + "20", color: activeRoom.dm_user.team.color }}>
                 {activeRoom.dm_user.team.name}
               </span>
             )}
