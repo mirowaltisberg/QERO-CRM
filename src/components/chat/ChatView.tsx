@@ -17,19 +17,23 @@ export function ChatView() {
   const [searchQuery, setSearchQuery] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // Mobile state
   const [isMobile, setIsMobile] = useState(false);
-  const [showMessages, setShowMessages] = useState(false);
+  const [mobileView, setMobileView] = useState<"list" | "chat">("list");
 
-  // Detect mobile
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // Reset to list view when switching to mobile
+      if (mobile && mobileView === "chat" && !activeRoom) {
+        setMobileView("list");
+      }
+    };
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  }, [mobileView, activeRoom]);
 
-  // Fetch rooms
   const fetchRooms = useCallback(async () => {
     try {
       const res = await fetch("/api/chat/rooms");
@@ -47,7 +51,6 @@ export function ChatView() {
     }
   }, [activeRoom, isMobile]);
 
-  // Fetch members
   const fetchMembers = useCallback(async () => {
     try {
       const res = await fetch("/api/chat/members");
@@ -58,7 +61,6 @@ export function ChatView() {
     }
   }, []);
 
-  // Fetch messages
   const fetchMessages = useCallback(async (roomId: string) => {
     setMessagesLoading(true);
     try {
@@ -111,10 +113,14 @@ export function ChatView() {
 
   const handleSelectRoom = useCallback((room: ChatRoom) => {
     setActiveRoom(room);
-    if (isMobile) setShowMessages(true);
+    if (isMobile) {
+      setMobileView("chat");
+    }
   }, [isMobile]);
 
-  const handleBack = useCallback(() => setShowMessages(false), []);
+  const handleBack = useCallback(() => {
+    setMobileView("list");
+  }, []);
 
   const handleSendMessage = async (content: string, mentions: string[], attachments: Array<{ file_name: string; file_url: string; file_type: string; file_size: number; }>) => {
     if (!activeRoom) return;
@@ -147,7 +153,7 @@ export function ChatView() {
           const newRoom = roomsJson.data.find((r: ChatRoom) => r.id === json.data.id);
           if (newRoom) {
             setActiveRoom(newRoom);
-            if (isMobile) setShowMessages(true);
+            if (isMobile) setMobileView("chat");
           }
         }
       }
@@ -165,10 +171,12 @@ export function ChatView() {
   // ==================== MOBILE ====================
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 overflow-hidden">
+      <div className="fixed inset-0 z-50 bg-gray-50">
         {/* Room List */}
         <div
-          className={`absolute inset-0 bg-white transition-transform duration-300 ease-out ${showMessages ? "-translate-x-full" : "translate-x-0"}`}
+          className={`absolute inset-0 bg-gray-50 transition-transform duration-300 ease-out ${
+            mobileView === "chat" ? "-translate-x-full" : "translate-x-0"
+          }`}
         >
           <ChatRoomList
             rooms={rooms}
@@ -182,57 +190,57 @@ export function ChatView() {
           />
         </div>
 
-        {/* Messages */}
+        {/* Chat View */}
         <div
-          className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-out ${showMessages ? "translate-x-0" : "translate-x-full"}`}
-          style={{ backgroundColor: "#ece5dd" }}
+          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-out ${
+            mobileView === "chat" ? "translate-x-0" : "translate-x-full"
+          }`}
         >
-          {/* Header - WhatsApp green */}
+          {/* Header */}
           <header 
-            className="flex items-center gap-3 px-2 py-2 flex-shrink-0"
-            style={{ 
-              backgroundColor: "#075e54",
-              paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)"
-            }}
+            className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0"
+            style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
           >
-            <button onClick={handleBack} className="p-2 -ml-1 text-white active:opacity-70">
+            <button 
+              onClick={handleBack}
+              className="flex items-center justify-center w-8 h-8 -ml-2 rounded-lg text-gray-600 active:bg-gray-100"
+            >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             
-            <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center overflow-hidden flex-shrink-0">
-              {activeRoom?.type === "dm" && activeRoom.dm_user?.avatar_url ? (
-                <img src={activeRoom.dm_user.avatar_url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-lg">{activeRoom?.type === "all" ? "👥" : activeRoom?.type === "team" ? "💼" : "👤"}</span>
-              )}
-            </div>
+            {activeRoom?.type === "dm" && activeRoom.dm_user?.avatar_url ? (
+              <img src={activeRoom.dm_user.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
+                {activeRoom?.type === "all" ? "👥" : activeRoom?.type === "team" ? "💼" : "👤"}
+              </div>
+            )}
             
-            <div className="flex-1 min-w-0 text-white">
-              <h1 className="text-[17px] font-medium truncate">{getRoomDisplayName(activeRoom)}</h1>
-              <p className="text-[13px] opacity-80">
-                {activeRoom?.type === "all" ? "Alle" : activeRoom?.type === "team" ? "Team" : "online"}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-base font-semibold text-gray-900 truncate">
+                {getRoomDisplayName(activeRoom)}
+              </h1>
+              <p className="text-xs text-gray-500">
+                {activeRoom?.type === "all" ? "Alle Teammitglieder" : activeRoom?.type === "team" ? "Team Chat" : ""}
               </p>
             </div>
           </header>
 
-          {/* Messages area - scrollable */}
+          {/* Messages */}
           <div 
-            className="flex-1 overflow-y-auto px-3 py-2"
-            style={{ 
-              WebkitOverflowScrolling: "touch",
-              overscrollBehavior: "contain"
-            }}
+            className="flex-1 overflow-y-auto px-4 py-3 bg-gray-50"
+            style={{ WebkitOverflowScrolling: "touch" }}
           >
             {messagesLoading ? (
               <div className="flex h-full items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-3 border-gray-300 border-t-[#075e54]" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center text-gray-500">
-                <span className="text-4xl mb-2">💬</span>
-                <p>Noch keine Nachrichten</p>
+              <div className="flex h-full flex-col items-center justify-center text-gray-400">
+                <span className="text-3xl mb-2">💬</span>
+                <p className="text-sm">Noch keine Nachrichten</p>
               </div>
             ) : (
               <>
@@ -244,11 +252,8 @@ export function ChatView() {
 
           {/* Input */}
           <div 
-            className="flex-shrink-0 px-2 py-2"
-            style={{ 
-              backgroundColor: "#f0f0f0",
-              paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)"
-            }}
+            className="flex-shrink-0 px-4 py-3 bg-white border-t border-gray-200"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
           >
             <ChatInput
               members={members}
