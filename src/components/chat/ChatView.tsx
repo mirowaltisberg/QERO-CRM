@@ -346,6 +346,7 @@ export function ChatView() {
           <div className="border-t border-gray-200 px-4 py-3 safe-area-bottom bg-white">
             <ChatInput
               members={members}
+              activeRoom={activeRoom}
               onSend={handleSendMessage}
               disabled={!activeRoom}
             />
@@ -355,7 +356,7 @@ export function ChatView() {
     );
   }
 
-  // Desktop Layout (unchanged)
+  // Desktop Layout
   return (
     <div className="flex h-full">
       {/* Left sidebar - Room list */}
@@ -420,6 +421,7 @@ export function ChatView() {
         <div className="border-t border-gray-200 px-6 py-4">
           <ChatInput
             members={members}
+            activeRoom={activeRoom}
             onSend={handleSendMessage}
             disabled={!activeRoom}
           />
