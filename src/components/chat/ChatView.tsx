@@ -1,77 +1,79 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { memo, useState, useEffect, useRef, useCallback } from "react";
 import { ChatRoomList } from "./ChatRoomList";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 import { createClient } from "@/lib/supabase/client";
 import type { ChatRoom, ChatMessage, ChatMember } from "@/lib/types";
 
-export function ChatView() {
+export const ChatView = memo(function ChatView() {
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [members, setMembers] = useState<ChatMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeRoomRef = useRef<ChatRoom | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Keep ref in sync with state
+  // Keep ref in sync
   useEffect(() => {
     activeRoomRef.current = activeRoom;
   }, [activeRoom]);
 
+  // Fetch rooms on mount
   const fetchRooms = useCallback(async () => {
     try {
       const res = await fetch("/api/chat/rooms");
       const json = await res.json();
-      if (res.ok && json.data) {
+      if (json.data) {
         setRooms(json.data);
         if (!activeRoomRef.current && json.data.length > 0) {
           setActiveRoom(json.data[0]);
         }
       }
-    } catch (error) {
-      console.error("Error fetching rooms:", error);
+    } catch (err) {
+      console.error("Error fetching rooms:", err);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Fetch members on mount
   const fetchMembers = useCallback(async () => {
     try {
       const res = await fetch("/api/chat/members");
       const json = await res.json();
-      if (res.ok && json.data) setMembers(json.data);
-    } catch (error) {
-      console.error("Error fetching members:", error);
+      if (json.data) setMembers(json.data);
+    } catch (err) {
+      console.error("Error fetching members:", err);
     }
   }, []);
 
+  // Fetch messages when room changes
   const fetchMessages = useCallback(async (roomId: string) => {
-    setMessagesLoading(true);
     try {
-      const res = await fetch("/api/chat/rooms/" + roomId + "/messages");
+      const res = await fetch("/api/chat/rooms/" + roomId + "/messages?limit=50");
       const json = await res.json();
-      if (res.ok && json.data) setMessages(json.data);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
-    } finally {
-      setMessagesLoading(false);
+      if (json.data) setMessages(json.data);
+    } catch (err) {
+      console.error("Error fetching messages:", err);
     }
   }, []);
 
-  // Initial load
+  // Initial data load
   useEffect(() => {
     fetchRooms();
     fetchMembers();
   }, [fetchRooms, fetchMembers]);
 
-  // Load messages when room changes
+  // Load messages when active room changes
   useEffect(() => {
-    if (activeRoom) fetchMessages(activeRoom.id);
+    if (activeRoom) {
+      fetchMessages(activeRoom.id);
+    } else {
+      setMessages([]);
+    }
   }, [activeRoom, fetchMessages]);
 
   // Scroll to bottom when messages change
@@ -79,56 +81,60 @@ export function ChatView() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Global real-time subscription (runs once on mount)
+  // Real-time subscription
   useEffect(() => {
     const supabase = createClient();
     
-    const globalChannel = supabase
-      .channel("chat-global-sub")
+    const channel = supabase
+      .channel("chat-realtime")
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
         table: "chat_messages",
-      }, (payload) => {
-        console.log("[Chat Global] New message received:", payload);
-        // Refresh room list
-        fetch("/api/chat/rooms")
-          .then(res => res.json())
-          .then(json => {
-            if (json.data) {
-              setRooms(json.data);
-            }
-          });
+      }, async (payload) => {
+        console.log("[Chat] New message:", payload);
+        const newRecord = payload.new as { id: string; room_id: string; sender_id: string; content: string; mentions: string[]; created_at: string };
         
-        // If the message is for the active room, add it
-        const newRecord = payload.new as { id: string; room_id: string };
+        // Refresh rooms (for unread counts later)
+        fetchRooms();
+        
+        // If message is for active room, add it directly
         const currentRoom = activeRoomRef.current;
         if (currentRoom && newRecord.room_id === currentRoom.id) {
-          // Fetch messages to get the new one with sender info
-          fetch("/api/chat/rooms/" + currentRoom.id + "/messages?limit=50")
-            .then(res => res.json())
-            .then(json => {
-              if (json.data) {
-                const newMsg = json.data.find((m: ChatMessage) => m.id === newRecord.id);
-                if (newMsg) {
-                  setMessages((prev) => {
-                    if (prev.some((m) => m.id === newMsg.id)) return prev;
-                    return [...prev, newMsg];
-                  });
-                }
-              }
-            });
+          // Find sender info from members
+          const sender = members.find(m => m.id === newRecord.sender_id);
+          
+          const newMessage: ChatMessage = {
+            id: newRecord.id,
+            room_id: newRecord.room_id,
+            sender_id: newRecord.sender_id,
+            content: newRecord.content,
+            mentions: newRecord.mentions || [],
+            created_at: newRecord.created_at,
+            updated_at: newRecord.created_at,
+            sender: sender ? {
+              id: sender.id,
+              full_name: sender.full_name,
+              avatar_url: sender.avatar_url,
+              team: sender.team,
+            } : null,
+            attachments: [],
+          };
+          
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            return [...prev, newMessage];
+          });
         }
       })
       .subscribe((status) => {
-        console.log("[Chat Global] Subscription status:", status);
+        console.log("[Chat] Subscription status:", status);
       });
 
     return () => {
-      console.log("[Chat Global] Cleaning up subscription");
-      supabase.removeChannel(globalChannel);
+      supabase.removeChannel(channel);
     };
-  }, []); // Empty deps - only run once
+  }, [members, fetchRooms]);
 
   const handleSendMessage = async (
     content: string,
@@ -144,11 +150,19 @@ export function ChatView() {
       });
       const json = await res.json();
       if (res.ok && json.data) {
-        setMessages((prev) => [...prev, json.data]);
+        // Add our own message immediately (realtime will handle others)
+        setMessages(prev => {
+          if (prev.some(m => m.id === json.data.id)) return prev;
+          return [...prev, json.data];
+        });
       }
-    } catch (error) {
-      console.error("Error sending message:", error);
+    } catch (err) {
+      console.error("Error sending message:", err);
     }
+  };
+
+  const handleSelectRoom = (room: ChatRoom) => {
+    setActiveRoom(room);
   };
 
   const handleStartDM = async (userId: string) => {
@@ -160,67 +174,71 @@ export function ChatView() {
       });
       const json = await res.json();
       if (res.ok && json.data) {
-        const roomsRes = await fetch("/api/chat/rooms");
-        const roomsJson = await roomsRes.json();
-        if (roomsRes.ok && roomsJson.data) {
-          setRooms(roomsJson.data);
-          const newRoom = roomsJson.data.find((r: ChatRoom) => r.id === json.data.id);
-          if (newRoom) setActiveRoom(newRoom);
+        await fetchRooms();
+        const newRoom = rooms.find(r => r.id === json.data.id);
+        if (newRoom) setActiveRoom(newRoom);
+        else {
+          const refreshRes = await fetch("/api/chat/rooms");
+          const refreshJson = await refreshRes.json();
+          if (refreshJson.data) {
+            setRooms(refreshJson.data);
+            const found = refreshJson.data.find((r: ChatRoom) => r.id === json.data.id);
+            if (found) setActiveRoom(found);
+          }
         }
       }
-    } catch (error) {
-      console.error("Error starting DM:", error);
+    } catch (err) {
+      console.error("Error starting DM:", err);
     }
   };
 
-  const getRoomDisplayName = (room: ChatRoom | null) => {
-    if (!room) return "";
-    if (room.type === "dm" && room.dm_user) return room.dm_user.full_name;
-    return room.name || "Chat";
-  };
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full">
-      <ChatRoomList
-        rooms={rooms}
-        members={members}
-        activeRoomId={activeRoom?.id || null}
-        onSelectRoom={setActiveRoom}
-        onStartDM={handleStartDM}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        loading={loading}
-      />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">{getRoomDisplayName(activeRoom)}</h1>
-            {activeRoom?.type === "dm" && activeRoom.dm_user?.team && (
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium mt-1"
-                style={{ backgroundColor: activeRoom.dm_user.team.color + "20", color: activeRoom.dm_user.team.color }}>
-                {activeRoom.dm_user.team.name}
-              </span>
-            )}
-            {activeRoom?.type === "team" && <p className="text-sm text-gray-500">Team Chat</p>}
-            {activeRoom?.type === "all" && <p className="text-sm text-gray-500">Alle Teammitglieder</p>}
-          </div>
+      <aside className="w-80 border-r border-gray-200 bg-white">
+        <ChatRoomList
+          rooms={rooms}
+          activeRoom={activeRoom}
+          members={members}
+          onSelectRoom={handleSelectRoom}
+          onStartDM={handleStartDM}
+        />
+      </aside>
+      <div className="flex flex-1 flex-col">
+        <header className="border-b border-gray-200 bg-white px-6 py-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {activeRoom?.type === "dm" && activeRoom.dm_user
+              ? activeRoom.dm_user.full_name
+              : activeRoom?.name || "Chat"}
+          </h2>
+          <p className="text-sm text-gray-500">
+            {activeRoom?.type === "all"
+              ? "Alle Teammitglieder"
+              : activeRoom?.type === "team"
+              ? "Team Chat"
+              : activeRoom?.dm_user?.team?.name || "Direct Message"}
+          </p>
         </header>
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          {messagesLoading ? (
-            <div className="flex h-full items-center justify-center text-gray-500">Lädt Nachrichten...</div>
-          ) : messages.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-gray-500">Noch keine Nachrichten.</div>
-          ) : (
-            <>
-              <ChatMessages messages={messages} members={members} />
-              <div ref={messagesEndRef} />
-            </>
-          )}
+        <div className="flex-1 overflow-y-auto p-6">
+          <ChatMessages messages={messages} members={members} />
+          <div ref={messagesEndRef} />
         </div>
-        <div className="border-t border-gray-200 px-6 py-4">
-          <ChatInput members={members} activeRoom={activeRoom} onSend={handleSendMessage} disabled={!activeRoom} />
+        <div className="border-t border-gray-200 bg-white p-4">
+          <ChatInput
+            members={members}
+            activeRoom={activeRoom}
+            onSend={handleSendMessage}
+            disabled={!activeRoom}
+          />
         </div>
       </div>
     </div>
   );
-}
+});
