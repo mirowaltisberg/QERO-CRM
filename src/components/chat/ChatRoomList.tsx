@@ -4,20 +4,10 @@ import { memo, useMemo } from "react";
 import Image from "next/image";
 import type { ChatRoom, ChatMember } from "@/lib/types";
 
-// Special display for CEO
-const getDisplayRole = (member: { full_name?: string; team?: { name: string; color: string } | null }) => {
-  if (member.full_name === "Arbios Shtanaj") {
-    return { name: "CEO", color: "#1a1a1a" };
-  }
-  return member.team;
-};
-
 interface ChatRoomListProps {
   rooms: ChatRoom[];
   members: ChatMember[];
   activeRoomId: string | null;
-  currentUserId?: string;
-  currentUserName?: string;
   onSelectRoom: (room: ChatRoom) => void;
   onStartDM: (userId: string) => void;
   searchQuery: string;
@@ -26,169 +16,309 @@ interface ChatRoomListProps {
 }
 
 export const ChatRoomList = memo(function ChatRoomList({
-  rooms, members, activeRoomId, currentUserId, currentUserName, onSelectRoom, onStartDM, searchQuery, onSearchChange, loading,
+  rooms,
+  members,
+  activeRoomId,
+  onSelectRoom,
+  onStartDM,
+  searchQuery,
+  onSearchChange,
+  loading,
 }: ChatRoomListProps) {
-  // Get current user's team from members (the one that matches rooms)
-  const currentUserTeamId = useMemo(() => {
-    const teamRoom = rooms.find(r => r.type === "team");
-    return teamRoom?.team_id || null;
+  // Separate rooms by type
+  const { allRoom, teamRooms, dmRooms } = useMemo(() => {
+    const all = rooms.find((r) => r.type === "all") || null;
+    const teams = rooms.filter((r) => r.type === "team");
+    const dms = rooms.filter((r) => r.type === "dm");
+    return { allRoom: all, teamRooms: teams, dmRooms: dms };
   }, [rooms]);
 
-  const { allRoom, teamRooms, dmRooms } = useMemo(() => ({
-    allRoom: rooms.find((r) => r.type === "all") || null,
-    teamRooms: rooms.filter((r) => r.type === "team"),
-    dmRooms: rooms.filter((r) => r.type === "dm"),
-  }), [rooms]);
-
-  // Get IDs of users we already have DMs with
-  const existingDmUserIds = useMemo(() => {
-    return new Set(dmRooms.map((r) => r.dm_user?.id).filter(Boolean));
-  }, [dmRooms]);
-
-  // Team members (same team as current user) - shown in Direktnachrichten when no search
-  const teamMembers = useMemo(() => {
-    if (!currentUserTeamId) return [];
-    return members.filter(m => 
-      m.team_id === currentUserTeamId && !existingDmUserIds.has(m.id)
-    );
-  }, [members, currentUserTeamId, existingDmUserIds]);
-
-  // Search results - people from OTHER teams (when searching)
-  const searchResults = useMemo(() => {
+  // Filter members by search (for starting new DMs)
+  const filteredMembers = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const query = searchQuery.toLowerCase();
     return members.filter((m) =>
-      (m.full_name?.toLowerCase().includes(query) || m.team?.name?.toLowerCase().includes(query)) &&
-      m.team_id !== currentUserTeamId && // Only show people from other teams in search
-      !existingDmUserIds.has(m.id)
-    ).slice(0, 10);
-  }, [members, searchQuery, currentUserTeamId, existingDmUserIds]);
+      m.full_name?.toLowerCase().includes(query) ||
+      m.team?.name?.toLowerCase().includes(query)
+    );
+  }, [members, searchQuery]);
+
+  // Members not in existing DMs
+  const membersWithoutDM = useMemo(() => {
+    const dmUserIds = new Set(dmRooms.map((r) => r.dm_user?.id).filter(Boolean));
+    return filteredMembers.filter((m) => !dmUserIds.has(m.id));
+  }, [filteredMembers, dmRooms]);
 
   if (loading) {
     return (
-      <aside className="flex h-full w-72 flex-col border-r border-gray-200 bg-gray-50 items-center justify-center">
-        <span className="text-gray-500">Lädt Chats...</span>
+      <aside className="flex h-full w-full md:w-72 flex-col border-r border-gray-200 bg-gray-50">
+        <div className="flex h-full items-center justify-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+        </div>
       </aside>
     );
   }
 
   return (
-    <aside className="flex h-full w-72 flex-col border-r border-gray-200 bg-gray-50">
-      <header className="border-b border-gray-200 px-4 py-4">
-        <h2 className="text-lg font-semibold text-gray-900">Chat</h2>
-        <p className="text-xs text-gray-500">Team-Kommunikation</p>
+    <aside className="flex h-full w-full md:w-72 flex-col md:border-r border-gray-200 bg-gray-50">
+      {/* Header */}
+      <header 
+        className="border-b border-gray-200 px-4 py-4 bg-white md:bg-transparent"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
+      >
+        <h2 className="text-xl md:text-lg font-semibold text-gray-900">Chat</h2>
+        <p className="text-xs text-gray-500 hidden md:block">Team-Kommunikation</p>
       </header>
-      <div className="border-b border-gray-200 px-4 py-2">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Suche nach Person..."
-          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none"
-        />
+
+      {/* Search */}
+      <div className="px-4 py-3 border-b border-gray-200 bg-white md:bg-transparent">
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Suchen..."
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 py-2.5 text-[16px] md:text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+          />
+        </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-2">
-        {/* Search results - only show when searching */}
-        {searchQuery && searchResults.length > 0 && (
+
+      {/* Room list */}
+      <div className="flex-1 overflow-y-auto px-4 md:p-2">
+        {/* All chat */}
+        {allRoom && (
           <div className="mb-4">
-            <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Suchergebnisse</p>
-            {searchResults.map((member) => (
-              <MemberItem key={member.id} member={member} onClick={() => { onStartDM(member.id); onSearchChange(""); }} />
+            <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">
+              Alle
+            </p>
+            <RoomItem
+              room={allRoom}
+              isActive={activeRoomId === allRoom.id}
+              onClick={() => onSelectRoom(allRoom)}
+            />
+          </div>
+        )}
+
+        {/* Team chats */}
+        {teamRooms.length > 0 && (
+          <div className="mb-4">
+            <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">
+              Teams
+            </p>
+            {teamRooms.map((room) => (
+              <RoomItem
+                key={room.id}
+                room={room}
+                isActive={activeRoomId === room.id}
+                onClick={() => onSelectRoom(room)}
+              />
             ))}
           </div>
         )}
 
-        {/* Show no results message */}
-        {searchQuery && searchResults.length === 0 && (
-          <div className="mb-4 px-2">
-            <p className="text-sm text-gray-500">Keine Personen gefunden</p>
+        {/* DMs */}
+        {dmRooms.length > 0 && (
+          <div className="mb-4">
+            <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">
+              Direktnachrichten
+            </p>
+            {dmRooms.map((room) => (
+              <RoomItem
+                key={room.id}
+                room={room}
+                isActive={activeRoomId === room.id}
+                onClick={() => onSelectRoom(room)}
+              />
+            ))}
           </div>
         )}
 
-        {/* Normal view when not searching */}
-        {!searchQuery && (
-          <>
-            {allRoom && (
-              <div className="mb-4">
-                <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Alle</p>
-                <RoomItem room={allRoom} isActive={activeRoomId === allRoom.id} onClick={() => onSelectRoom(allRoom)} isMentioned={allRoom.has_mention} />
-              </div>
-            )}
-            {teamRooms.length > 0 && (
-              <div className="mb-4">
-                <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Teams</p>
-                {teamRooms.map((room) => (
-                  <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} isMentioned={room.has_mention} />
-                ))}
-              </div>
-            )}
-            <div className="mb-4">
-              <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Direktnachrichten</p>
-              {/* Existing DM rooms */}
-              {dmRooms.map((room) => (
-                <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} isMentioned={room.has_mention} />
-              ))}
-              {/* Team members without DM yet */}
-              {teamMembers.map((member) => (
-                <MemberItem key={member.id} member={member} onClick={() => onStartDM(member.id)} />
-              ))}
-              {dmRooms.length === 0 && teamMembers.length === 0 && (
-                <p className="px-2 text-sm text-gray-400">Keine Teammitglieder</p>
-              )}
-            </div>
-          </>
+        {/* Search results - new DMs */}
+        {membersWithoutDM.length > 0 && (
+          <div className="mb-4">
+            <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">
+              Neue Unterhaltung
+            </p>
+            {membersWithoutDM.map((member) => (
+              <MemberItem
+                key={member.id}
+                member={member}
+                onClick={() => onStartDM(member.id)}
+              />
+            ))}
+          </div>
         )}
       </div>
     </aside>
   );
 });
 
-const RoomItem = memo(function RoomItem({ room, isActive, onClick, isMentioned }: { room: ChatRoom; isActive: boolean; onClick: () => void; isMentioned?: boolean }) {
+// Room item component
+const RoomItem = memo(function RoomItem({
+  room,
+  isActive,
+  onClick,
+}: {
+  room: ChatRoom;
+  isActive: boolean;
+  onClick: () => void;
+}) {
   const isDM = room.type === "dm";
   const displayName = isDM && room.dm_user ? room.dm_user.full_name : room.name || "Chat";
   const avatar = isDM && room.dm_user?.avatar_url;
-  const team = isDM && room.dm_user ? getDisplayRole(room.dm_user) : null;
-  const initials = displayName?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
-  const getIcon = () => { if (room.type === "all") return "👥"; if (room.type === "team") return "💼"; return null; };
+  const team = isDM ? room.dm_user?.team : null;
+  const initials = displayName
+    ?.split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "?";
+
+  // Icon for non-DM rooms
+  const getIcon = () => {
+    if (room.type === "all") return "👥";
+    if (room.type === "team") return "💼";
+    return null;
+  };
+
+  const hasMention = room.has_mention && room.unread_count && room.unread_count > 0;
 
   return (
-    <button onClick={onClick} className={`w-full rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${isActive ? "bg-white shadow-sm border border-gray-200" : isMentioned ? "bg-red-50 border border-red-300 hover:bg-red-100" : "hover:bg-white/60"}`}>
+    <button
+      onClick={onClick}
+      className={`w-full rounded-xl md:rounded-xl px-2 md:px-3 py-3 md:py-2.5 text-left transition-all active:bg-gray-100 ${
+        isActive
+          ? "md:bg-white md:shadow-sm md:border md:border-gray-200"
+          : hasMention
+          ? "bg-blue-50 md:border md:border-blue-200"
+          : "md:hover:bg-white/60"
+      }`}
+    >
       <div className="flex items-center gap-3">
         {isDM ? (
-          <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
-            {avatar ? <Image src={avatar} alt={displayName} width={36} height={36} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full w-full items-center justify-center text-xs font-medium text-gray-600">{initials}</div>}
+          <div className="h-12 w-12 md:h-9 md:w-9 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
+            {avatar ? (
+              <Image
+                src={avatar}
+                alt={displayName}
+                width={48}
+                height={48}
+                className="h-full w-full object-cover"
+                unoptimized
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-sm md:text-xs font-medium text-gray-600">
+                {initials}
+              </div>
+            )}
           </div>
         ) : (
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-lg">{getIcon()}</div>
+          <div className="flex h-12 w-12 md:h-9 md:w-9 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-xl md:text-lg">
+            {getIcon()}
+          </div>
         )}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-medium text-gray-900">{displayName}</p>
-            {(room.unread_count && room.unread_count > 0) || room.has_mention ? (
-              <span className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-medium text-white ${room.has_mention ? "bg-red-500" : "bg-blue-500"}`}>{room.has_mention ? "@" : room.unread_count && room.unread_count > 99 ? "99+" : room.unread_count}</span>
-            ) : null}
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-[15px] md:text-sm font-semibold md:font-medium text-gray-900">
+              {displayName}
+            </p>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {room.last_message && (
+                <span className="text-[13px] md:hidden text-gray-400">
+                  {new Date(room.last_message.created_at).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+              {room.unread_count && room.unread_count > 0 && (
+                <span className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-medium text-white ${
+                  hasMention ? "bg-red-500" : "bg-blue-500"
+                }`}>
+                  {hasMention ? "@" : room.unread_count > 99 ? "99+" : room.unread_count}
+                </span>
+              )}
+            </div>
           </div>
-          {team && <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${team.color}20`, color: team.color }}>{team.name}</span>}
-          {room.last_message && <p className="mt-0.5 truncate text-xs text-gray-500">{room.last_message.sender?.full_name?.split(" ")[0]}: {room.last_message.content.slice(0, 30)}{room.last_message.content.length > 30 ? "..." : ""}</p>}
+          {team && (
+            <span
+              className="hidden md:inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium"
+              style={{
+                backgroundColor: `${team.color}20`,
+                color: team.color,
+              }}
+            >
+              {team.name}
+            </span>
+          )}
+          {room.last_message && (
+            <p className="mt-0.5 truncate text-[13px] md:text-xs text-gray-500">
+              <span className="md:hidden">{room.last_message.content.slice(0, 40)}</span>
+              <span className="hidden md:inline">{room.last_message.sender?.full_name?.split(" ")[0]}: {room.last_message.content.slice(0, 30)}</span>
+              {room.last_message.content.length > 30 ? "..." : ""}
+            </p>
+          )}
         </div>
       </div>
     </button>
   );
 });
 
-const MemberItem = memo(function MemberItem({ member, onClick }: { member: ChatMember; onClick: () => void }) {
-  const initials = member.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
+// Member item for starting new DMs
+const MemberItem = memo(function MemberItem({
+  member,
+  onClick,
+}: {
+  member: ChatMember;
+  onClick: () => void;
+}) {
+  const initials = member.full_name
+    ?.split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "?";
+
   return (
-    <button onClick={onClick} className="w-full rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/60">
+    <button
+      onClick={onClick}
+      className="w-full rounded-xl px-3 py-3 md:py-2.5 text-left transition-colors hover:bg-white/60 active:bg-gray-100 active:scale-[0.98]"
+    >
       <div className="flex items-center gap-3">
         <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
-          {member.avatar_url ? <Image src={member.avatar_url} alt={member.full_name || "User"} width={36} height={36} className="h-full w-full object-cover" unoptimized /> : <div className="flex h-full w-full items-center justify-center text-xs font-medium text-gray-600">{initials}</div>}
+          {member.avatar_url ? (
+            <Image
+              src={member.avatar_url}
+              alt={member.full_name || "User"}
+              width={36}
+              height={36}
+              className="h-full w-full object-cover"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs font-medium text-gray-600">
+              {initials}
+            </div>
+          )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-gray-900">{member.full_name}</p>
-          {member.team && <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${member.team.color}20`, color: member.team.color }}>{member.team.name}</span>}
+          <p className="truncate text-sm font-medium text-gray-900">
+            {member.full_name}
+          </p>
+          {member.team && (
+            <span
+              className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium"
+              style={{
+                backgroundColor: `${member.team.color}20`,
+                color: member.team.color,
+              }}
+            >
+              {member.team.name}
+            </span>
+          )}
         </div>
       </div>
     </button>
   );
 });
+

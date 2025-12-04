@@ -60,11 +60,51 @@ const navigation = [
 
 export function Sidebar({ user, profile }: SidebarProps) {
   const pathname = usePathname();
-  // Initialize with false to match server render, then update from localStorage in useEffect
+  // Start with false (server default), then read from localStorage after mount
   const [collapsed, setCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
 
+  // Detect mobile
   useEffect(() => {
-    // Read from localStorage after mount to avoid hydration mismatch
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Poll chat unread count every 30 seconds (simple and safe)
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchCount = async () => {
+      try {
+        const res = await fetch("/api/chat/rooms");
+        if (!res.ok || !isMounted) return;
+        const json = await res.json();
+        if (json.data && isMounted) {
+          const total = json.data.reduce((sum: number, room: { unread_count?: number }) => 
+            sum + (room.unread_count || 0), 0);
+          setChatUnreadCount(total);
+        }
+      } catch {
+        // Silently ignore errors
+      }
+    };
+
+    fetchCount();
+    const interval = setInterval(fetchCount, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Read localStorage only after hydration to avoid mismatch
+  useEffect(() => {
+    setMounted(true);
     const stored = window.localStorage.getItem("qero-sidebar-collapsed");
     if (stored === "true") {
       setCollapsed(true);
@@ -73,8 +113,9 @@ export function Sidebar({ user, profile }: SidebarProps) {
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
-      window.localStorage.setItem("qero-sidebar-collapsed", String(!prev));
-      return !prev;
+      const newValue = !prev;
+      window.localStorage.setItem("qero-sidebar-collapsed", String(newValue));
+      return newValue;
     });
   };
 
@@ -87,21 +128,31 @@ export function Sidebar({ user, profile }: SidebarProps) {
     .toUpperCase()
     .slice(0, 2);
 
+  // Use expanded state during SSR and initial render to avoid hydration mismatch
+  const isCollapsed = mounted ? collapsed : false;
+
+  // Hide sidebar completely on mobile when on chat page
+  if (isMobile && mounted && pathname === "/chat") {
+    return null;
+  }
+
   return (
     <aside
       className={cn(
         "h-full border-r border-border bg-gray-50 flex flex-col transition-[width] duration-200 ease-out",
-        collapsed ? "w-16" : "w-56"
+        isCollapsed ? "w-16" : "w-56",
+        // Hide on mobile for chat page via CSS (before JS hydration)
+        pathname === "/chat" && "hidden md:flex"
       )}
     >
       {/* Logo + collapse toggle */}
       <div
         className={cn(
           "flex items-center border-b border-border",
-          collapsed ? "h-auto flex-col gap-1 py-3" : "h-16 justify-between px-3"
+          isCollapsed ? "h-auto flex-col gap-1 py-3" : "h-16 justify-between px-3"
         )}
       >
-        {collapsed ? (
+        {isCollapsed ? (
           <Link href="/calling" className="flex items-center justify-center">
             <Image src="/qero-logo.svg" alt="QERO" width={28} height={28} priority className="h-7 w-7" />
           </Link>
@@ -114,9 +165,9 @@ export function Sidebar({ user, profile }: SidebarProps) {
           type="button"
           onClick={toggleCollapsed}
           className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 shadow-sm hover:bg-gray-100 hover:text-gray-700 transition-colors"
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <ChevronIcon collapsed={collapsed} />
+          <ChevronIcon collapsed={isCollapsed} />
         </button>
       </div>
 
@@ -133,17 +184,29 @@ export function Sidebar({ user, profile }: SidebarProps) {
                   href={item.href}
                   prefetch={true}
                   className={cn(
-                    "group flex items-center rounded-md text-sm transition-colors duration-100",
-                    collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-2",
+                    "group flex items-center rounded-md text-sm transition-colors duration-100 relative",
+                    isCollapsed ? "justify-center p-2" : "gap-2.5 px-3 py-2",
                     isActive
                       ? "bg-white text-gray-900 shadow-sm border border-border"
                       : "text-gray-600 hover:bg-white hover:text-gray-900"
                   )}
-                  title={collapsed ? `${item.name} (${item.shortcut})` : undefined}
+                  title={isCollapsed ? `${item.name} (${item.shortcut})` : undefined}
                 >
-                  <item.icon className="w-4 h-4 shrink-0" />
-                  {!collapsed && <span className="flex-1 whitespace-nowrap">{item.name}</span>}
-                  {!collapsed && !isActive && (
+                  <div className="relative">
+                    <item.icon className="w-4 h-4 shrink-0" />
+                    {item.name === "Chat" && chatUnreadCount > 0 && isCollapsed && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-medium text-white">
+                        {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                      </span>
+                    )}
+                  </div>
+                  {!isCollapsed && <span className="flex-1 whitespace-nowrap">{item.name}</span>}
+                  {item.name === "Chat" && chatUnreadCount > 0 && !isCollapsed && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-medium text-white">
+                      {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                    </span>
+                  )}
+                  {!isCollapsed && !isActive && item.name !== "Chat" && (
                     <span className="text-xs text-gray-400 hidden group-hover:block">
                       {item.shortcut}
                     </span>
@@ -163,12 +226,12 @@ export function Sidebar({ user, profile }: SidebarProps) {
             prefetch={true}
             className={cn(
               "flex items-center rounded-md text-sm transition-colors duration-100",
-              collapsed ? "justify-center p-2" : "gap-3 px-3 py-2",
+              isCollapsed ? "justify-center p-2" : "gap-3 px-3 py-2",
               pathname === "/settings"
                 ? "bg-white text-gray-900 shadow-sm border border-border"
                 : "text-gray-600 hover:bg-white hover:text-gray-900"
             )}
-            title={collapsed ? displayName : undefined}
+            title={isCollapsed ? displayName : undefined}
           >
             <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
               {avatarUrl ? (
@@ -186,7 +249,7 @@ export function Sidebar({ user, profile }: SidebarProps) {
                 </div>
               )}
             </div>
-            {!collapsed && (
+            {!isCollapsed && (
               <>
                 <div className="flex-1 min-w-0">
                   <p className="truncate font-medium text-gray-900">{displayName}</p>
@@ -201,7 +264,7 @@ export function Sidebar({ user, profile }: SidebarProps) {
 
       {/* Keyboard hints */}
       <div className="p-4 border-t border-border">
-        {!collapsed ? (
+        {!isCollapsed ? (
           <div className="text-xs text-gray-400 space-y-1">
             <div className="flex items-center justify-between">
               <span>Command palette</span>
@@ -329,6 +392,7 @@ function SettingsIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
 function ChatIcon({ className }: { className?: string }) {
   return (
     <svg

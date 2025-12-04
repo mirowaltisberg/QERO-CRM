@@ -5,14 +5,6 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import type { ChatMember, ChatRoom } from "@/lib/types";
 
-// Special display for CEO
-const getDisplayRole = (member: ChatMember) => {
-  if (member.full_name === "Arbios Shtanaj") {
-    return { name: "CEO", color: "#1a1a1a" };
-  }
-  return member.team;
-};
-
 interface ChatInputProps {
   members: ChatMember[];
   activeRoom: ChatRoom | null;
@@ -56,23 +48,18 @@ export const ChatInput = memo(function ChatInput({
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const handleSendRef = useRef<() => void>(() => {});
 
-  // Filter members based on room type and search query
+  // Filter members for @ autocomplete (with @everyone option)
   const filteredMembers = useMemo(() => {
+    // Filter by room type first
     let availableMembers = members;
-    
-    // Filter by room type
     if (activeRoom?.type === "team" && activeRoom.team_id) {
-      // In team chat, only show members of that team
       availableMembers = members.filter(m => m.team_id === activeRoom.team_id);
     } else if (activeRoom?.type === "dm" && activeRoom.dm_user) {
-      // In DM, only show the other person
       availableMembers = members.filter(m => m.id === activeRoom.dm_user?.id);
     }
-    // In "all" chat, show everyone
-    
-    // Add @everyone option for group chats (not DMs)
+
+    // Create @everyone option for group chats
     const everyoneOption: ChatMember = {
       id: "everyone",
       full_name: "everyone",
@@ -80,22 +67,25 @@ export const ChatInput = memo(function ChatInput({
       team_id: null,
       team: null,
     };
-    
-    // Apply search filter
+
     if (!mentionQuery) {
-      // Show @everyone first for group chats
+      // Show @everyone first for non-DM chats
       if (activeRoom?.type !== "dm") {
         return [everyoneOption, ...availableMembers.slice(0, 4)];
       }
       return availableMembers.slice(0, 5);
     }
-    
+
     const query = mentionQuery.toLowerCase();
     const filtered = availableMembers
-      .filter((m) => m.full_name?.toLowerCase().includes(query))
+      .filter(
+        (m) =>
+          m.full_name?.toLowerCase().includes(query) ||
+          m.team?.name?.toLowerCase().includes(query)
+      )
       .slice(0, 5);
-    
-    // Add @everyone if it matches query
+
+    // Add @everyone if it matches query (for non-DM chats)
     if (activeRoom?.type !== "dm" && "everyone".includes(query)) {
       return [everyoneOption, ...filtered.slice(0, 4)];
     }
@@ -108,10 +98,10 @@ export const ChatInput = memo(function ChatInput({
       const value = e.target.value;
       setContent(value);
 
-      // Check for @ mentions - match @ followed by any characters until space or end
+      // Check for @ mentions
       const cursorPos = e.target.selectionStart;
       const textBeforeCursor = value.slice(0, cursorPos);
-      const atMatch = textBeforeCursor.match(/@([^@]*)$/);
+      const atMatch = textBeforeCursor.match(/@(\w*)$/);
 
       if (atMatch) {
         setShowMentions(true);
@@ -148,7 +138,7 @@ export const ChatInput = memo(function ChatInput({
         }
       } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        handleSendRef.current();
+        handleSend();
       }
     },
     [showMentions, filteredMembers, mentionIndex]
@@ -168,7 +158,7 @@ export const ChatInput = memo(function ChatInput({
       const atIndex = textBeforeCursor.lastIndexOf("@");
       const newText =
         textBeforeCursor.slice(0, atIndex) +
-        "@" + member.full_name + " " +
+        `@${member.full_name} ` +
         textAfterCursor;
 
       setContent(newText);
@@ -178,7 +168,7 @@ export const ChatInput = memo(function ChatInput({
       // Focus and move cursor
       setTimeout(() => {
         textarea.focus();
-        const newPos = atIndex + (member.full_name?.length || 0) + 2;
+        const newPos = atIndex + member.full_name!.length + 2;
         textarea.setSelectionRange(newPos, newPos);
       }, 0);
     },
@@ -197,7 +187,7 @@ export const ChatInput = memo(function ChatInput({
       for (const file of files) {
         // Validate file size (10MB)
         if (file.size > 10 * 1024 * 1024) {
-          alert(file.name + " ist zu gross. Maximum: 10MB");
+          alert(`${file.name} ist zu gross. Maximum: 10MB`);
           continue;
         }
 
@@ -293,21 +283,23 @@ export const ChatInput = memo(function ChatInput({
     if (sending) return;
 
     // Extract mentions from content
+    const mentionRegex = /@([A-Za-zÀ-ÿ]+(?: [A-Za-zÀ-ÿ]+)*)/g;
     const mentions: string[] = [];
-    
-    // Check for @everyone first (case insensitive)
-    if (trimmedContent.toLowerCase().includes("@everyone")) {
-      mentions.push("everyone");
-    }
-    
-    // Check for member mentions - try to match each member's name after @
-    for (const member of members) {
-      if (!member.full_name) continue;
-      // Create a regex that matches @MemberName (case insensitive, word boundary)
-      const escapedName = member.full_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const memberRegex = new RegExp('@' + escapedName + '(?![A-Za-zÀ-ÿ])', 'gi');
-      if (memberRegex.test(trimmedContent) && !mentions.includes(member.id)) {
-        mentions.push(member.id);
+    let match: RegExpExecArray | null;
+    while ((match = mentionRegex.exec(trimmedContent)) !== null) {
+      const mentionName = match[1];
+      // Check for @everyone
+      if (mentionName.toLowerCase() === "everyone") {
+        if (!mentions.includes("everyone")) {
+          mentions.push("everyone");
+        }
+      } else {
+        const mentionedMember = members.find(
+          (m) => m.full_name?.toLowerCase() === mentionName.toLowerCase()
+        );
+        if (mentionedMember && !mentions.includes(mentionedMember.id)) {
+          mentions.push(mentionedMember.id);
+        }
       }
     }
 
@@ -320,11 +312,6 @@ export const ChatInput = memo(function ChatInput({
       setSending(false);
     }
   }, [content, attachments, members, onSend, sending]);
-
-  // Keep ref updated for handleKeyDown
-  useEffect(() => {
-    handleSendRef.current = handleSend;
-  }, [handleSend]);
 
   // Cleanup object URLs on unmount
   useEffect(() => {
@@ -344,7 +331,7 @@ export const ChatInput = memo(function ChatInput({
     <div className="relative">
       {/* Mention autocomplete dropdown */}
       {showMentions && filteredMembers.length > 0 && (
-        <div className="absolute bottom-full left-0 mb-2 w-64 rounded-lg border border-gray-200 bg-white shadow-lg z-50">
+        <div className="absolute bottom-full left-0 right-0 md:right-auto mb-2 md:w-64 rounded-xl border border-gray-200 bg-white shadow-lg z-50 max-h-[40vh] overflow-y-auto">
           {filteredMembers.map((member, index) => {
             const isEveryone = member.id === "everyone";
             const initials = isEveryone ? "👥" : (member.full_name
@@ -373,7 +360,7 @@ export const ChatInput = memo(function ChatInput({
                       unoptimized
                     />
                   ) : (
-                    <div className={`flex h-full w-full items-center justify-center font-medium ${isEveryone ? "text-blue-600 text-base" : "text-gray-600 text-[10px]"}`}>
+                    <div className={`flex h-full w-full items-center justify-center text-[10px] font-medium ${isEveryone ? "text-blue-600 text-base" : "text-gray-600"}`}>
                       {initials}
                     </div>
                   )}
@@ -385,7 +372,10 @@ export const ChatInput = memo(function ChatInput({
                   {isEveryone ? (
                     <p className="truncate text-xs text-gray-500">Alle benachrichtigen</p>
                   ) : member.team ? (
-                    <p className="truncate text-xs" style={{ color: member.team.color }}>
+                    <p
+                      className="truncate text-xs"
+                      style={{ color: member.team.color }}
+                    >
                       {member.team.name}
                     </p>
                   ) : null}
@@ -441,26 +431,27 @@ export const ChatInput = memo(function ChatInput({
 
       {/* Input area */}
       <div className="flex items-end gap-2">
+        {/* Text input */}
         <div className="relative flex-1">
           <textarea
             ref={textareaRef}
             value={content}
             onChange={handleContentChange}
             onKeyDown={handleKeyDown}
-            placeholder="Nachricht schreiben... (@erwähnen mit @)"
+            placeholder="Nachricht schreiben..."
             disabled={disabled}
             rows={1}
-            className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 pr-24 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            style={{ minHeight: "48px", maxHeight: "200px" }}
+            className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-[16px] text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none disabled:opacity-50"
+            style={{ minHeight: "44px", maxHeight: "120px" }}
           />
-          {/* Attachment button inside textarea */}
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
-            className="absolute right-14 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
-            title="Datei anhängen"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 active:text-gray-800 disabled:opacity-50"
           >
-            📎
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
           </button>
         </div>
 
@@ -473,14 +464,26 @@ export const ChatInput = memo(function ChatInput({
           accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
         />
 
-        <Button
+        {/* Send button */}
+        <button
           onClick={handleSend}
           disabled={!canSend}
-          className="h-12 px-6"
+          className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition-all ${
+            canSend 
+              ? "bg-gray-900 text-white active:scale-95" 
+              : "bg-gray-100 text-gray-400"
+          }`}
         >
-          {sending ? "..." : "Senden"}
-        </Button>
+          {sending ? (
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : (
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+            </svg>
+          )}
+        </button>
       </div>
     </div>
   );
 });
+
