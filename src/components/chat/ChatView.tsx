@@ -72,10 +72,17 @@ export const ChatView = memo(function ChatView() {
     fetchMembers();
   }, [fetchRooms, fetchMembers]);
 
-  // Load messages when active room changes
+  // Load messages when active room changes + poll every 3 seconds
   useEffect(() => {
     if (activeRoom) {
       fetchMessages(activeRoom.id);
+      
+      // Poll every 3 seconds as fallback for realtime
+      const interval = setInterval(() => {
+        fetchMessages(activeRoom.id);
+      }, 3000);
+      
+      return () => clearInterval(interval);
     } else {
       setMessages([]);
     }
