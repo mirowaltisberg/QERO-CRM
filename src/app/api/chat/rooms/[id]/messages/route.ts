@@ -47,7 +47,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Get team info for senders
     const messagesWithTeams = await Promise.all(
       (messages || []).map(async (msg) => {
-        const sender = msg.sender as { id: string; full_name: string; avatar_url: string | null; team_id: string | null; team?: { name: string; color: string } | null };
+        // Handle sender - could be array or object depending on Supabase version
+        const rawSender = msg.sender;
+        const sender = (Array.isArray(rawSender) ? rawSender[0] : rawSender) as { id: string; full_name: string; avatar_url: string | null; team_id: string | null; team?: { name: string; color: string } | null } | null;
+        
         if (sender?.team_id) {
           const { data: team } = await adminSupabase
             .from("teams")
@@ -56,6 +59,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
             .single();
           sender.team = team;
         }
+        
+        // Ensure sender is properly attached
+        (msg as Record<string, unknown>).sender = sender;
         return msg;
       })
     );
