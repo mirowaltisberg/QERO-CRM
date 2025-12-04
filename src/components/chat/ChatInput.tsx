@@ -71,12 +71,34 @@ export const ChatInput = memo(function ChatInput({
     }
     // In "all" chat, show everyone
     
+    // Add @everyone option for group chats (not DMs)
+    const everyoneOption: ChatMember = {
+      id: "everyone",
+      full_name: "everyone",
+      avatar_url: null,
+      team_id: null,
+      team: null,
+    };
+    
     // Apply search filter
-    if (!mentionQuery) return availableMembers.slice(0, 5);
+    if (!mentionQuery) {
+      // Show @everyone first for group chats
+      if (activeRoom?.type !== "dm") {
+        return [everyoneOption, ...availableMembers.slice(0, 4)];
+      }
+      return availableMembers.slice(0, 5);
+    }
+    
     const query = mentionQuery.toLowerCase();
-    return availableMembers
+    const filtered = availableMembers
       .filter((m) => m.full_name?.toLowerCase().includes(query))
       .slice(0, 5);
+    
+    // Add @everyone if it matches query
+    if (activeRoom?.type !== "dm" && "everyone".includes(query)) {
+      return [everyoneOption, ...filtered.slice(0, 4)];
+    }
+    return filtered;
   }, [members, mentionQuery, activeRoom]);
 
   // Handle content change
@@ -354,8 +376,8 @@ export const ChatInput = memo(function ChatInput({
                       <p className="truncate text-xs" style={{ color: role.color }}>
                         {role.name}
                       </p>
-                    );
-                  })()}
+                    )
+                  )}
                 </div>
               </button>
             );

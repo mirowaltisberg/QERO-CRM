@@ -90,15 +90,27 @@ const MessageCard = memo(function MessageCard({
       const afterAt = remaining.slice(atIndex + 1);
       let foundMatch = false;
       
-      for (const name of Array.from(memberNames)) {
-        if (afterAt.toLowerCase().startsWith(name)) {
-          const afterName = afterAt.slice(name.length);
-          if (afterName.length === 0 || !/^[A-Za-zÀ-ÿ]/.test(afterName)) {
-            const originalName = afterAt.slice(0, name.length);
-            parts.push({ type: "mention", value: "@" + originalName });
-            remaining = afterAt.slice(name.length);
-            foundMatch = true;
-            break;
+      // Check for @everyone first
+      if (afterAt.toLowerCase().startsWith("everyone")) {
+        const afterName = afterAt.slice(8); // "everyone".length
+        if (afterName.length === 0 || !/^[A-Za-zÀ-ÿ]/.test(afterName)) {
+          parts.push({ type: "mention", value: "@everyone" });
+          remaining = afterAt.slice(8);
+          foundMatch = true;
+        }
+      }
+      
+      if (!foundMatch) {
+        for (const name of Array.from(memberNames)) {
+          if (afterAt.toLowerCase().startsWith(name)) {
+            const afterName = afterAt.slice(name.length);
+            if (afterName.length === 0 || !/^[A-Za-zÀ-ÿ]/.test(afterName)) {
+              const originalName = afterAt.slice(0, name.length);
+              parts.push({ type: "mention", value: "@" + originalName });
+              remaining = afterAt.slice(name.length);
+              foundMatch = true;
+              break;
+            }
           }
         }
       }

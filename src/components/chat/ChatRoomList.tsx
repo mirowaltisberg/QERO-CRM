@@ -16,6 +16,8 @@ interface ChatRoomListProps {
   rooms: ChatRoom[];
   members: ChatMember[];
   activeRoomId: string | null;
+  currentUserId?: string;
+  currentUserName?: string;
   onSelectRoom: (room: ChatRoom) => void;
   onStartDM: (userId: string) => void;
   searchQuery: string;
@@ -24,7 +26,7 @@ interface ChatRoomListProps {
 }
 
 export const ChatRoomList = memo(function ChatRoomList({
-  rooms, members, activeRoomId, onSelectRoom, onStartDM, searchQuery, onSearchChange, loading,
+  rooms, members, activeRoomId, currentUserId, currentUserName, onSelectRoom, onStartDM, searchQuery, onSearchChange, loading,
 }: ChatRoomListProps) {
   // Get current user's team from members (the one that matches rooms)
   const currentUserTeamId = useMemo(() => {
@@ -109,14 +111,14 @@ export const ChatRoomList = memo(function ChatRoomList({
             {allRoom && (
               <div className="mb-4">
                 <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Alle</p>
-                <RoomItem room={allRoom} isActive={activeRoomId === allRoom.id} onClick={() => onSelectRoom(allRoom)} />
+                <RoomItem room={allRoom} isActive={activeRoomId === allRoom.id} onClick={() => onSelectRoom(allRoom)} isMentioned={false} />
               </div>
             )}
             {teamRooms.length > 0 && (
               <div className="mb-4">
                 <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Teams</p>
                 {teamRooms.map((room) => (
-                  <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} />
+                  <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} isMentioned={false} />
                 ))}
               </div>
             )}
@@ -124,7 +126,7 @@ export const ChatRoomList = memo(function ChatRoomList({
               <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Direktnachrichten</p>
               {/* Existing DM rooms */}
               {dmRooms.map((room) => (
-                <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} />
+                <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} isMentioned={false} />
               ))}
               {/* Team members without DM yet */}
               {teamMembers.map((member) => (
@@ -141,7 +143,7 @@ export const ChatRoomList = memo(function ChatRoomList({
   );
 });
 
-const RoomItem = memo(function RoomItem({ room, isActive, onClick }: { room: ChatRoom; isActive: boolean; onClick: () => void }) {
+const RoomItem = memo(function RoomItem({ room, isActive, onClick, isMentioned }: { room: ChatRoom; isActive: boolean; onClick: () => void; isMentioned?: boolean }) {
   const isDM = room.type === "dm";
   const displayName = isDM && room.dm_user ? room.dm_user.full_name : room.name || "Chat";
   const avatar = isDM && room.dm_user?.avatar_url;
@@ -150,7 +152,7 @@ const RoomItem = memo(function RoomItem({ room, isActive, onClick }: { room: Cha
   const getIcon = () => { if (room.type === "all") return "👥"; if (room.type === "team") return "💼"; return null; };
 
   return (
-    <button onClick={onClick} className={`w-full rounded-xl px-3 py-2.5 text-left transition-colors ${isActive ? "bg-white shadow-sm border border-gray-200" : "hover:bg-white/60"}`}>
+    <button onClick={onClick} className={`w-full rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${isActive ? "bg-white shadow-sm border border-gray-200" : isMentioned ? "bg-blue-50 border border-blue-200 hover:bg-blue-100" : "hover:bg-white/60"}`}>
       <div className="flex items-center gap-3">
         {isDM ? (
           <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">

@@ -15,6 +15,8 @@ export const ChatView = memo(function ChatView() {
   const [members, setMembers] = useState<ChatMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [currentUserName, setCurrentUserName] = useState<string>("");
   const activeRoomRef = useRef<ChatRoom | null>(null);
   const membersRef = useRef<ChatMember[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -54,7 +56,19 @@ export const ChatView = memo(function ChatView() {
     try {
       const res = await fetch("/api/chat/members");
       const json = await res.json();
-      if (json.data) setMembers(json.data);
+      if (json.data) {
+        setMembers(json.data);
+        // Get current user from Supabase
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setCurrentUserId(user.id);
+          const currentMember = json.data.find((m: ChatMember) => m.id === user.id);
+          if (currentMember) {
+            setCurrentUserName(currentMember.full_name || "");
+          }
+        }
+      }
     } catch (err) {
       console.error("Error fetching members:", err);
     }
@@ -241,6 +255,8 @@ export const ChatView = memo(function ChatView() {
           rooms={rooms}
           activeRoomId={activeRoom?.id || null}
           members={members}
+          currentUserId={currentUserId}
+          currentUserName={currentUserName}
           onSelectRoom={handleSelectRoom}
           onStartDM={handleStartDM}
           searchQuery={searchQuery}

@@ -363,6 +363,7 @@ export interface ChatRoom {
   team_id: string | null;
   created_at: string;
   unread_count?: number;
+  has_mention?: boolean;
   last_message?: {
     id: string;
     content: string;
