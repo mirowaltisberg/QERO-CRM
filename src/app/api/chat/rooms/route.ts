@@ -78,6 +78,29 @@ export async function GET() {
           .neq("sender_id", user.id)
           .gt("created_at", lastReadAt);
 
+        // Check for mentions in unread messages
+        let hasMention = false;
+        if (unreadCount && unreadCount > 0) {
+          const { data: unreadMsgs } = await adminSupabase
+            .from("chat_messages")
+            .select("mentions")
+            .eq("room_id", room.id)
+            .neq("sender_id", user.id)
+            .gt("created_at", lastReadAt)
+            .limit(20);
+          
+          if (unreadMsgs) {
+            for (const msg of unreadMsgs) {
+              const mentions = msg.mentions || [];
+              // Check if user is mentioned directly or @everyone
+              if (mentions.includes(user.id) || mentions.includes("everyone")) {
+                hasMention = true;
+                break;
+              }
+            }
+          }
+        }
+
         // Get last message
         const { data: lastMessageData } = await adminSupabase
           .from("chat_messages")
@@ -124,6 +147,7 @@ export async function GET() {
         return {
           ...room,
           unread_count: unreadCount || 0,
+          has_mention: hasMention,
           last_message: lastMessage,
           dm_user: dmUser,
         };

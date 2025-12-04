@@ -111,14 +111,14 @@ export const ChatRoomList = memo(function ChatRoomList({
             {allRoom && (
               <div className="mb-4">
                 <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Alle</p>
-                <RoomItem room={allRoom} isActive={activeRoomId === allRoom.id} onClick={() => onSelectRoom(allRoom)} isMentioned={false} />
+                <RoomItem room={allRoom} isActive={activeRoomId === allRoom.id} onClick={() => onSelectRoom(allRoom)} isMentioned={room.has_mention} />
               </div>
             )}
             {teamRooms.length > 0 && (
               <div className="mb-4">
                 <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Teams</p>
                 {teamRooms.map((room) => (
-                  <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} isMentioned={false} />
+                  <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} isMentioned={room.has_mention} />
                 ))}
               </div>
             )}
@@ -126,7 +126,7 @@ export const ChatRoomList = memo(function ChatRoomList({
               <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Direktnachrichten</p>
               {/* Existing DM rooms */}
               {dmRooms.map((room) => (
-                <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} isMentioned={false} />
+                <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} isMentioned={room.has_mention} />
               ))}
               {/* Team members without DM yet */}
               {teamMembers.map((member) => (
@@ -152,7 +152,7 @@ const RoomItem = memo(function RoomItem({ room, isActive, onClick, isMentioned }
   const getIcon = () => { if (room.type === "all") return "👥"; if (room.type === "team") return "💼"; return null; };
 
   return (
-    <button onClick={onClick} className={`w-full rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${isActive ? "bg-white shadow-sm border border-gray-200" : isMentioned ? "bg-blue-50 border border-blue-200 hover:bg-blue-100" : "hover:bg-white/60"}`}>
+    <button onClick={onClick} className={`w-full rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${isActive ? "bg-white shadow-sm border border-gray-200" : isMentioned ? "bg-red-50 border border-red-300 hover:bg-red-100" : "hover:bg-white/60"}`}>
       <div className="flex items-center gap-3">
         {isDM ? (
           <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
@@ -164,9 +164,9 @@ const RoomItem = memo(function RoomItem({ room, isActive, onClick, isMentioned }
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate text-sm font-medium text-gray-900">{displayName}</p>
-            {room.unread_count && room.unread_count > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-medium text-white">{room.unread_count > 99 ? "99+" : room.unread_count}</span>
-            )}
+            {(room.unread_count && room.unread_count > 0) || room.has_mention ? (
+              <span className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-medium text-white ${room.has_mention ? "bg-red-500" : "bg-blue-500"}`}>{room.has_mention ? "@" : room.unread_count && room.unread_count > 99 ? "99+" : room.unread_count}</span>
+            ) : null}
           </div>
           {team && <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${team.color}20`, color: team.color }}>{team.name}</span>}
           {room.last_message && <p className="mt-0.5 truncate text-xs text-gray-500">{room.last_message.sender?.full_name?.split(" ")[0]}: {room.last_message.content.slice(0, 30)}{room.last_message.content.length > 30 ? "..." : ""}</p>}
