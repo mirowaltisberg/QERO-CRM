@@ -151,8 +151,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       (message as Record<string, unknown>).attachments = [];
     }
 
-    // Get team info
-    const sender = message.sender as { id: string; full_name: string; avatar_url: string | null; team_id: string | null; team?: { name: string; color: string } | null };
+    // Get team info - handle sender that could be array or object
+    const rawSender = message.sender;
+    const sender = (Array.isArray(rawSender) ? rawSender[0] : rawSender) as { id: string; full_name: string; avatar_url: string | null; team_id: string | null; team?: { name: string; color: string } | null } | null;
     if (sender?.team_id) {
       const { data: team } = await adminSupabase
         .from("teams")
@@ -161,6 +162,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         .single();
       sender.team = team;
     }
+    (message as Record<string, unknown>).sender = sender;
 
     await adminSupabase
       .from("chat_room_members")
