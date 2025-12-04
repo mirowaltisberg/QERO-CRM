@@ -10,39 +10,88 @@ interface ChatMessagesProps {
 }
 
 export const ChatMessages = memo(function ChatMessages({ messages, members }: ChatMessagesProps) {
-  const memberMap = useMemo(() => {
+  // Create a map of member IDs and a set of member names for mention matching
+  const { memberMap, memberNames } = useMemo(() => {
     const map = new Map<string, ChatMember>();
-    members.forEach((m) => map.set(m.id, m));
-    return map;
+    const names = new Set<string>();
+    members.forEach((m) => {
+      map.set(m.id, m);
+      if (m.full_name) names.add(m.full_name.toLowerCase());
+    });
+    return { memberMap: map, memberNames: names };
   }, [members]);
 
   return (
     <div className="space-y-4">
       {messages.map((message) => (
-        <MessageCard key={message.id} message={message} memberMap={memberMap} />
+        <MessageCard key={message.id} message={message} memberMap={memberMap} memberNames={memberNames} />
       ))}
     </div>
   );
 });
 
-const MessageCard = memo(function MessageCard({ message, memberMap }: { message: ChatMessage; memberMap: Map<string, ChatMember> }) {
+const MessageCard = memo(function MessageCard({ 
+  message, 
+  memberMap,
+  memberNames 
+}: { 
+  message: ChatMessage; 
+  memberMap: Map<string, ChatMember>;
+  memberNames: Set<string>;
+}) {
   const sender = message.sender;
   const initials = sender?.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "??";
 
+  // Parse content and highlight only valid member mentions
   const parsedContent = useMemo(() => {
     if (!message.content) return null;
-    const mentionRegex = /@([A-Za-zÀ-ÿ]+(?: [A-Za-zÀ-ÿ]+)*)/g;
+    
     const parts: Array<{ type: "text" | "mention"; value: string }> = [];
-    let lastIndex = 0;
-    let match;
-    while ((match = mentionRegex.exec(message.content)) !== null) {
-      if (match.index > lastIndex) parts.push({ type: "text", value: message.content.slice(lastIndex, match.index) });
-      parts.push({ type: "mention", value: `@${match[1]}` });
-      lastIndex = match.index + match[0].length;
+    let remaining = message.content;
+    
+    while (remaining.length > 0) {
+      const atIndex = remaining.indexOf("@");
+      
+      if (atIndex === -1) {
+        // No more @ symbols
+        parts.push({ type: "text", value: remaining });
+        break;
+      }
+      
+      // Add text before @
+      if (atIndex > 0) {
+        parts.push({ type: "text", value: remaining.slice(0, atIndex) });
+      }
+      
+      // Try to match a member name after @
+      const afterAt = remaining.slice(atIndex + 1);
+      let foundMatch = false;
+      
+      // Check each member name to see if the text starts with it
+      for (const name of Array.from(memberNames)) {
+        if (afterAt.toLowerCase().startsWith(name)) {
+          // Make sure it's followed by a non-letter or end of string
+          const afterName = afterAt.slice(name.length);
+          if (afterName.length === 0 || !/^[A-Za-zÀ-ÿ]/.test(afterName)) {
+            // Found a valid mention
+            const originalName = afterAt.slice(0, name.length);
+            parts.push({ type: "mention", value: "@" + originalName });
+            remaining = afterAt.slice(name.length);
+            foundMatch = true;
+            break;
+          }
+        }
+      }
+      
+      if (!foundMatch) {
+        // No valid mention found, treat @ as regular text
+        parts.push({ type: "text", value: "@" });
+        remaining = afterAt;
+      }
     }
-    if (lastIndex < message.content.length) parts.push({ type: "text", value: message.content.slice(lastIndex) });
+    
     return parts.length > 0 ? parts : [{ type: "text" as const, value: message.content }];
-  }, [message.content]);
+  }, [message.content, memberNames]);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -58,7 +107,7 @@ const MessageCard = memo(function MessageCard({ message, memberMap }: { message:
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-gray-900">{sender?.full_name || "Unbekannt"}</span>
             {sender?.team && (
-              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${sender.team.color}20`, color: sender.team.color }}>{sender.team.name}</span>
+              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: sender.team.color + "20", color: sender.team.color }}>{sender.team.name}</span>
             )}
             <span className="text-xs text-gray-400">{formatRelativeTime(message.created_at)}</span>
           </div>
@@ -88,9 +137,9 @@ const AttachmentPreview = memo(function AttachmentPreview({ attachment }: { atta
   const isImage = attachment.file_type?.startsWith("image/");
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return "";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
   if (isImage) {
@@ -121,9 +170,9 @@ function formatRelativeTime(dateStr: string): string {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
   if (diffMins < 1) return "gerade eben";
-  if (diffMins < 60) return `vor ${diffMins} Min.`;
-  if (diffHours < 24) return `vor ${diffHours} Std.`;
+  if (diffMins < 60) return "vor " + diffMins + " Min.";
+  if (diffHours < 24) return "vor " + diffHours + " Std.";
   if (diffDays === 1) return "gestern";
-  if (diffDays < 7) return `vor ${diffDays} Tagen`;
+  if (diffDays < 7) return "vor " + diffDays + " Tagen";
   return date.toLocaleDateString("de-CH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
