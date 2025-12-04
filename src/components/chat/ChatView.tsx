@@ -99,14 +99,11 @@ export function ChatView() {
           schema: "public",
           table: "chat_messages",
         },
-        (payload) => {
-          console.log("[Chat Global] New message in system:", payload);
+        () => {
           fetchRooms();
         }
       )
-      .subscribe((status) => {
-        console.log("[Chat Global] Subscription status:", status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(globalChannel);
@@ -142,7 +139,6 @@ export function ChatView() {
           filter: `room_id=eq.${activeRoom.id}`,
         },
         async (payload) => {
-          console.log("[Chat Realtime] New message payload:", payload);
           const newRecord = payload.new as { id: string; sender_id: string };
           
           const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages?limit=50`);
@@ -160,12 +156,7 @@ export function ChatView() {
           fetchRooms();
         }
       )
-      .subscribe((status) => {
-        console.log("[Chat Realtime] Subscription status:", status);
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.error("[Chat Realtime] Subscription failed:", status);
-        }
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -208,8 +199,6 @@ export function ChatView() {
       const json = await res.json();
       if (res.ok && json.data) {
         setMessages((prev) => [...prev, json.data]);
-      } else {
-        console.error("Error sending message:", json.error);
       }
     } catch (error) {
       console.error("Error sending message:", error);
@@ -229,20 +218,14 @@ export function ChatView() {
       if (res.ok && json.data) {
         await fetchRooms();
         const roomId = json.data.id;
-        const room = rooms.find((r) => r.id === roomId);
-        if (room) {
-          setActiveRoom(room);
-          if (isMobile) setShowMessages(true);
-        } else {
-          const roomsRes = await fetch("/api/chat/rooms");
-          const roomsJson = await roomsRes.json();
-          if (roomsRes.ok && roomsJson.data) {
-            setRooms(roomsJson.data);
-            const newRoom = roomsJson.data.find((r: ChatRoom) => r.id === roomId);
-            if (newRoom) {
-              setActiveRoom(newRoom);
-              if (isMobile) setShowMessages(true);
-            }
+        const roomsRes = await fetch("/api/chat/rooms");
+        const roomsJson = await roomsRes.json();
+        if (roomsRes.ok && roomsJson.data) {
+          setRooms(roomsJson.data);
+          const newRoom = roomsJson.data.find((r: ChatRoom) => r.id === roomId);
+          if (newRoom) {
+            setActiveRoom(newRoom);
+            if (isMobile) setShowMessages(true);
           }
         }
       }
@@ -260,79 +243,73 @@ export function ChatView() {
     return room.name || "Chat";
   };
 
-  // Mobile Layout
+  // ==================== MOBILE LAYOUT ====================
   if (isMobile) {
     return (
-      <div className="relative h-[100dvh] w-full overflow-hidden bg-gray-50">
-        {/* Room List - Slides out when showMessages is true */}
+      <div className="fixed inset-0 z-50 bg-white">
+        {/* Room List View */}
         <div
-          className={`absolute inset-0 transition-transform duration-300 ease-out ${
+          className={`absolute inset-0 bg-white transition-transform duration-250 ease-out ${
             showMessages ? "-translate-x-full" : "translate-x-0"
           }`}
+          style={{ willChange: "transform" }}
         >
-          <div className="h-full overflow-hidden bg-white">
-            <ChatRoomList
-              rooms={rooms}
-              members={members}
-              activeRoomId={activeRoom?.id || null}
-              onSelectRoom={handleSelectRoom}
-              onStartDM={handleStartDM}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              loading={loading}
-            />
-          </div>
+          <ChatRoomList
+            rooms={rooms}
+            members={members}
+            activeRoomId={activeRoom?.id || null}
+            onSelectRoom={handleSelectRoom}
+            onStartDM={handleStartDM}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            loading={loading}
+          />
         </div>
 
-        {/* Messages View - Slides in from right */}
+        {/* Messages View */}
         <div
-          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-out ${
+          className={`absolute inset-0 bg-white flex flex-col transition-transform duration-250 ease-out ${
             showMessages ? "translate-x-0" : "translate-x-full"
           }`}
+          style={{ willChange: "transform" }}
         >
-          {/* Mobile Header with Back Button */}
-          <header className="flex items-center gap-3 border-b border-gray-200 px-4 py-3 safe-area-top">
+          {/* Native-style Header */}
+          <header 
+            className="flex items-center gap-2 px-2 py-2 bg-white border-b border-gray-100"
+            style={{ paddingTop: "env(safe-area-inset-top, 8px)" }}
+          >
             <button
               onClick={handleBack}
-              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
+              className="flex items-center gap-1 px-2 py-2 -ml-1 text-blue-500 active:opacity-60"
             >
-              <svg className="h-6 w-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
+              <span className="text-[17px]">Chats</span>
             </button>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-semibold text-gray-900 truncate">
+            <div className="flex-1 text-center pr-16">
+              <h1 className="text-[17px] font-semibold text-gray-900 truncate">
                 {getRoomDisplayName(activeRoom)}
               </h1>
-              {activeRoom?.type === "dm" && activeRoom.dm_user?.team && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-                  style={{
-                    backgroundColor: `${activeRoom.dm_user.team.color}20`,
-                    color: activeRoom.dm_user.team.color,
-                  }}
-                >
-                  {activeRoom.dm_user.team.name}
-                </span>
-              )}
               {activeRoom?.type === "team" && (
-                <p className="text-sm text-gray-500">Team Chat</p>
+                <p className="text-[13px] text-gray-500">Team</p>
               )}
               {activeRoom?.type === "all" && (
-                <p className="text-sm text-gray-500">Alle Teammitglieder</p>
+                <p className="text-[13px] text-gray-500">Alle</p>
               )}
             </div>
           </header>
 
-          {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto px-4 py-3">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto bg-gray-50 px-3 py-2">
             {messagesLoading ? (
-              <div className="flex h-full items-center justify-center text-gray-500">
-                Lädt Nachrichten...
+              <div className="flex h-full items-center justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-gray-500">
-                Noch keine Nachrichten. Schreib die erste!
+              <div className="flex h-full flex-col items-center justify-center text-gray-400">
+                <div className="text-4xl mb-2">💬</div>
+                <p className="text-[15px]">Keine Nachrichten</p>
               </div>
             ) : (
               <>
@@ -342,8 +319,11 @@ export function ChatView() {
             )}
           </div>
 
-          {/* Input Area - Sticky at bottom */}
-          <div className="border-t border-gray-200 px-4 py-3 safe-area-bottom bg-white">
+          {/* Input */}
+          <div 
+            className="bg-white border-t border-gray-200 px-3 py-2"
+            style={{ paddingBottom: "env(safe-area-inset-bottom, 8px)" }}
+          >
             <ChatInput
               members={members}
               activeRoom={activeRoom}
@@ -356,10 +336,9 @@ export function ChatView() {
     );
   }
 
-  // Desktop Layout
+  // ==================== DESKTOP LAYOUT ====================
   return (
     <div className="flex h-full">
-      {/* Left sidebar - Room list */}
       <ChatRoomList
         rooms={rooms}
         members={members}
@@ -371,9 +350,7 @@ export function ChatView() {
         loading={loading}
       />
 
-      {/* Main chat area */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Room header */}
         <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <div>
             <h1 className="text-lg font-semibold text-gray-900">
@@ -399,7 +376,6 @@ export function ChatView() {
           </div>
         </header>
 
-        {/* Messages area */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {messagesLoading ? (
             <div className="flex h-full items-center justify-center text-gray-500">
@@ -417,7 +393,6 @@ export function ChatView() {
           )}
         </div>
 
-        {/* Input area */}
         <div className="border-t border-gray-200 px-6 py-4">
           <ChatInput
             members={members}
