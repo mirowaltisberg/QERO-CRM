@@ -381,6 +381,7 @@ export interface ChatRoom {
 export interface ChatMessage {
   id: string;
   room_id: string;
+  sender_id: string;
   content: string;
   mentions: string[];
   created_at: string;

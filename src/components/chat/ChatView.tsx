@@ -112,13 +112,13 @@ export const ChatView = memo(function ChatView() {
             mentions: newRecord.mentions || [],
             created_at: newRecord.created_at,
             updated_at: newRecord.created_at,
-            sender: sender ? {
-              id: sender.id,
-              full_name: sender.full_name,
-              avatar_url: sender.avatar_url,
-              team_id: sender.team_id,
-              team: sender.team,
-            } : undefined,
+            sender: {
+              id: sender?.id || newRecord.sender_id,
+              full_name: sender?.full_name || "Unknown",
+              avatar_url: sender?.avatar_url || null,
+              team_id: sender?.team_id || null,
+              team: sender?.team ? { name: sender.team.name, color: sender.team.color } : null,
+            },
             attachments: [],
           };
           
