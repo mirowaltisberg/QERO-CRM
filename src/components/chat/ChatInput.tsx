@@ -291,18 +291,24 @@ export const ChatInput = memo(function ChatInput({
     if (!trimmedContent && uploadedAttachments.length === 0) return;
     if (sending) return;
 
-    // Extract mentions from content - match @Name Surname pattern
+    // Extract mentions from content - match @Name Surname pattern and @everyone
     const mentions: string[] = [];
-    // Find all @mentions by looking for @ followed by text until we hit another @ or end
     const mentionRegex = /@([A-Za-zÀ-ÿ]+(?: [A-Za-zÀ-ÿ]+)*)/g;
     let match: RegExpExecArray | null;
     while ((match = mentionRegex.exec(trimmedContent)) !== null) {
       const mentionName = match[1];
-      const mentionedMember = members.find(
-        (m) => m.full_name?.toLowerCase() === mentionName.toLowerCase()
-      );
-      if (mentionedMember) {
-        mentions.push(mentionedMember.id);
+      // Check for @everyone
+      if (mentionName.toLowerCase() === "everyone") {
+        if (!mentions.includes("everyone")) {
+          mentions.push("everyone");
+        }
+      } else {
+        const mentionedMember = members.find(
+          (m) => m.full_name?.toLowerCase() === mentionName.toLowerCase()
+        );
+        if (mentionedMember && !mentions.includes(mentionedMember.id)) {
+          mentions.push(mentionedMember.id);
+        }
       }
     }
 

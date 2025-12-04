@@ -70,33 +70,26 @@ export async function GET() {
       roomsData.map(async (room) => {
         const lastReadAt = membershipMap.get(room.id) || "1970-01-01";
 
-        // Get unread count
-        const { count: unreadCount } = await adminSupabase
+        // Get unread messages with mentions in single query
+        const { data: unreadMsgs } = await adminSupabase
           .from("chat_messages")
-          .select("id", { count: "exact", head: true })
+          .select("id, mentions")
           .eq("room_id", room.id)
           .neq("sender_id", user.id)
-          .gt("created_at", lastReadAt);
-
-        // Check for mentions in unread messages
+          .gt("created_at", lastReadAt)
+          .order("created_at", { ascending: false })
+          .limit(50);
+        
+        const unreadCount = unreadMsgs?.length || 0;
+        
+        // Check for mentions
         let hasMention = false;
-        if (unreadCount && unreadCount > 0) {
-          const { data: unreadMsgs } = await adminSupabase
-            .from("chat_messages")
-            .select("mentions")
-            .eq("room_id", room.id)
-            .neq("sender_id", user.id)
-            .gt("created_at", lastReadAt)
-            .limit(20);
-          
-          if (unreadMsgs) {
-            for (const msg of unreadMsgs) {
-              const mentions = msg.mentions || [];
-              // Check if user is mentioned directly or @everyone
-              if (mentions.includes(user.id) || mentions.includes("everyone")) {
-                hasMention = true;
-                break;
-              }
+        if (unreadMsgs && unreadMsgs.length > 0) {
+          for (const msg of unreadMsgs) {
+            const mentions = msg.mentions || [];
+            if (mentions.includes(user.id) || mentions.includes("everyone")) {
+              hasMention = true;
+              break;
             }
           }
         }
