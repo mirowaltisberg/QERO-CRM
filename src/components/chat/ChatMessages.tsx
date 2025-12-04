@@ -24,12 +24,19 @@ export const ChatMessages = memo(function ChatMessages({ messages, members }: Ch
     return map;
   }, [members]);
 
-  const memberNames = useMemo(() => {
-    const names = new Set<string>();
+  // Store both original and normalized names for matching
+  const memberNamesMap = useMemo(() => {
+    const map = new Map<string, string>(); // normalized -> original
     members.forEach((m) => {
-      if (m.full_name) names.add(m.full_name.toLowerCase());
+      if (m.full_name) {
+        // Normalize: lowercase, replace fancy quotes with regular ones
+        const normalized = m.full_name.toLowerCase()
+          .replace(/['']/g, "'")
+          .replace(/[""]/g, '"');
+        map.set(normalized, m.full_name);
+      }
     });
-    return names;
+    return map;
   }, [members]);
 
   if (messages.length === 0) {
@@ -47,7 +54,7 @@ export const ChatMessages = memo(function ChatMessages({ messages, members }: Ch
           key={message.id} 
           message={message} 
           memberMap={memberMap} 
-          memberNames={memberNames}
+          memberNamesMap={memberNamesMap}
           isNew={index === messages.length - 1}
         />
       ))}
@@ -58,12 +65,12 @@ export const ChatMessages = memo(function ChatMessages({ messages, members }: Ch
 const MessageCard = memo(function MessageCard({ 
   message, 
   memberMap,
-  memberNames,
+  memberNamesMap,
   isNew
 }: { 
   message: ChatMessage; 
   memberMap: Map<string, ChatMember>;
-  memberNames: Set<string>;
+  memberNamesMap: Map<string, string>;
   isNew?: boolean;
 }) {
   const sender = message.sender;
@@ -74,6 +81,9 @@ const MessageCard = memo(function MessageCard({
     
     const parts: Array<{ type: "text" | "mention"; value: string }> = [];
     let remaining = message.content;
+    
+    // Normalize function for matching
+    const normalize = (s: string) => s.toLowerCase().replace(/['']/g, "'").replace(/[""]/g, '"');
     
     while (remaining.length > 0) {
       const atIndex = remaining.indexOf("@");
@@ -88,12 +98,13 @@ const MessageCard = memo(function MessageCard({
       }
       
       const afterAt = remaining.slice(atIndex + 1);
+      const normalizedAfterAt = normalize(afterAt);
       let foundMatch = false;
       
       // Check for @everyone first
-      if (afterAt.toLowerCase().startsWith("everyone")) {
-        const afterName = afterAt.slice(8); // "everyone".length
-        if (afterName.length === 0 || !/^[A-Za-zÀ-ÿ]/.test(afterName)) {
+      if (normalizedAfterAt.startsWith("everyone")) {
+        const afterName = afterAt.slice(8);
+        if (afterName.length === 0 || /^[\s.,!?;:]/.test(afterName) || !/^[A-Za-zÀ-ÿ']/.test(afterName)) {
           parts.push({ type: "mention", value: "@everyone" });
           remaining = afterAt.slice(8);
           foundMatch = true;
@@ -101,13 +112,18 @@ const MessageCard = memo(function MessageCard({
       }
       
       if (!foundMatch) {
-        for (const name of Array.from(memberNames)) {
-          if (afterAt.toLowerCase().startsWith(name)) {
-            const afterName = afterAt.slice(name.length);
-            if (afterName.length === 0 || !/^[A-Za-zÀ-ÿ]/.test(afterName)) {
-              const originalName = afterAt.slice(0, name.length);
+        // Sort by length (longest first) to match full names before partial
+        const sortedNames = Array.from(memberNamesMap.keys()).sort((a, b) => b.length - a.length);
+        
+        for (const normalizedName of sortedNames) {
+          if (normalizedAfterAt.startsWith(normalizedName)) {
+            const nameLength = normalizedName.length;
+            const afterName = afterAt.slice(nameLength);
+            // Check word boundary - allow space, punctuation, or end of string
+            if (afterName.length === 0 || /^[\s.,!?;:\n]/.test(afterName)) {
+              const originalName = afterAt.slice(0, nameLength);
               parts.push({ type: "mention", value: "@" + originalName });
-              remaining = afterAt.slice(name.length);
+              remaining = afterAt.slice(nameLength);
               foundMatch = true;
               break;
             }
@@ -122,7 +138,7 @@ const MessageCard = memo(function MessageCard({
     }
     
     return parts.length > 0 ? parts : [{ type: "text" as const, value: message.content }];
-  }, [message.content, memberNames]);
+  }, [message.content, memberNamesMap]);
 
   const role = getDisplayRole(sender?.full_name, sender?.team);
 
