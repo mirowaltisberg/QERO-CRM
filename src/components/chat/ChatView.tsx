@@ -116,8 +116,9 @@ export const ChatView = memo(function ChatView() {
               id: sender.id,
               full_name: sender.full_name,
               avatar_url: sender.avatar_url,
+              team_id: sender.team_id,
               team: sender.team,
-            } : null,
+            } : undefined,
             attachments: [],
           };
           
