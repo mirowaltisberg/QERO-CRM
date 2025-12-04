@@ -63,7 +63,7 @@ export function ChatView() {
   const fetchMessages = useCallback(async (roomId: string) => {
     setMessagesLoading(true);
     try {
-      const res = await fetch(\`/api/chat/rooms/\${roomId}/messages\`);
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages`);
       const json = await res.json();
       if (res.ok && json.data) setMessages(json.data);
     } catch (error) {
@@ -94,11 +94,11 @@ export function ChatView() {
   useEffect(() => {
     if (!activeRoom) return;
     const supabase = createClient();
-    const channel = supabase.channel(\`chat-\${activeRoom.id}\`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter: \`room_id=eq.\${activeRoom.id}\` },
+    const channel = supabase.channel(`chat-${activeRoom.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter: `room_id=eq.${activeRoom.id}` },
         async (payload) => {
           const newId = (payload.new as { id: string }).id;
-          const res = await fetch(\`/api/chat/rooms/\${activeRoom.id}/messages?limit=50\`);
+          const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages?limit=50`);
           const json = await res.json();
           if (res.ok && json.data) {
             const newMsg = json.data.find((m: ChatMessage) => m.id === newId);
@@ -124,7 +124,7 @@ export function ChatView() {
   const handleSendMessage = async (content: string, mentions: string[], attachments: Array<{ file_name: string; file_url: string; file_type: string; file_size: number; }>) => {
     if (!activeRoom) return;
     try {
-      const res = await fetch(\`/api/chat/rooms/\${activeRoom.id}/messages\`, {
+      const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, mentions, attachments }),
@@ -173,9 +173,9 @@ export function ChatView() {
       <div className="fixed inset-0 z-50 bg-gray-50">
         {/* Room List */}
         <div
-          className={\`absolute inset-0 bg-gray-50 transition-transform duration-300 ease-out \${
+          className={`absolute inset-0 bg-gray-50 transition-transform duration-300 ease-out ${
             mobileView === "chat" ? "-translate-x-full" : "translate-x-0"
-          }\`}
+          }`}
         >
           <ChatRoomList
             rooms={rooms}
@@ -191,9 +191,9 @@ export function ChatView() {
 
         {/* Chat View */}
         <div
-          className={\`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-out \${
+          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-out ${
             mobileView === "chat" ? "translate-x-0" : "translate-x-full"
-          }\`}
+          }`}
         >
           {/* Header */}
           <header 
@@ -285,7 +285,7 @@ export function ChatView() {
             <h1 className="text-lg font-semibold text-gray-900">{getRoomDisplayName(activeRoom)}</h1>
             {activeRoom?.type === "dm" && activeRoom.dm_user?.team && (
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium mt-1"
-                style={{ backgroundColor: \`\${activeRoom.dm_user.team.color}20\`, color: activeRoom.dm_user.team.color }}>
+                style={{ backgroundColor: `${activeRoom.dm_user.team.color}20`, color: activeRoom.dm_user.team.color }}>
                 {activeRoom.dm_user.team.name}
               </span>
             )}
