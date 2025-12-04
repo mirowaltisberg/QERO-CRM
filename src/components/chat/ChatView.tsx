@@ -19,6 +19,15 @@ export function ChatView() {
   
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
+  
+  // Refs to prevent subscription recreation
+  const activeRoomRef = useRef<ChatRoom | null>(null);
+  const subscriptionRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
+  
+  // Keep activeRoomRef in sync
+  useEffect(() => {
+    activeRoomRef.current = activeRoom;
+  }, [activeRoom]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -91,41 +100,52 @@ export function ChatView() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Stable realtime subscription - only recreate when room ID changes
   useEffect(() => {
     if (!activeRoom) return;
+    
+    const roomId = activeRoom.id;
     const supabase = createClient();
-    const channel = supabase.channel(`chat-${activeRoom.id}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter: `room_id=eq.${activeRoom.id}` },
+    
+    // Clean up previous subscription if exists
+    if (subscriptionRef.current) {
+      supabase.removeChannel(subscriptionRef.current);
+    }
+    
+    const channel = supabase.channel(`chat-room-${roomId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter: `room_id=eq.${roomId}` },
         async (payload) => {
           console.log("[Chat Realtime] New message received:", payload.new);
-          const newId = (payload.new as { id: string }).id;
-          // Fetch the full message with sender info
-          const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages?limit=50`);
+          const newMsg = payload.new as { id: string; content: string; sender_id: string; created_at: string };
+          
+          // Fetch full message with sender info
+          const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=1`);
           const json = await res.json();
-          if (res.ok && json.data) {
-            const newMsg = json.data.find((m: ChatMessage) => m.id === newId);
-            if (newMsg) {
-              setMessages(prev => {
-                // Check if message already exists
-                if (prev.some(m => m.id === newMsg.id)) {
-                  console.log("[Chat Realtime] Message already exists, skipping");
-                  return prev;
-                }
-                console.log("[Chat Realtime] Adding new message to state");
-                return [...prev, newMsg];
-              });
-            }
+          if (res.ok && json.data && json.data.length > 0) {
+            const fullMsg = json.data.find((m: ChatMessage) => m.id === newMsg.id) || json.data[0];
+            setMessages(prev => {
+              if (prev.some(m => m.id === fullMsg.id)) return prev;
+              return [...prev, fullMsg];
+            });
           }
-          fetchRooms();
+          
+          // Update room list
+          fetch("/api/chat/rooms").then(r => r.json()).then(j => {
+            if (j.data) setRooms(j.data);
+          });
         })
       .subscribe((status) => {
         console.log("[Chat Realtime] Subscription status:", status);
       });
+    
+    subscriptionRef.current = channel;
+    
     return () => { 
-      console.log("[Chat Realtime] Cleaning up subscription");
-      supabase.removeChannel(channel); 
+      console.log("[Chat Realtime] Cleaning up subscription for room:", roomId);
+      supabase.removeChannel(channel);
+      subscriptionRef.current = null;
     };
-  }, [activeRoom, fetchRooms]);
+  }, [activeRoom?.id]); // Only depend on room ID, not the whole object
 
   const handleSelectRoom = useCallback((room: ChatRoom) => {
     setActiveRoom(room);
