@@ -28,7 +28,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "50");
 
-    // Get messages without joins
     const { data: messages, error: msgError } = await adminSupabase
       .from("chat_messages")
       .select("id, content, mentions, created_at, updated_at, sender_id")
@@ -41,24 +40,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return respondError("Failed to fetch messages", 500);
     }
 
-    // Get all profiles
     const { data: allProfiles } = await adminSupabase
       .from("profiles")
       .select("id, full_name, avatar_url, team_id");
     const profilesMap = new Map((allProfiles || []).map(p => [p.id, p]));
 
-    // Get all teams
     const { data: allTeams } = await adminSupabase
       .from("teams")
       .select("id, name, color");
     const teamsMap = new Map((allTeams || []).map(t => [t.id, t]));
 
-    // Get attachments for these messages
     const messageIds = (messages || []).map(m => m.id);
-    const { data: attachments } = await adminSupabase
-      .from("chat_attachments")
-      .select("id, message_id, file_name, file_url, file_type, file_size")
-      .in("message_id", messageIds.length > 0 ? messageIds : ["none"]);
+    const { data: attachments } = messageIds.length > 0 
+      ? await adminSupabase
+          .from("chat_attachments")
+          .select("id, message_id, file_name, file_url, file_type, file_size")
+          .in("message_id", messageIds)
+      : { data: [] };
 
     const attachmentsByMessage = new Map<string, typeof attachments>();
     (attachments || []).forEach(a => {
@@ -67,7 +65,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       attachmentsByMessage.set(a.message_id, existing);
     });
 
-    // Build response
     const messagesWithData = (messages || []).map(msg => {
       const senderProfile = profilesMap.get(msg.sender_id);
       const sender = senderProfile ? {
@@ -88,7 +85,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       };
     });
 
-    // Update last_read_at
     await adminSupabase
       .from("chat_room_members")
       .update({ last_read_at: new Date().toISOString() })
@@ -120,20 +116,31 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!membership) return respondError("Not a member", 403);
 
-    const body = await request.json();
-    const { content, mentions, attachments } = body;
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      console.error("Failed to parse request body:", e);
+      return respondError("Invalid request body", 400);
+    }
 
-    if (!content?.trim() && (!attachments || attachments.length === 0)) {
+    const content = body.content || "";
+    const mentions = body.mentions || [];
+    const attachments = body.attachments || [];
+
+    if (!content.trim() && attachments.length === 0) {
       return respondError("Content or attachments required", 400);
     }
+
+    console.log("[POST messages] Creating message:", { roomId, content: content.slice(0, 50), mentions, attachmentCount: attachments.length });
 
     const { data: newMessage, error: msgError } = await adminSupabase
       .from("chat_messages")
       .insert({
         room_id: roomId,
         sender_id: user.id,
-        content: content?.trim() || "",
-        mentions: mentions || [],
+        content: content.trim(),
+        mentions,
       })
       .select("id, content, mentions, created_at, updated_at, sender_id")
       .single();
@@ -143,17 +150,25 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return respondError("Failed to send message", 500);
     }
 
-    // Insert attachments
-    if (attachments && attachments.length > 0) {
-      await adminSupabase.from("chat_attachments").insert(
-        attachments.map((a: any) => ({
-          message_id: newMessage.id,
-          file_name: a.file_name,
-          file_url: a.file_url,
-          file_type: a.file_type,
-          file_size: a.file_size,
-        }))
-      );
+    console.log("[POST messages] Message created:", newMessage.id);
+
+    // Insert attachments if any
+    if (attachments.length > 0) {
+      const attachmentData = attachments.map((a: { file_name: string; file_url: string; file_type: string; file_size: number }) => ({
+        message_id: newMessage.id,
+        file_name: a.file_name,
+        file_url: a.file_url,
+        file_type: a.file_type,
+        file_size: a.file_size,
+      }));
+      
+      const { error: attError } = await adminSupabase
+        .from("chat_attachments")
+        .insert(attachmentData);
+      
+      if (attError) {
+        console.error("Error inserting attachments:", attError);
+      }
     }
 
     // Get sender profile
