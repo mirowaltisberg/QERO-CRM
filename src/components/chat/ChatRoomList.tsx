@@ -111,7 +111,7 @@ export const ChatRoomList = memo(function ChatRoomList({
             {allRoom && (
               <div className="mb-4">
                 <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Alle</p>
-                <RoomItem room={allRoom} isActive={activeRoomId === allRoom.id} onClick={() => onSelectRoom(allRoom)} isMentioned={room.has_mention} />
+                <RoomItem room={allRoom} isActive={activeRoomId === allRoom.id} onClick={() => onSelectRoom(allRoom)} isMentioned={allRoom.has_mention} />
               </div>
             )}
             {teamRooms.length > 0 && (
