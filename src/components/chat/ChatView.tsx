@@ -1,227 +1,202 @@
 "use client";
 
-import { memo, useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ChatRoomList } from "./ChatRoomList";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 import { createClient } from "@/lib/supabase/client";
-import { chatCache } from "@/lib/chat-cache";
-import { useNotifications } from "@/lib/notifications/NotificationContext";
-import { useRouter } from "next/navigation";
 import type { ChatRoom, ChatMessage, ChatMember } from "@/lib/types";
 
-export const ChatView = memo(function ChatView() {
+export function ChatView() {
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [members, setMembers] = useState<ChatMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [currentUserName, setCurrentUserName] = useState<string>("");
-  
-  const activeRoomRef = useRef<ChatRoom | null>(null);
-  const membersRef = useRef<ChatMember[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const currentUserIdRef = useRef<string>("");
-  const roomsRef = useRef<ChatRoom[]>([]);
   
-  const { addNotification } = useNotifications();
-  const router = useRouter();
+  // Mobile state
+  const [isMobile, setIsMobile] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
 
-  useEffect(() => { activeRoomRef.current = activeRoom; }, [activeRoom]);
-  useEffect(() => { membersRef.current = members; }, [members]);
-  useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
-  useEffect(() => { roomsRef.current = rooms; }, [rooms]);
-
+  // Detect mobile on mount and resize
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
+  // Fetch rooms
   const fetchRooms = useCallback(async () => {
     try {
       const res = await fetch("/api/chat/rooms");
       const json = await res.json();
-      if (json.data) {
+      if (res.ok && json.data) {
         setRooms(json.data);
-        if (!activeRoomRef.current && json.data.length > 0) {
+        // Select first room if none selected (only on desktop)
+        if (!activeRoom && json.data.length > 0 && !isMobile) {
           setActiveRoom(json.data[0]);
         }
-        const roomIds = json.data.map((r: ChatRoom) => r.id);
-        chatCache.prefetchAll(roomIds);
       }
-    } catch (err) {
-      console.error("Error fetching rooms:", err);
+    } catch (error) {
+      console.error("Error fetching rooms:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeRoom, isMobile]);
 
+  // Fetch members for @ mentions
   const fetchMembers = useCallback(async () => {
     try {
       const res = await fetch("/api/chat/members");
       const json = await res.json();
-      if (json.data) {
+      if (res.ok && json.data) {
         setMembers(json.data);
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          setCurrentUserId(user.id);
-          const currentMember = json.data.find((m: ChatMember) => m.id === user.id);
-          if (currentMember) setCurrentUserName(currentMember.full_name || "");
-        }
       }
-    } catch (err) {
-      console.error("Error fetching members:", err);
+    } catch (error) {
+      console.error("Error fetching members:", error);
     }
   }, []);
 
+  // Fetch messages for active room
   const fetchMessages = useCallback(async (roomId: string) => {
-    const cached = chatCache.get(roomId);
-    if (cached) setMessages(cached);
-
+    setMessagesLoading(true);
     try {
-      const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=50`);
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages`);
       const json = await res.json();
-      if (json.data) {
+      if (res.ok && json.data) {
         setMessages(json.data);
-        chatCache.set(roomId, json.data);
       }
-    } catch (err) {
-      console.error("Error fetching messages:", err);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    } finally {
+      setMessagesLoading(false);
     }
   }, []);
 
+  // Initial load
   useEffect(() => {
     fetchRooms();
     fetchMembers();
   }, [fetchRooms, fetchMembers]);
 
-  useEffect(() => {
-    if (activeRoom) {
-      fetchMessages(activeRoom.id);
-    } else {
-      setMessages([]);
-    }
-  }, [activeRoom, fetchMessages]);
-
-  // SIMPLE REALTIME - just detect new messages and refetch
+  // Global subscription for all chat messages (to update unread counts)
   useEffect(() => {
     const supabase = createClient();
-    let isSubscribed = true;
-    
-    console.log("[Chat] Setting up realtime...");
-    
-    const channel = supabase
-      .channel("chat-simple")
-      .on("postgres_changes", {
-        event: "INSERT",
-        schema: "public",
-        table: "chat_messages",
-      }, (payload) => {
-        if (!isSubscribed) return;
-        
-        console.log("[Chat] New message detected:", payload.new);
-        
-        const newRecord = payload.new as { room_id: string; sender_id: string; content: string };
-        const currentRoom = activeRoomRef.current;
-        const myUserId = currentUserIdRef.current;
-        
-        // Refresh rooms list for unread counts
-        fetchRooms();
-        
-        // Show notification if message is from someone else
-        if (newRecord.sender_id !== myUserId) {
-          const sender = membersRef.current.find(m => m.id === newRecord.sender_id);
-          const room = roomsRef.current.find(r => r.id === newRecord.room_id);
-          
-          // Determine room name for notification
-          let roomName = "Chat";
-          if (room?.type === "dm" && room.dm_user) {
-            roomName = room.dm_user.full_name || "Direct Message";
-          } else if (room?.name) {
-            roomName = room.name;
-          }
-          
-          addNotification({
-            type: "chat",
-            title: sender?.full_name || "Neue Nachricht",
-            message: newRecord.content?.slice(0, 100) || "Hat eine Nachricht gesendet",
-            avatar: sender?.avatar_url || undefined,
-            onClick: () => {
-              router.push("/chat");
-            },
-          });
+
+    const globalChannel = supabase
+      .channel("chat-global")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+        },
+        (payload) => {
+          console.log("[Chat Global] New message in system:", payload);
+          fetchRooms();
         }
-        
-        // If message is in current room and not from us, refetch messages
-        if (currentRoom && newRecord.room_id === currentRoom.id) {
-          // Small delay to ensure DB has committed
-          setTimeout(() => {
-            if (isSubscribed && activeRoomRef.current?.id === currentRoom.id) {
-              fetchMessages(currentRoom.id);
-            }
-          }, 100);
-        }
-      })
+      )
       .subscribe((status) => {
-        console.log("[Chat] Subscription:", status);
+        console.log("[Chat Global] Subscription status:", status);
       });
 
     return () => {
-      console.log("[Chat] Cleaning up...");
-      isSubscribed = false;
-      supabase.removeChannel(channel);
+      supabase.removeChannel(globalChannel);
     };
-  }, [fetchRooms, fetchMessages]);
+  }, [fetchRooms]);
 
-  // Polling fallback - refresh every 5 seconds when chat is active
+  // Load messages when room changes
+  useEffect(() => {
+    if (activeRoom) {
+      fetchMessages(activeRoom.id);
+    }
+  }, [activeRoom, fetchMessages]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Real-time subscription for messages
   useEffect(() => {
     if (!activeRoom) return;
-    
-    const interval = setInterval(() => {
-      fetchMessages(activeRoom.id);
-      fetchRooms();
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [activeRoom, fetchMessages, fetchRooms]);
 
-  const handleSendMessage = useCallback(async (
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel(`chat-messages-${activeRoom.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+          filter: `room_id=eq.${activeRoom.id}`,
+        },
+        async (payload) => {
+          console.log("[Chat Realtime] New message payload:", payload);
+          const newRecord = payload.new as { id: string; sender_id: string };
+          
+          const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages?limit=50`);
+          const json = await res.json();
+          if (res.ok && json.data) {
+            const newMessage = json.data.find((m: ChatMessage) => m.id === newRecord.id);
+            if (newMessage) {
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === newMessage.id)) return prev;
+                return [...prev, newMessage];
+              });
+            }
+          }
+          
+          fetchRooms();
+        }
+      )
+      .subscribe((status) => {
+        console.log("[Chat Realtime] Subscription status:", status);
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.error("[Chat Realtime] Subscription failed:", status);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeRoom, fetchRooms]);
+
+  // Handle room selection
+  const handleSelectRoom = useCallback((room: ChatRoom) => {
+    setActiveRoom(room);
+    if (isMobile) {
+      setShowMessages(true);
+    }
+  }, [isMobile]);
+
+  // Handle back button on mobile
+  const handleBack = useCallback(() => {
+    setShowMessages(false);
+  }, []);
+
+  // Send message handler
+  const handleSendMessage = async (
     content: string,
     mentions: string[],
-    attachments: Array<{ file_name: string; file_url: string; file_type: string; file_size: number }>
+    attachments: Array<{
+      file_name: string;
+      file_url: string;
+      file_type: string;
+      file_size: number;
+    }>
   ) => {
-    if (!activeRoom || !currentUserId) return;
-
-    // Optimistic update
-    const optimisticId = `temp-${Date.now()}`;
-    const currentMember = membersRef.current.find(m => m.id === currentUserId);
-    
-    const optimisticMessage: ChatMessage = {
-      id: optimisticId,
-      room_id: activeRoom.id,
-      sender_id: currentUserId,
-      content,
-      mentions,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      sender: {
-        id: currentUserId,
-        full_name: currentMember?.full_name || currentUserName || "You",
-        avatar_url: currentMember?.avatar_url || null,
-        team_id: currentMember?.team_id || null,
-        team: currentMember?.team || null,
-      },
-      attachments: attachments.map((a, i) => ({
-        id: `temp-att-${i}`,
-        message_id: optimisticId,
-        ...a,
-      })),
-    };
-
-    // Add optimistic message
-    setMessages(prev => [...prev, optimisticMessage]);
+    if (!activeRoom) return;
 
     try {
       const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages`, {
@@ -229,105 +204,222 @@ export const ChatView = memo(function ChatView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, mentions, attachments }),
       });
-      
+
       const json = await res.json();
-      
       if (res.ok && json.data) {
-        // Replace optimistic with real message
-        setMessages(prev => {
-          const withoutOptimistic = prev.filter(m => m.id !== optimisticId);
-          // Check if real message already exists
-          if (withoutOptimistic.some(m => m.id === json.data.id)) {
-            return withoutOptimistic;
-          }
-          const updated = [...withoutOptimistic, json.data];
-          chatCache.set(activeRoom.id, updated);
-          return updated;
-        });
+        setMessages((prev) => [...prev, json.data]);
       } else {
-        // Remove optimistic on error
-        setMessages(prev => prev.filter(m => m.id !== optimisticId));
-        console.error("Send failed:", json.error);
+        console.error("Error sending message:", json.error);
       }
-    } catch (err) {
-      setMessages(prev => prev.filter(m => m.id !== optimisticId));
-      console.error("Send error:", err);
+    } catch (error) {
+      console.error("Error sending message:", error);
     }
-  }, [activeRoom, currentUserId, currentUserName]);
+  };
 
-  const handleSelectRoom = useCallback((room: ChatRoom) => {
-    setActiveRoom(room);
-  }, []);
-
-  const handleStartDM = useCallback(async (userId: string) => {
+  // Start DM with a user
+  const handleStartDM = async (userId: string) => {
     try {
       const res = await fetch("/api/chat/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId }),
       });
+
       const json = await res.json();
       if (res.ok && json.data) {
-        const refreshRes = await fetch("/api/chat/rooms");
-        const refreshJson = await refreshRes.json();
-        if (refreshJson.data) {
-          setRooms(refreshJson.data);
-          const found = refreshJson.data.find((r: ChatRoom) => r.id === json.data.id);
-          if (found) setActiveRoom(found);
+        await fetchRooms();
+        const roomId = json.data.id;
+        const room = rooms.find((r) => r.id === roomId);
+        if (room) {
+          setActiveRoom(room);
+          if (isMobile) setShowMessages(true);
+        } else {
+          const roomsRes = await fetch("/api/chat/rooms");
+          const roomsJson = await roomsRes.json();
+          if (roomsRes.ok && roomsJson.data) {
+            setRooms(roomsJson.data);
+            const newRoom = roomsJson.data.find((r: ChatRoom) => r.id === roomId);
+            if (newRoom) {
+              setActiveRoom(newRoom);
+              if (isMobile) setShowMessages(true);
+            }
+          }
         }
       }
-    } catch (err) {
-      console.error("Error starting DM:", err);
+    } catch (error) {
+      console.error("Error starting DM:", error);
     }
-  }, []);
+  };
 
-  if (loading) {
+  // Get room display name
+  const getRoomDisplayName = (room: ChatRoom | null) => {
+    if (!room) return "";
+    if (room.type === "dm" && room.dm_user) {
+      return room.dm_user.full_name;
+    }
+    return room.name || "Chat";
+  };
+
+  // Mobile Layout
+  if (isMobile) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+      <div className="relative h-[100dvh] w-full overflow-hidden bg-gray-50">
+        {/* Room List - Slides out when showMessages is true */}
+        <div
+          className={`absolute inset-0 transition-transform duration-300 ease-out ${
+            showMessages ? "-translate-x-full" : "translate-x-0"
+          }`}
+        >
+          <div className="h-full overflow-hidden bg-white">
+            <ChatRoomList
+              rooms={rooms}
+              members={members}
+              activeRoomId={activeRoom?.id || null}
+              onSelectRoom={handleSelectRoom}
+              onStartDM={handleStartDM}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              loading={loading}
+            />
+          </div>
+        </div>
+
+        {/* Messages View - Slides in from right */}
+        <div
+          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-out ${
+            showMessages ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          {/* Mobile Header with Back Button */}
+          <header className="flex items-center gap-3 border-b border-gray-200 px-4 py-3 safe-area-top">
+            <button
+              onClick={handleBack}
+              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
+            >
+              <svg className="h-6 w-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-semibold text-gray-900 truncate">
+                {getRoomDisplayName(activeRoom)}
+              </h1>
+              {activeRoom?.type === "dm" && activeRoom.dm_user?.team && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                  style={{
+                    backgroundColor: `${activeRoom.dm_user.team.color}20`,
+                    color: activeRoom.dm_user.team.color,
+                  }}
+                >
+                  {activeRoom.dm_user.team.name}
+                </span>
+              )}
+              {activeRoom?.type === "team" && (
+                <p className="text-sm text-gray-500">Team Chat</p>
+              )}
+              {activeRoom?.type === "all" && (
+                <p className="text-sm text-gray-500">Alle Teammitglieder</p>
+              )}
+            </div>
+          </header>
+
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            {messagesLoading ? (
+              <div className="flex h-full items-center justify-center text-gray-500">
+                Lädt Nachrichten...
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-gray-500">
+                Noch keine Nachrichten. Schreib die erste!
+              </div>
+            ) : (
+              <>
+                <ChatMessages messages={messages} members={members} />
+                <div ref={messagesEndRef} />
+              </>
+            )}
+          </div>
+
+          {/* Input Area - Sticky at bottom */}
+          <div className="border-t border-gray-200 px-4 py-3 safe-area-bottom bg-white">
+            <ChatInput
+              members={members}
+              onSend={handleSendMessage}
+              disabled={!activeRoom}
+            />
+          </div>
+        </div>
       </div>
     );
   }
 
+  // Desktop Layout (unchanged)
   return (
     <div className="flex h-full">
-      <aside className="w-80 border-r border-gray-200 bg-white">
-        <ChatRoomList
-          rooms={rooms}
-          activeRoomId={activeRoom?.id || null}
-          members={members}
-          currentUserId={currentUserId}
-          currentUserName={currentUserName}
-          onSelectRoom={handleSelectRoom}
-          onStartDM={handleStartDM}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          loading={loading}
-        />
-      </aside>
-      <div className="flex flex-1 flex-col">
-        <header className="border-b border-gray-200 bg-white px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {activeRoom?.type === "dm" && activeRoom.dm_user
-              ? activeRoom.dm_user.full_name
-              : activeRoom?.name || "Chat"}
-          </h2>
-          <p className="text-sm text-gray-500">
-            {activeRoom?.type === "all"
-              ? "Alle Teammitglieder"
-              : activeRoom?.type === "team"
-              ? "Team Chat"
-              : activeRoom?.dm_user?.team?.name || "Direct Message"}
-          </p>
+      {/* Left sidebar - Room list */}
+      <ChatRoomList
+        rooms={rooms}
+        members={members}
+        activeRoomId={activeRoom?.id || null}
+        onSelectRoom={handleSelectRoom}
+        onStartDM={handleStartDM}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        loading={loading}
+      />
+
+      {/* Main chat area */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Room header */}
+        <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">
+              {getRoomDisplayName(activeRoom)}
+            </h1>
+            {activeRoom?.type === "dm" && activeRoom.dm_user?.team && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium mt-1"
+                style={{
+                  backgroundColor: `${activeRoom.dm_user.team.color}20`,
+                  color: activeRoom.dm_user.team.color,
+                }}
+              >
+                {activeRoom.dm_user.team.name}
+              </span>
+            )}
+            {activeRoom?.type === "team" && (
+              <p className="text-sm text-gray-500">Team Chat</p>
+            )}
+            {activeRoom?.type === "all" && (
+              <p className="text-sm text-gray-500">Alle Teammitglieder</p>
+            )}
+          </div>
         </header>
-        <div className="flex-1 overflow-y-auto p-6">
-          <ChatMessages messages={messages} members={members} />
-          <div ref={messagesEndRef} />
+
+        {/* Messages area */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {messagesLoading ? (
+            <div className="flex h-full items-center justify-center text-gray-500">
+              Lädt Nachrichten...
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-gray-500">
+              Noch keine Nachrichten. Schreib die erste!
+            </div>
+          ) : (
+            <>
+              <ChatMessages messages={messages} members={members} />
+              <div ref={messagesEndRef} />
+            </>
+          )}
         </div>
-        <div className="border-t border-gray-200 bg-white p-4">
+
+        {/* Input area */}
+        <div className="border-t border-gray-200 px-6 py-4">
           <ChatInput
             members={members}
-            activeRoom={activeRoom}
             onSend={handleSendMessage}
             disabled={!activeRoom}
           />
@@ -335,4 +427,4 @@ export const ChatView = memo(function ChatView() {
       </div>
     </div>
   );
-});
+}
