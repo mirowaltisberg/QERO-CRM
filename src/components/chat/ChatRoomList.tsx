@@ -4,6 +4,14 @@ import { memo, useMemo } from "react";
 import Image from "next/image";
 import type { ChatRoom, ChatMember } from "@/lib/types";
 
+// Special display for CEO
+const getDisplayRole = (member: { full_name?: string; team?: { name: string; color: string } | null }) => {
+  if (member.full_name === "Arbios Shtanaj") {
+    return { name: "CEO", color: "#1a1a1a" };
+  }
+  return member.team;
+};
+
 interface ChatRoomListProps {
   rooms: ChatRoom[];
   members: ChatMember[];
@@ -137,7 +145,7 @@ const RoomItem = memo(function RoomItem({ room, isActive, onClick }: { room: Cha
   const isDM = room.type === "dm";
   const displayName = isDM && room.dm_user ? room.dm_user.full_name : room.name || "Chat";
   const avatar = isDM && room.dm_user?.avatar_url;
-  const team = isDM ? room.dm_user?.team : null;
+  const team = isDM && room.dm_user ? getDisplayRole(room.dm_user) : null;
   const initials = displayName?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
   const getIcon = () => { if (room.type === "all") return "👥"; if (room.type === "team") return "💼"; return null; };
 

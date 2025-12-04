@@ -5,6 +5,14 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import type { ChatMember, ChatRoom } from "@/lib/types";
 
+// Special display for CEO
+const getDisplayRole = (member: ChatMember) => {
+  if (member.full_name === "Arbios Shtanaj") {
+    return { name: "CEO", color: "#1a1a1a" };
+  }
+  return member.team;
+};
+
 interface ChatInputProps {
   members: ChatMember[];
   activeRoom: ChatRoom | null;
@@ -340,14 +348,14 @@ export const ChatInput = memo(function ChatInput({
                   <p className="truncate text-sm font-medium text-gray-900">
                     {member.full_name}
                   </p>
-                  {member.team && (
-                    <p
-                      className="truncate text-xs"
-                      style={{ color: member.team.color }}
-                    >
-                      {member.team.name}
-                    </p>
-                  )}
+                  {(() => {
+                    const role = getDisplayRole(member);
+                    return role && (
+                      <p className="truncate text-xs" style={{ color: role.color }}>
+                        {role.name}
+                      </p>
+                    );
+                  })()}
                 </div>
               </button>
             );

@@ -4,6 +4,14 @@ import { memo, useMemo } from "react";
 import Image from "next/image";
 import type { ChatMessage, ChatMember } from "@/lib/types";
 
+// Special display for CEO
+const getDisplayRole = (name?: string, team?: { name: string; color: string } | null) => {
+  if (name === "Arbios Shtanaj") {
+    return { name: "CEO", color: "#1a1a1a" };
+  }
+  return team;
+};
+
 interface ChatMessagesProps {
   messages: ChatMessage[];
   members: ChatMember[];
@@ -106,9 +114,12 @@ const MessageCard = memo(function MessageCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-gray-900">{sender?.full_name || "Unbekannt"}</span>
-            {sender?.team && (
-              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: sender.team.color + "20", color: sender.team.color }}>{sender.team.name}</span>
-            )}
+            {(() => {
+              const role = getDisplayRole(sender?.full_name, sender?.team);
+              return role && (
+                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: role.color + "20", color: role.color }}>{role.name}</span>
+              );
+            })()}
             <span className="text-xs text-gray-400">{formatRelativeTime(message.created_at)}</span>
           </div>
           <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
