@@ -336,21 +336,23 @@ export const ChatInput = memo(function ChatInput({
       {showMentions && filteredMembers.length > 0 && (
         <div className="absolute bottom-full left-0 mb-2 w-64 rounded-lg border border-gray-200 bg-white shadow-lg z-50">
           {filteredMembers.map((member, index) => {
-            const initials = member.full_name
+            const isEveryone = member.id === "everyone";
+            const initials = isEveryone ? "👥" : (member.full_name
               ?.split(" ")
               .map((n) => n[0])
               .join("")
               .toUpperCase()
-              .slice(0, 2) || "?";
+              .slice(0, 2) || "?");
 
             return (
               <button
                 key={member.id}
                 onClick={() => insertMention(member)}
-                className={"flex w-full items-center gap-2 px-3 py-2 text-left transition-colors " +
-                  (index === mentionIndex ? "bg-blue-50" : "hover:bg-gray-50")}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left transition-colors ${
+                  index === mentionIndex ? "bg-blue-50" : "hover:bg-gray-50"
+                }`}
               >
-                <div className="h-7 w-7 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
+                <div className={`h-7 w-7 flex-shrink-0 overflow-hidden rounded-full ${isEveryone ? "bg-blue-100" : "bg-gray-200"}`}>
                   {member.avatar_url ? (
                     <Image
                       src={member.avatar_url}
@@ -361,23 +363,22 @@ export const ChatInput = memo(function ChatInput({
                       unoptimized
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-gray-600">
+                    <div className={`flex h-full w-full items-center justify-center font-medium ${isEveryone ? "text-blue-600 text-base" : "text-gray-600 text-[10px]"}`}>
                       {initials}
                     </div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-900">
-                    {member.full_name}
+                  <p className={`truncate text-sm font-medium ${isEveryone ? "text-blue-600" : "text-gray-900"}`}>
+                    {isEveryone ? "@everyone" : member.full_name}
                   </p>
-                  {(() => {
-                    const role = getDisplayRole(member);
-                    return role && (
-                      <p className="truncate text-xs" style={{ color: role.color }}>
-                        {role.name}
-                      </p>
-                    )
-                  )}
+                  {isEveryone ? (
+                    <p className="truncate text-xs text-gray-500">Alle benachrichtigen</p>
+                  ) : member.team ? (
+                    <p className="truncate text-xs" style={{ color: member.team.color }}>
+                      {member.team.name}
+                    </p>
+                  ) : null}
                 </div>
               </button>
             );
