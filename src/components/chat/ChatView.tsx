@@ -100,7 +100,37 @@ export function ChatView() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Stable realtime subscription - only recreate when room ID changes
+  // Polling fallback for realtime (every 3 seconds)
+  useEffect(() => {
+    if (!activeRoom) return;
+    const roomId = activeRoom.id;
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=50`);
+        const json = await res.json();
+        if (res.ok && json.data) {
+          setMessages(prev => {
+            // Only update if there are new messages
+            const newMsgIds = new Set(json.data.map((m: ChatMessage) => m.id));
+            const prevMsgIds = new Set(prev.map(m => m.id));
+            const hasNew = json.data.some((m: ChatMessage) => !prevMsgIds.has(m.id));
+            if (hasNew) {
+              console.log("[Chat Poll] New messages detected via polling");
+              return json.data;
+            }
+            return prev;
+          });
+        }
+      } catch (e) {
+        // Silently ignore polling errors
+      }
+    }, 3000);
+    
+    return () => clearInterval(pollInterval);
+  }, [activeRoom?.id]);
+
+  // Realtime subscription (primary method)
   useEffect(() => {
     if (!activeRoom) return;
     
@@ -119,14 +149,16 @@ export function ChatView() {
           const newMsg = payload.new as { id: string; content: string; sender_id: string; created_at: string };
           
           // Fetch full message with sender info
-          const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=1`);
+          const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=50`);
           const json = await res.json();
           if (res.ok && json.data && json.data.length > 0) {
-            const fullMsg = json.data.find((m: ChatMessage) => m.id === newMsg.id) || json.data[0];
-            setMessages(prev => {
-              if (prev.some(m => m.id === fullMsg.id)) return prev;
-              return [...prev, fullMsg];
-            });
+            const fullMsg = json.data.find((m: ChatMessage) => m.id === newMsg.id);
+            if (fullMsg) {
+              setMessages(prev => {
+                if (prev.some(m => m.id === fullMsg.id)) return prev;
+                return [...prev, fullMsg];
+              });
+            }
           }
           
           // Update room list
