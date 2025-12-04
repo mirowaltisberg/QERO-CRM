@@ -20,13 +20,10 @@ export function ChatView() {
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
   
-  // Refs to prevent subscription recreation
-  const activeRoomRef = useRef<ChatRoom | null>(null);
-  const subscriptionRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
-  
-  // Keep activeRoomRef in sync
+  // Track active room ID in ref to prevent stale closures
+  const activeRoomIdRef = useRef<string | null>(null);
   useEffect(() => {
-    activeRoomRef.current = activeRoom;
+    activeRoomIdRef.current = activeRoom?.id || null;
   }, [activeRoom]);
 
   useEffect(() => {
@@ -42,13 +39,14 @@ export function ChatView() {
     return () => window.removeEventListener("resize", checkMobile);
   }, [mobileView, activeRoom]);
 
+  // Fetch with no-cache to prevent stale data
   const fetchRooms = useCallback(async () => {
     try {
-      const res = await fetch("/api/chat/rooms");
+      const res = await fetch("/api/chat/rooms", { cache: "no-store" });
       const json = await res.json();
       if (res.ok && json.data) {
         setRooms(json.data);
-        if (!activeRoom && json.data.length > 0 && !isMobile) {
+        if (!activeRoomIdRef.current && json.data.length > 0 && !isMobile) {
           setActiveRoom(json.data[0]);
         }
       }
@@ -57,11 +55,11 @@ export function ChatView() {
     } finally {
       setLoading(false);
     }
-  }, [activeRoom, isMobile]);
+  }, [isMobile]);
 
   const fetchMembers = useCallback(async () => {
     try {
-      const res = await fetch("/api/chat/members");
+      const res = await fetch("/api/chat/members", { cache: "no-store" });
       const json = await res.json();
       if (res.ok && json.data) setMembers(json.data);
     } catch (error) {
@@ -69,115 +67,87 @@ export function ChatView() {
     }
   }, []);
 
-  const fetchMessages = useCallback(async (roomId: string) => {
-    setMessagesLoading(true);
+  const fetchMessages = useCallback(async (roomId: string, silent = false) => {
+    if (!silent) setMessagesLoading(true);
     try {
-      const res = await fetch(`/api/chat/rooms/${roomId}/messages`);
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=50&t=${Date.now()}`, { 
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
+      });
       const json = await res.json();
-      if (res.ok && json.data) setMessages(json.data);
+      if (res.ok && json.data) {
+        // Only update if this is still the active room
+        if (activeRoomIdRef.current === roomId) {
+          setMessages(json.data);
+        }
+      }
     } catch (error) {
       console.error("Error fetching messages:", error);
     } finally {
-      setMessagesLoading(false);
+      if (!silent) setMessagesLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchRooms(); fetchMembers(); }, [fetchRooms, fetchMembers]);
+  // Initial load
+  useEffect(() => { 
+    fetchRooms(); 
+    fetchMembers(); 
+  }, [fetchRooms, fetchMembers]);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase.channel("chat-global")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, () => fetchRooms())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchRooms]);
-
+  // Load messages when room changes
   useEffect(() => {
     if (activeRoom) fetchMessages(activeRoom.id);
-  }, [activeRoom, fetchMessages]);
+  }, [activeRoom?.id, fetchMessages]);
 
+  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Polling fallback for realtime (every 3 seconds)
+  // ========== REALTIME: Single stable subscription ==========
   useEffect(() => {
-    if (!activeRoom) return;
-    const roomId = activeRoom.id;
-    
-    const pollInterval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=50`);
-        const json = await res.json();
-        if (res.ok && json.data) {
-          setMessages(prev => {
-            // Only update if there are new messages
-            const newMsgIds = new Set(json.data.map((m: ChatMessage) => m.id));
-            const prevMsgIds = new Set(prev.map(m => m.id));
-            const hasNew = json.data.some((m: ChatMessage) => !prevMsgIds.has(m.id));
-            if (hasNew) {
-              console.log("[Chat Poll] New messages detected via polling");
-              return json.data;
-            }
-            return prev;
-          });
-        }
-      } catch (e) {
-        // Silently ignore polling errors
-      }
-    }, 3000);
-    
-    return () => clearInterval(pollInterval);
-  }, [activeRoom?.id]);
-
-  // Realtime subscription (primary method)
-  useEffect(() => {
-    if (!activeRoom) return;
-    
-    const roomId = activeRoom.id;
     const supabase = createClient();
     
-    // Clean up previous subscription if exists
-    if (subscriptionRef.current) {
-      supabase.removeChannel(subscriptionRef.current);
-    }
-    
-    const channel = supabase.channel(`chat-room-${roomId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter: `room_id=eq.${roomId}` },
-        async (payload) => {
-          console.log("[Chat Realtime] New message received:", payload.new);
-          const newMsg = payload.new as { id: string; content: string; sender_id: string; created_at: string };
+    const channel = supabase
+      .channel("chat-realtime-v2")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "chat_messages" },
+        (payload) => {
+          console.log("[Chat RT] INSERT received:", payload.new);
+          const newMsg = payload.new as { room_id: string; id: string };
           
-          // Fetch full message with sender info
-          const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=50`);
-          const json = await res.json();
-          if (res.ok && json.data && json.data.length > 0) {
-            const fullMsg = json.data.find((m: ChatMessage) => m.id === newMsg.id);
-            if (fullMsg) {
-              setMessages(prev => {
-                if (prev.some(m => m.id === fullMsg.id)) return prev;
-                return [...prev, fullMsg];
-              });
-            }
+          // If the message is for the active room, fetch fresh messages
+          if (activeRoomIdRef.current === newMsg.room_id) {
+            console.log("[Chat RT] Message for active room, refreshing...");
+            fetchMessages(newMsg.room_id, true);
           }
           
-          // Update room list
-          fetch("/api/chat/rooms").then(r => r.json()).then(j => {
-            if (j.data) setRooms(j.data);
-          });
-        })
+          // Always refresh room list for unread counts
+          fetchRooms();
+        }
+      )
       .subscribe((status) => {
-        console.log("[Chat Realtime] Subscription status:", status);
+        console.log("[Chat RT] Status:", status);
       });
-    
-    subscriptionRef.current = channel;
-    
-    return () => { 
-      console.log("[Chat Realtime] Cleaning up subscription for room:", roomId);
+
+    return () => {
+      console.log("[Chat RT] Cleaning up");
       supabase.removeChannel(channel);
-      subscriptionRef.current = null;
     };
-  }, [activeRoom?.id]); // Only depend on room ID, not the whole object
+  }, []); // Empty deps - subscribe once, use refs for current values
+
+  // ========== POLLING BACKUP: Every 2 seconds ==========
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      const roomId = activeRoomIdRef.current;
+      if (roomId) {
+        fetchMessages(roomId, true);
+      }
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [fetchMessages]);
 
   const handleSelectRoom = useCallback((room: ChatRoom) => {
     setActiveRoom(room);
@@ -192,14 +162,27 @@ export function ChatView() {
 
   const handleSendMessage = async (content: string, mentions: string[], attachments: Array<{ file_name: string; file_url: string; file_type: string; file_size: number; }>) => {
     if (!activeRoom) return;
+    
+    const roomId = activeRoom.id;
+    
     try {
-      const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages`, {
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, mentions, attachments }),
       });
       const json = await res.json();
-      if (res.ok && json.data) setMessages(prev => [...prev, json.data]);
+      
+      if (res.ok && json.data) {
+        // Immediately add the message to state
+        setMessages(prev => {
+          if (prev.some(m => m.id === json.data.id)) return prev;
+          return [...prev, json.data];
+        });
+        
+        // Also do a full refresh to ensure consistency
+        setTimeout(() => fetchMessages(roomId, true), 100);
+      }
     } catch (error) {
       console.error("Error sending message:", error);
     }
@@ -214,16 +197,10 @@ export function ChatView() {
       });
       const json = await res.json();
       if (res.ok && json.data) {
-        const roomsRes = await fetch("/api/chat/rooms");
-        const roomsJson = await roomsRes.json();
-        if (roomsRes.ok && roomsJson.data) {
-          setRooms(roomsJson.data);
-          const newRoom = roomsJson.data.find((r: ChatRoom) => r.id === json.data.id);
-          if (newRoom) {
-            setActiveRoom(newRoom);
-            if (isMobile) setMobileView("chat");
-          }
-        }
+        await fetchRooms();
+        const newRoom = rooms.find((r: ChatRoom) => r.id === json.data.id) || json.data;
+        setActiveRoom(newRoom);
+        if (isMobile) setMobileView("chat");
       }
     } catch (error) {
       console.error("Error starting DM:", error);
