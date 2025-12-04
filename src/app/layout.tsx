@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
@@ -14,6 +14,31 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "QERO CRM - Cold Calling for Recruiters",
   description: "Hyper-focused CRM for recruiters making 100+ calls per day",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "QERO CRM",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/qero-logo.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+    shortcut: ["/favicon.ico"],
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default async function RootLayout({
@@ -40,3 +65,4 @@ export default async function RootLayout({
     </html>
   );
 }
+
