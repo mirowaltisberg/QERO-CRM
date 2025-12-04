@@ -291,24 +291,22 @@ export const ChatInput = memo(function ChatInput({
     if (!trimmedContent && uploadedAttachments.length === 0) return;
     if (sending) return;
 
-    // Extract mentions from content - match @Name Surname pattern and @everyone
+    // Extract mentions from content
     const mentions: string[] = [];
-    const mentionRegex = /@([A-Za-zÀ-ÿ]+(?: [A-Za-zÀ-ÿ]+)*)/g;
-    let match: RegExpExecArray | null;
-    while ((match = mentionRegex.exec(trimmedContent)) !== null) {
-      const mentionName = match[1];
-      // Check for @everyone
-      if (mentionName.toLowerCase() === "everyone") {
-        if (!mentions.includes("everyone")) {
-          mentions.push("everyone");
-        }
-      } else {
-        const mentionedMember = members.find(
-          (m) => m.full_name?.toLowerCase() === mentionName.toLowerCase()
-        );
-        if (mentionedMember && !mentions.includes(mentionedMember.id)) {
-          mentions.push(mentionedMember.id);
-        }
+    
+    // Check for @everyone first (case insensitive)
+    if (trimmedContent.toLowerCase().includes("@everyone")) {
+      mentions.push("everyone");
+    }
+    
+    // Check for member mentions - try to match each member's name after @
+    for (const member of members) {
+      if (!member.full_name) continue;
+      // Create a regex that matches @MemberName (case insensitive, word boundary)
+      const escapedName = member.full_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const memberRegex = new RegExp('@' + escapedName + '(?![A-Za-zÀ-ÿ])', 'gi');
+      if (memberRegex.test(trimmedContent) && !mentions.includes(member.id)) {
+        mentions.push(member.id);
       }
     }
 
