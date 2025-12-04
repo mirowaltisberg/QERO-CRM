@@ -17,20 +17,24 @@ export const ChatView = memo(function ChatView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [currentUserName, setCurrentUserName] = useState<string>("");
+  
+  // Refs to access latest state in subscription callbacks
   const activeRoomRef = useRef<ChatRoom | null>(null);
   const membersRef = useRef<ChatMember[]>([]);
+  const messagesRef = useRef<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Keep refs in sync
-  useEffect(() => {
-    activeRoomRef.current = activeRoom;
-  }, [activeRoom]);
+  useEffect(() => { activeRoomRef.current = activeRoom; }, [activeRoom]);
+  useEffect(() => { membersRef.current = members; }, [members]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
 
+  // Scroll to bottom when messages change
   useEffect(() => {
-    membersRef.current = members;
-  }, [members]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  // Fetch rooms on mount
+  // Fetch rooms
   const fetchRooms = useCallback(async () => {
     try {
       const res = await fetch("/api/chat/rooms");
@@ -40,7 +44,7 @@ export const ChatView = memo(function ChatView() {
         if (!activeRoomRef.current && json.data.length > 0) {
           setActiveRoom(json.data[0]);
         }
-        // Prefetch messages for all rooms in background
+        // Prefetch messages for all rooms
         const roomIds = json.data.map((r: ChatRoom) => r.id);
         chatCache.prefetchAll(roomIds);
       }
@@ -51,22 +55,19 @@ export const ChatView = memo(function ChatView() {
     }
   }, []);
 
-  // Fetch members on mount
+  // Fetch members and current user
   const fetchMembers = useCallback(async () => {
     try {
       const res = await fetch("/api/chat/members");
       const json = await res.json();
       if (json.data) {
         setMembers(json.data);
-        // Get current user from Supabase
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           setCurrentUserId(user.id);
           const currentMember = json.data.find((m: ChatMember) => m.id === user.id);
-          if (currentMember) {
-            setCurrentUserName(currentMember.full_name || "");
-          }
+          if (currentMember) setCurrentUserName(currentMember.full_name || "");
         }
       }
     } catch (err) {
@@ -74,17 +75,14 @@ export const ChatView = memo(function ChatView() {
     }
   }, []);
 
-  // Fetch messages - uses cache first, then refreshes
+  // Fetch messages for a room
   const fetchMessages = useCallback(async (roomId: string) => {
-    // Show cached messages instantly
+    // Show cached instantly
     const cached = chatCache.get(roomId);
-    if (cached) {
-      setMessages(cached);
-    }
+    if (cached) setMessages(cached);
 
-    // Fetch fresh messages
     try {
-      const res = await fetch("/api/chat/rooms/" + roomId + "/messages?limit=50");
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=50`);
       const json = await res.json();
       if (json.data) {
         setMessages(json.data);
@@ -95,54 +93,53 @@ export const ChatView = memo(function ChatView() {
     }
   }, []);
 
-  // Initial data load
+  // Initial load
   useEffect(() => {
     fetchRooms();
     fetchMembers();
   }, [fetchRooms, fetchMembers]);
 
-  // Load messages when active room changes
+  // Load messages when room changes
   useEffect(() => {
     if (activeRoom) {
       fetchMessages(activeRoom.id);
-      
-      // Poll every 3 seconds as fallback
-      const interval = setInterval(() => {
-        fetchMessages(activeRoom.id);
-      }, 3000);
-      
-      return () => clearInterval(interval);
     } else {
       setMessages([]);
     }
   }, [activeRoom, fetchMessages]);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Real-time subscription
+  // REAL-TIME SUBSCRIPTION - ONE GLOBAL SUBSCRIPTION
   useEffect(() => {
     const supabase = createClient();
     
+    console.log("[Chat RT] Setting up realtime subscription...");
+    
     const channel = supabase
-      .channel("chat-realtime")
+      .channel("chat-global-realtime", {
+        config: { broadcast: { self: true } }
+      })
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
         table: "chat_messages",
-      }, async (payload) => {
-        console.log("[Chat] New message received:", payload);
-        const newRecord = payload.new as { id: string; room_id: string; sender_id: string; content: string; mentions: string[]; created_at: string };
+      }, (payload) => {
+        console.log("[Chat RT] INSERT received:", payload.new);
         
-        const currentRoom = activeRoomRef.current;
-        console.log("[Chat] Current room:", currentRoom?.id, "Message room:", newRecord.room_id);
-        
+        const newRecord = payload.new as {
+          id: string;
+          room_id: string;
+          sender_id: string;
+          content: string;
+          mentions: string[];
+          created_at: string;
+        };
+
+        // Always refresh rooms (for unread counts, last message, etc.)
         fetchRooms();
-        
+
+        // If this message is for the active room, add it instantly
+        const currentRoom = activeRoomRef.current;
         if (currentRoom && newRecord.room_id === currentRoom.id) {
-          console.log("[Chat] Adding message to current room");
           const sender = membersRef.current.find(m => m.id === newRecord.sender_id);
           
           const newMessage: ChatMessage = {
@@ -162,8 +159,9 @@ export const ChatView = memo(function ChatView() {
             },
             attachments: [],
           };
-          
+
           setMessages(prev => {
+            // Avoid duplicates
             if (prev.some(m => m.id === newMessage.id)) return prev;
             const updated = [...prev, newMessage];
             chatCache.set(currentRoom.id, updated);
@@ -171,49 +169,92 @@ export const ChatView = memo(function ChatView() {
           });
         }
         
-        // Also update cache for the room even if not active
+        // Update cache for the room
         chatCache.addMessage(newRecord.room_id, payload.new);
       })
       .subscribe((status) => {
-        console.log("[Chat] Subscription status:", status);
+        console.log("[Chat RT] Subscription status:", status);
       });
 
     return () => {
+      console.log("[Chat RT] Cleaning up subscription");
       supabase.removeChannel(channel);
     };
-  }, [fetchRooms]);
+  }, [fetchRooms]); // Only depend on fetchRooms
 
-  const handleSendMessage = async (
+  // SEND MESSAGE with optimistic update
+  const handleSendMessage = useCallback(async (
     content: string,
     mentions: string[],
     attachments: Array<{ file_name: string; file_url: string; file_type: string; file_size: number }>
   ) => {
-    if (!activeRoom) return;
+    if (!activeRoom || !currentUserId) return;
+
+    // Create optimistic message
+    const optimisticId = `optimistic-${Date.now()}`;
+    const currentMember = membersRef.current.find(m => m.id === currentUserId);
+    
+    const optimisticMessage: ChatMessage = {
+      id: optimisticId,
+      room_id: activeRoom.id,
+      sender_id: currentUserId,
+      content,
+      mentions,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      sender: {
+        id: currentUserId,
+        full_name: currentMember?.full_name || currentUserName || "You",
+        avatar_url: currentMember?.avatar_url || null,
+        team_id: currentMember?.team_id || null,
+        team: currentMember?.team || null,
+      },
+      attachments: attachments.map((a, i) => ({
+        id: `att-${i}`,
+        message_id: optimisticId,
+        ...a,
+      })),
+    };
+
+    // Add optimistic message immediately
+    setMessages(prev => [...prev, optimisticMessage]);
+
     try {
-      const res = await fetch("/api/chat/rooms/" + activeRoom.id + "/messages", {
+      const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, mentions, attachments }),
       });
+      
       const json = await res.json();
+      
       if (res.ok && json.data) {
+        // Replace optimistic message with real one
         setMessages(prev => {
-          if (prev.some(m => m.id === json.data.id)) return prev;
-          const updated = [...prev, json.data];
+          const filtered = prev.filter(m => m.id !== optimisticId);
+          // Check if real message already added by realtime
+          if (filtered.some(m => m.id === json.data.id)) return filtered;
+          const updated = [...filtered, json.data];
           chatCache.set(activeRoom.id, updated);
           return updated;
         });
+      } else {
+        // Remove optimistic message on error
+        setMessages(prev => prev.filter(m => m.id !== optimisticId));
+        console.error("Failed to send message:", json.error);
       }
     } catch (err) {
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(m => m.id !== optimisticId));
       console.error("Error sending message:", err);
     }
-  };
+  }, [activeRoom, currentUserId, currentUserName]);
 
-  const handleSelectRoom = (room: ChatRoom) => {
+  const handleSelectRoom = useCallback((room: ChatRoom) => {
     setActiveRoom(room);
-  };
+  }, []);
 
-  const handleStartDM = async (userId: string) => {
+  const handleStartDM = useCallback(async (userId: string) => {
     try {
       const res = await fetch("/api/chat/rooms", {
         method: "POST",
@@ -223,22 +264,19 @@ export const ChatView = memo(function ChatView() {
       const json = await res.json();
       if (res.ok && json.data) {
         await fetchRooms();
-        const newRoom = rooms.find(r => r.id === json.data.id);
-        if (newRoom) setActiveRoom(newRoom);
-        else {
-          const refreshRes = await fetch("/api/chat/rooms");
-          const refreshJson = await refreshRes.json();
-          if (refreshJson.data) {
-            setRooms(refreshJson.data);
-            const found = refreshJson.data.find((r: ChatRoom) => r.id === json.data.id);
-            if (found) setActiveRoom(found);
-          }
+        // Find and select the new/existing room
+        const refreshRes = await fetch("/api/chat/rooms");
+        const refreshJson = await refreshRes.json();
+        if (refreshJson.data) {
+          setRooms(refreshJson.data);
+          const found = refreshJson.data.find((r: ChatRoom) => r.id === json.data.id);
+          if (found) setActiveRoom(found);
         }
       }
     } catch (err) {
       console.error("Error starting DM:", err);
     }
-  };
+  }, [fetchRooms]);
 
   if (loading) {
     return (
