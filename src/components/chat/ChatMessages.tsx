@@ -87,12 +87,15 @@ const MessageCard = memo(function MessageCard({
     
     // Build regex pattern for all names + everyone
     const namePatterns = ["everyone", ...allNames].map(name => {
-      // Escape special regex chars but keep the name readable
-      return name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Escape special regex chars
+      let escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Replace any apostrophe with pattern matching both types
+      escaped = escaped.replace(/['\u2019]/g, "['\u2019]");
+      return escaped;
     });
     
-    // Match @name (case insensitive)
-    const mentionRegex = new RegExp("(@(?:" + namePatterns.join("|") + "))(?![A-Za-zÀ-ÿ'])", "gi");
+    // Match @name (case insensitive), word boundary after
+    const mentionRegex = new RegExp("(@(?:" + namePatterns.join("|") + "))(?![A-Za-zÀ-ÿ])", "gi");
     
     let lastIndex = 0;
     let match;
