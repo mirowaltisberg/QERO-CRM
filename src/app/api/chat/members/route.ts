@@ -9,13 +9,29 @@ export async function GET() {
     if (!user) return respondError("Unauthorized", 401);
 
     const adminSupabase = createAdminClient();
-    const { data: profiles, error } = await adminSupabase
+    
+    const { data: profiles, error: profilesError } = await adminSupabase
       .from("profiles")
-      .select("id, full_name, avatar_url, team_id, team:teams!team_id(id, name, color)")
+      .select("id, full_name, avatar_url, team_id")
       .order("full_name");
 
-    if (error) return respondError("Failed to fetch members", 500);
-    return respondSuccess(profiles || []);
+    if (profilesError) {
+      console.error("Error fetching profiles:", profilesError);
+      return respondError("Failed to fetch members", 500);
+    }
+
+    const { data: teams } = await adminSupabase
+      .from("teams")
+      .select("id, name, color");
+
+    const teamsMap = new Map((teams || []).map(t => [t.id, t]));
+
+    const membersWithTeams = (profiles || []).map(p => ({
+      ...p,
+      team: p.team_id ? teamsMap.get(p.team_id) || null : null,
+    }));
+
+    return respondSuccess(membersWithTeams);
   } catch (err) {
     console.error("GET members error:", err);
     return respondError("Failed to fetch members", 500);

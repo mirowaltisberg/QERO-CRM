@@ -26,9 +26,10 @@ export async function GET() {
 
     await ensureUserRoomMemberships(adminSupabase, user.id, profile.team_id);
 
+    // Get memberships - no joins
     const { data: memberships, error: membershipError } = await adminSupabase
       .from("chat_room_members")
-      .select("room_id, last_read_at, room:chat_rooms(id, type, name, team_id, created_at)")
+      .select("room_id, last_read_at")
       .eq("user_id", user.id);
 
     if (membershipError) {
@@ -36,44 +37,86 @@ export async function GET() {
       return respondError("Failed to fetch chat rooms", 500);
     }
 
-    const rooms = await Promise.all(
-      (memberships || []).map(async (m) => {
-        const room = m.room as any;
-        if (!room) return null;
+    if (!memberships || memberships.length === 0) {
+      return respondSuccess([]);
+    }
 
+    const roomIds = memberships.map(m => m.room_id);
+    const membershipMap = new Map(memberships.map(m => [m.room_id, m.last_read_at]));
+
+    // Get rooms separately
+    const { data: roomsData } = await adminSupabase
+      .from("chat_rooms")
+      .select("id, type, name, team_id, created_at")
+      .in("id", roomIds);
+
+    if (!roomsData || roomsData.length === 0) {
+      return respondSuccess([]);
+    }
+
+    // Get all profiles
+    const { data: allProfiles } = await adminSupabase
+      .from("profiles")
+      .select("id, full_name, avatar_url, team_id");
+    const profilesMap = new Map((allProfiles || []).map(p => [p.id, p]));
+
+    // Get all teams
+    const { data: allTeams } = await adminSupabase
+      .from("teams")
+      .select("id, name, color");
+    const teamsMap = new Map((allTeams || []).map(t => [t.id, t]));
+
+    const rooms = await Promise.all(
+      roomsData.map(async (room) => {
+        const lastReadAt = membershipMap.get(room.id) || "1970-01-01";
+
+        // Get unread count
         const { count: unreadCount } = await adminSupabase
           .from("chat_messages")
           .select("id", { count: "exact", head: true })
           .eq("room_id", room.id)
           .neq("sender_id", user.id)
-          .gt("created_at", m.last_read_at || "1970-01-01");
+          .gt("created_at", lastReadAt);
 
-        const { data: lastMessage } = await adminSupabase
+        // Get last message - no join
+        const { data: lastMsgData } = await adminSupabase
           .from("chat_messages")
-          .select("id, content, created_at, sender:profiles!sender_id(full_name)")
+          .select("id, content, created_at, sender_id")
           .eq("room_id", room.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .single();
 
+        let lastMessage = null;
+        if (lastMsgData) {
+          const senderProfile = profilesMap.get(lastMsgData.sender_id);
+          lastMessage = {
+            id: lastMsgData.id,
+            content: lastMsgData.content,
+            created_at: lastMsgData.created_at,
+            sender: senderProfile ? { full_name: senderProfile.full_name } : null,
+          };
+        }
+
+        // Get DM user
         let dmUser = null;
         if (room.type === "dm") {
-          const { data: otherMember } = await adminSupabase
+          const { data: otherMembers } = await adminSupabase
             .from("chat_room_members")
-            .select("user:profiles!user_id(id, full_name, avatar_url, team_id)")
+            .select("user_id")
             .eq("room_id", room.id)
             .neq("user_id", user.id)
-            .single();
-          
-          if (otherMember?.user) {
-            dmUser = otherMember.user as any;
-            if (dmUser.team_id) {
-              const { data: team } = await adminSupabase
-                .from("teams")
-                .select("name, color")
-                .eq("id", dmUser.team_id)
-                .single();
-              dmUser.team = team;
+            .limit(1);
+
+          if (otherMembers && otherMembers[0]) {
+            const otherProfile = profilesMap.get(otherMembers[0].user_id);
+            if (otherProfile) {
+              dmUser = {
+                id: otherProfile.id,
+                full_name: otherProfile.full_name,
+                avatar_url: otherProfile.avatar_url,
+                team: otherProfile.team_id ? teamsMap.get(otherProfile.team_id) : null,
+              };
             }
           }
         }
@@ -87,17 +130,15 @@ export async function GET() {
       })
     );
 
-    const sortedRooms = rooms
-      .filter(Boolean)
-      .sort((a, b) => {
-        const typePriority: Record<string, number> = { all: 0, team: 1, dm: 2 };
-        const aPriority = typePriority[a!.type] ?? 3;
-        const bPriority = typePriority[b!.type] ?? 3;
-        if (aPriority !== bPriority) return aPriority - bPriority;
-        const aTime = a!.last_message?.created_at || a!.created_at;
-        const bTime = b!.last_message?.created_at || b!.created_at;
-        return new Date(bTime).getTime() - new Date(aTime).getTime();
-      });
+    const sortedRooms = rooms.sort((a, b) => {
+      const typePriority = { all: 0, team: 1, dm: 2 } as Record<string, number>;
+      const aPriority = typePriority[a.type] ?? 3;
+      const bPriority = typePriority[b.type] ?? 3;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      const aTime = a.last_message?.created_at || a.created_at;
+      const bTime = b.last_message?.created_at || b.created_at;
+      return new Date(bTime).getTime() - new Date(aTime).getTime();
+    });
 
     return respondSuccess(sortedRooms);
 
@@ -112,16 +153,12 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
-      return respondError("Unauthorized", 401);
-    }
+    if (!user) return respondError("Unauthorized", 401);
 
     const body = await request.json();
     const { user_id: targetUserId } = body;
 
-    if (!targetUserId) {
-      return respondError("user_id is required", 400);
-    }
+    if (!targetUserId) return respondError("user_id is required", 400);
 
     const adminSupabase = createAdminClient();
 
@@ -133,17 +170,24 @@ export async function POST(request: NextRequest) {
     const myRoomIds = (existingRooms || []).map(r => r.room_id);
 
     if (myRoomIds.length > 0) {
-      const { data: sharedRoom } = await adminSupabase
+      const { data: targetMemberships } = await adminSupabase
         .from("chat_room_members")
-        .select("room_id, room:chat_rooms!inner(id, type)")
+        .select("room_id")
         .eq("user_id", targetUserId)
-        .in("room_id", myRoomIds)
-        .eq("room.type", "dm")
-        .limit(1)
-        .single();
+        .in("room_id", myRoomIds);
 
-      if (sharedRoom) {
-        return respondSuccess({ id: sharedRoom.room_id, existing: true });
+      if (targetMemberships && targetMemberships.length > 0) {
+        const sharedRoomIds = targetMemberships.map(m => m.room_id);
+        const { data: dmRooms } = await adminSupabase
+          .from("chat_rooms")
+          .select("id")
+          .in("id", sharedRoomIds)
+          .eq("type", "dm")
+          .limit(1);
+
+        if (dmRooms && dmRooms[0]) {
+          return respondSuccess({ id: dmRooms[0].id, existing: true });
+        }
       }
     }
 
@@ -153,26 +197,21 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    if (roomError || !newRoom) {
-      return respondError("Failed to create chat room", 500);
-    }
+    if (roomError || !newRoom) return respondError("Failed to create chat room", 500);
 
-    await adminSupabase
-      .from("chat_room_members")
-      .insert([
-        { room_id: newRoom.id, user_id: user.id },
-        { room_id: newRoom.id, user_id: targetUserId },
-      ]);
+    await adminSupabase.from("chat_room_members").insert([
+      { room_id: newRoom.id, user_id: user.id },
+      { room_id: newRoom.id, user_id: targetUserId },
+    ]);
 
     return respondSuccess({ id: newRoom.id, existing: false }, { status: 201 });
-
   } catch (err) {
     console.error("POST /api/chat/rooms error:", err);
     return respondError("Failed to create chat room", 500);
   }
 }
 
-async function ensureUserRoomMemberships(adminSupabase: any, userId: string, teamId: string | null) {
+async function ensureUserRoomMemberships(adminSupabase: ReturnType<typeof createAdminClient>, userId: string, teamId: string | null) {
   let { data: allRoom } = await adminSupabase
     .from("chat_rooms")
     .select("id")
