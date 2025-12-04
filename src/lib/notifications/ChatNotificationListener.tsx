@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "./NotificationContext";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 interface ChatMember {
   id: string;
@@ -14,15 +14,17 @@ interface ChatMember {
 export function ChatNotificationListener() {
   const { addNotification } = useNotifications();
   const router = useRouter();
-  const pathname = usePathname();
   const currentUserIdRef = useRef<string>("");
   const membersRef = useRef<Map<string, ChatMember>>(new Map());
-  const isOnChatPageRef = useRef(false);
+  const subscriptionSetUp = useRef(false);
+  const addNotificationRef = useRef(addNotification);
+  const routerRef = useRef(router);
 
-  // Track if user is on chat page
+  // Keep refs updated
   useEffect(() => {
-    isOnChatPageRef.current = pathname === "/chat";
-  }, [pathname]);
+    addNotificationRef.current = addNotification;
+    routerRef.current = router;
+  }, [addNotification, router]);
 
   // Fetch current user and members on mount
   useEffect(() => {
@@ -33,35 +35,46 @@ export function ChatNotificationListener() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         currentUserIdRef.current = user.id;
+        console.log("[Chat Global Listener] Current user:", user.id);
       }
 
       // Fetch all members for name lookup
-      const res = await fetch("/api/chat/members");
-      if (res.ok) {
-        const json = await res.json();
-        const members: ChatMember[] = json.data || [];
-        const map = new Map<string, ChatMember>();
-        members.forEach(m => map.set(m.id, m));
-        membersRef.current = map;
+      try {
+        const res = await fetch("/api/chat/members");
+        if (res.ok) {
+          const json = await res.json();
+          const members: ChatMember[] = json.data || [];
+          const map = new Map<string, ChatMember>();
+          members.forEach(m => map.set(m.id, m));
+          membersRef.current = map;
+          console.log("[Chat Global Listener] Loaded", members.length, "members");
+        }
+      } catch (err) {
+        console.error("[Chat Global Listener] Failed to load members:", err);
       }
     };
 
     fetchUserAndMembers();
   }, []);
 
-  // Subscribe to chat messages globally
+  // Subscribe to chat messages globally - only once
   useEffect(() => {
-    const supabase = createClient();
+    if (subscriptionSetUp.current) {
+      console.log("[Chat Global Listener] Subscription already set up, skipping");
+      return;
+    }
+    subscriptionSetUp.current = true;
 
+    const supabase = createClient();
     console.log("[Chat Global Listener] Setting up subscription...");
 
     const channel = supabase
-      .channel("global-chat-notifications")
+      .channel("global-chat-notifications-v2")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chat_messages" },
         (payload) => {
-          console.log("[Chat Global Listener] New message:", payload.new);
+          console.log("[Chat Global Listener] New message received:", payload.new);
 
           const newRecord = payload.new as {
             id: string;
@@ -72,13 +85,7 @@ export function ChatNotificationListener() {
 
           // Don't notify for own messages
           if (newRecord.sender_id === currentUserIdRef.current) {
-            console.log("[Chat Global Listener] Skipping own message");
-            return;
-          }
-
-          // Don't notify if already on chat page (ChatView will handle it)
-          if (isOnChatPageRef.current) {
-            console.log("[Chat Global Listener] Skipping - on chat page");
+            console.log("[Chat Global Listener] Skipping - own message");
             return;
           }
 
@@ -86,15 +93,15 @@ export function ChatNotificationListener() {
           const sender = membersRef.current.get(newRecord.sender_id);
           const senderName = sender?.full_name || "Neue Nachricht";
 
-          console.log("[Chat Global Listener] Showing notification for:", senderName);
+          console.log("[Chat Global Listener] Showing notification from:", senderName);
 
-          addNotification({
+          addNotificationRef.current({
             type: "chat",
             title: senderName,
             message: newRecord.content?.slice(0, 100) || "Hat eine Nachricht gesendet",
             avatar: sender?.avatar_url || undefined,
             onClick: () => {
-              router.push("/chat");
+              routerRef.current.push("/chat");
             },
           });
         }
@@ -103,11 +110,12 @@ export function ChatNotificationListener() {
         console.log("[Chat Global Listener] Subscription status:", status);
       });
 
+    // Don't clean up on re-renders - keep subscription alive
     return () => {
-      console.log("[Chat Global Listener] Cleaning up subscription");
-      supabase.removeChannel(channel);
+      // Only clean up on actual unmount (app closing)
+      // The subscription will be cleaned up by Supabase when the page is closed
     };
-  }, [addNotification, router]);
+  }, []); // Empty dependency array - run only once
 
   return null;
 }
