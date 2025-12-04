@@ -97,17 +97,34 @@ export function ChatView() {
     const channel = supabase.channel(`chat-${activeRoom.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter: `room_id=eq.${activeRoom.id}` },
         async (payload) => {
+          console.log("[Chat Realtime] New message received:", payload.new);
           const newId = (payload.new as { id: string }).id;
+          // Fetch the full message with sender info
           const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages?limit=50`);
           const json = await res.json();
           if (res.ok && json.data) {
             const newMsg = json.data.find((m: ChatMessage) => m.id === newId);
-            if (newMsg) setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
+            if (newMsg) {
+              setMessages(prev => {
+                // Check if message already exists
+                if (prev.some(m => m.id === newMsg.id)) {
+                  console.log("[Chat Realtime] Message already exists, skipping");
+                  return prev;
+                }
+                console.log("[Chat Realtime] Adding new message to state");
+                return [...prev, newMsg];
+              });
+            }
           }
           fetchRooms();
         })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      .subscribe((status) => {
+        console.log("[Chat Realtime] Subscription status:", status);
+      });
+    return () => { 
+      console.log("[Chat Realtime] Cleaning up subscription");
+      supabase.removeChannel(channel); 
+    };
   }, [activeRoom, fetchRooms]);
 
   const handleSelectRoom = useCallback((room: ChatRoom) => {
