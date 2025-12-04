@@ -21,12 +21,9 @@ export function ChatView() {
   const [isMobile, setIsMobile] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
 
-  // Detect mobile on mount and resize
+  // Detect mobile
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
@@ -39,7 +36,6 @@ export function ChatView() {
       const json = await res.json();
       if (res.ok && json.data) {
         setRooms(json.data);
-        // Select first room if none selected (only on desktop)
         if (!activeRoom && json.data.length > 0 && !isMobile) {
           setActiveRoom(json.data[0]);
         }
@@ -51,28 +47,24 @@ export function ChatView() {
     }
   }, [activeRoom, isMobile]);
 
-  // Fetch members for @ mentions
+  // Fetch members
   const fetchMembers = useCallback(async () => {
     try {
       const res = await fetch("/api/chat/members");
       const json = await res.json();
-      if (res.ok && json.data) {
-        setMembers(json.data);
-      }
+      if (res.ok && json.data) setMembers(json.data);
     } catch (error) {
       console.error("Error fetching members:", error);
     }
   }, []);
 
-  // Fetch messages for active room
+  // Fetch messages
   const fetchMessages = useCallback(async (roomId: string) => {
     setMessagesLoading(true);
     try {
       const res = await fetch(`/api/chat/rooms/${roomId}/messages`);
       const json = await res.json();
-      if (res.ok && json.data) {
-        setMessages(json.data);
-      }
+      if (res.ok && json.data) setMessages(json.data);
     } catch (error) {
       console.error("Error fetching messages:", error);
     } finally {
@@ -80,132 +72,65 @@ export function ChatView() {
     }
   }, []);
 
-  // Initial load
-  useEffect(() => {
-    fetchRooms();
-    fetchMembers();
-  }, [fetchRooms, fetchMembers]);
+  useEffect(() => { fetchRooms(); fetchMembers(); }, [fetchRooms, fetchMembers]);
 
-  // Global subscription for all chat messages (to update unread counts)
   useEffect(() => {
     const supabase = createClient();
-
-    const globalChannel = supabase
-      .channel("chat-global")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-        },
-        () => {
-          fetchRooms();
-        }
-      )
+    const channel = supabase.channel("chat-global")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, () => fetchRooms())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(globalChannel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [fetchRooms]);
 
-  // Load messages when room changes
   useEffect(() => {
-    if (activeRoom) {
-      fetchMessages(activeRoom.id);
-    }
+    if (activeRoom) fetchMessages(activeRoom.id);
   }, [activeRoom, fetchMessages]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Real-time subscription for messages
   useEffect(() => {
     if (!activeRoom) return;
-
     const supabase = createClient();
-
-    const channel = supabase
-      .channel(`chat-messages-${activeRoom.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-          filter: `room_id=eq.${activeRoom.id}`,
-        },
+    const channel = supabase.channel(`chat-${activeRoom.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter: `room_id=eq.${activeRoom.id}` },
         async (payload) => {
-          const newRecord = payload.new as { id: string; sender_id: string };
-          
+          const newId = (payload.new as { id: string }).id;
           const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages?limit=50`);
           const json = await res.json();
           if (res.ok && json.data) {
-            const newMessage = json.data.find((m: ChatMessage) => m.id === newRecord.id);
-            if (newMessage) {
-              setMessages((prev) => {
-                if (prev.some((m) => m.id === newMessage.id)) return prev;
-                return [...prev, newMessage];
-              });
-            }
+            const newMsg = json.data.find((m: ChatMessage) => m.id === newId);
+            if (newMsg) setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
           }
-          
           fetchRooms();
-        }
-      )
+        })
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [activeRoom, fetchRooms]);
 
-  // Handle room selection
   const handleSelectRoom = useCallback((room: ChatRoom) => {
     setActiveRoom(room);
-    if (isMobile) {
-      setShowMessages(true);
-    }
+    if (isMobile) setShowMessages(true);
   }, [isMobile]);
 
-  // Handle back button on mobile
-  const handleBack = useCallback(() => {
-    setShowMessages(false);
-  }, []);
+  const handleBack = useCallback(() => setShowMessages(false), []);
 
-  // Send message handler
-  const handleSendMessage = async (
-    content: string,
-    mentions: string[],
-    attachments: Array<{
-      file_name: string;
-      file_url: string;
-      file_type: string;
-      file_size: number;
-    }>
-  ) => {
+  const handleSendMessage = async (content: string, mentions: string[], attachments: Array<{ file_name: string; file_url: string; file_type: string; file_size: number; }>) => {
     if (!activeRoom) return;
-
     try {
       const res = await fetch(`/api/chat/rooms/${activeRoom.id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, mentions, attachments }),
       });
-
       const json = await res.json();
-      if (res.ok && json.data) {
-        setMessages((prev) => [...prev, json.data]);
-      }
+      if (res.ok && json.data) setMessages(prev => [...prev, json.data]);
     } catch (error) {
       console.error("Error sending message:", error);
     }
   };
 
-  // Start DM with a user
   const handleStartDM = async (userId: string) => {
     try {
       const res = await fetch("/api/chat/rooms", {
@@ -213,16 +138,13 @@ export function ChatView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId }),
       });
-
       const json = await res.json();
       if (res.ok && json.data) {
-        await fetchRooms();
-        const roomId = json.data.id;
         const roomsRes = await fetch("/api/chat/rooms");
         const roomsJson = await roomsRes.json();
         if (roomsRes.ok && roomsJson.data) {
           setRooms(roomsJson.data);
-          const newRoom = roomsJson.data.find((r: ChatRoom) => r.id === roomId);
+          const newRoom = roomsJson.data.find((r: ChatRoom) => r.id === json.data.id);
           if (newRoom) {
             setActiveRoom(newRoom);
             if (isMobile) setShowMessages(true);
@@ -234,25 +156,19 @@ export function ChatView() {
     }
   };
 
-  // Get room display name
   const getRoomDisplayName = (room: ChatRoom | null) => {
     if (!room) return "";
-    if (room.type === "dm" && room.dm_user) {
-      return room.dm_user.full_name;
-    }
+    if (room.type === "dm" && room.dm_user) return room.dm_user.full_name;
     return room.name || "Chat";
   };
 
-  // ==================== MOBILE LAYOUT ====================
+  // ==================== MOBILE ====================
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 bg-white">
-        {/* Room List View */}
+      <div className="fixed inset-0 z-50 overflow-hidden">
+        {/* Room List */}
         <div
-          className={`absolute inset-0 bg-white transition-transform duration-250 ease-out ${
-            showMessages ? "-translate-x-full" : "translate-x-0"
-          }`}
-          style={{ willChange: "transform" }}
+          className={`absolute inset-0 bg-white transition-transform duration-300 ease-out ${showMessages ? "-translate-x-full" : "translate-x-0"}`}
         >
           <ChatRoomList
             rooms={rooms}
@@ -266,50 +182,57 @@ export function ChatView() {
           />
         </div>
 
-        {/* Messages View */}
+        {/* Messages */}
         <div
-          className={`absolute inset-0 bg-white flex flex-col transition-transform duration-250 ease-out ${
-            showMessages ? "translate-x-0" : "translate-x-full"
-          }`}
-          style={{ willChange: "transform" }}
+          className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-out ${showMessages ? "translate-x-0" : "translate-x-full"}`}
+          style={{ backgroundColor: "#ece5dd" }}
         >
-          {/* Native-style Header */}
+          {/* Header - WhatsApp green */}
           <header 
-            className="flex items-center gap-2 px-2 py-2 bg-white border-b border-gray-100"
-            style={{ paddingTop: "env(safe-area-inset-top, 8px)" }}
+            className="flex items-center gap-3 px-2 py-2 flex-shrink-0"
+            style={{ 
+              backgroundColor: "#075e54",
+              paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)"
+            }}
           >
-            <button
-              onClick={handleBack}
-              className="flex items-center gap-1 px-2 py-2 -ml-1 text-blue-500 active:opacity-60"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <button onClick={handleBack} className="p-2 -ml-1 text-white active:opacity-70">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
-              <span className="text-[17px]">Chats</span>
             </button>
-            <div className="flex-1 text-center pr-16">
-              <h1 className="text-[17px] font-semibold text-gray-900 truncate">
-                {getRoomDisplayName(activeRoom)}
-              </h1>
-              {activeRoom?.type === "team" && (
-                <p className="text-[13px] text-gray-500">Team</p>
+            
+            <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center overflow-hidden flex-shrink-0">
+              {activeRoom?.type === "dm" && activeRoom.dm_user?.avatar_url ? (
+                <img src={activeRoom.dm_user.avatar_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-lg">{activeRoom?.type === "all" ? "👥" : activeRoom?.type === "team" ? "💼" : "👤"}</span>
               )}
-              {activeRoom?.type === "all" && (
-                <p className="text-[13px] text-gray-500">Alle</p>
-              )}
+            </div>
+            
+            <div className="flex-1 min-w-0 text-white">
+              <h1 className="text-[17px] font-medium truncate">{getRoomDisplayName(activeRoom)}</h1>
+              <p className="text-[13px] opacity-80">
+                {activeRoom?.type === "all" ? "Alle" : activeRoom?.type === "team" ? "Team" : "online"}
+              </p>
             </div>
           </header>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto bg-gray-50 px-3 py-2">
+          {/* Messages area - scrollable */}
+          <div 
+            className="flex-1 overflow-y-auto px-3 py-2"
+            style={{ 
+              WebkitOverflowScrolling: "touch",
+              overscrollBehavior: "contain"
+            }}
+          >
             {messagesLoading ? (
               <div className="flex h-full items-center justify-center">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+                <div className="h-8 w-8 animate-spin rounded-full border-3 border-gray-300 border-t-[#075e54]" />
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center text-gray-400">
-                <div className="text-4xl mb-2">💬</div>
-                <p className="text-[15px]">Keine Nachrichten</p>
+              <div className="flex h-full flex-col items-center justify-center text-gray-500">
+                <span className="text-4xl mb-2">💬</span>
+                <p>Noch keine Nachrichten</p>
               </div>
             ) : (
               <>
@@ -321,8 +244,11 @@ export function ChatView() {
 
           {/* Input */}
           <div 
-            className="bg-white border-t border-gray-200 px-3 py-2"
-            style={{ paddingBottom: "env(safe-area-inset-bottom, 8px)" }}
+            className="flex-shrink-0 px-2 py-2"
+            style={{ 
+              backgroundColor: "#f0f0f0",
+              paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)"
+            }}
           >
             <ChatInput
               members={members}
@@ -336,7 +262,7 @@ export function ChatView() {
     );
   }
 
-  // ==================== DESKTOP LAYOUT ====================
+  // ==================== DESKTOP ====================
   return (
     <div className="flex h-full">
       <ChatRoomList
@@ -349,42 +275,25 @@ export function ChatView() {
         onSearchChange={setSearchQuery}
         loading={loading}
       />
-
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">
-              {getRoomDisplayName(activeRoom)}
-            </h1>
+            <h1 className="text-lg font-semibold text-gray-900">{getRoomDisplayName(activeRoom)}</h1>
             {activeRoom?.type === "dm" && activeRoom.dm_user?.team && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium mt-1"
-                style={{
-                  backgroundColor: `${activeRoom.dm_user.team.color}20`,
-                  color: activeRoom.dm_user.team.color,
-                }}
-              >
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium mt-1"
+                style={{ backgroundColor: `${activeRoom.dm_user.team.color}20`, color: activeRoom.dm_user.team.color }}>
                 {activeRoom.dm_user.team.name}
               </span>
             )}
-            {activeRoom?.type === "team" && (
-              <p className="text-sm text-gray-500">Team Chat</p>
-            )}
-            {activeRoom?.type === "all" && (
-              <p className="text-sm text-gray-500">Alle Teammitglieder</p>
-            )}
+            {activeRoom?.type === "team" && <p className="text-sm text-gray-500">Team Chat</p>}
+            {activeRoom?.type === "all" && <p className="text-sm text-gray-500">Alle Teammitglieder</p>}
           </div>
         </header>
-
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {messagesLoading ? (
-            <div className="flex h-full items-center justify-center text-gray-500">
-              Lädt Nachrichten...
-            </div>
+            <div className="flex h-full items-center justify-center text-gray-500">Lädt...</div>
           ) : messages.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-gray-500">
-              Noch keine Nachrichten. Schreib die erste!
-            </div>
+            <div className="flex h-full items-center justify-center text-gray-500">Noch keine Nachrichten</div>
           ) : (
             <>
               <ChatMessages messages={messages} members={members} />
@@ -392,14 +301,8 @@ export function ChatView() {
             </>
           )}
         </div>
-
         <div className="border-t border-gray-200 px-6 py-4">
-          <ChatInput
-            members={members}
-            activeRoom={activeRoom}
-            onSend={handleSendMessage}
-            disabled={!activeRoom}
-          />
+          <ChatInput members={members} activeRoom={activeRoom} onSend={handleSendMessage} disabled={!activeRoom} />
         </div>
       </div>
     </div>
