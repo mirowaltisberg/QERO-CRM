@@ -82,8 +82,11 @@ const MessageCard = memo(function MessageCard({
     const text = message.content;
     const parts: Array<{ type: "text" | "mention"; value: string }> = [];
     
-    // Get all member names sorted by length (longest first)
-    const allNames = Array.from(memberNamesMap.values()).sort((a, b) => b.length - a.length);
+    // Get all member names sorted by length (longest first), trimmed
+    const allNames = Array.from(memberNamesMap.values())
+      .map(name => name.trim())
+      .filter(name => name.length > 0)
+      .sort((a, b) => b.length - a.length);
     
     // DEBUG
     if (text.includes("@")) {
