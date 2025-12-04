@@ -16,6 +16,12 @@ export function ChatView() {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeRoomRef = useRef<ChatRoom | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    activeRoomRef.current = activeRoom;
+  }, [activeRoom]);
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -23,7 +29,7 @@ export function ChatView() {
       const json = await res.json();
       if (res.ok && json.data) {
         setRooms(json.data);
-        if (!activeRoom && json.data.length > 0) {
+        if (!activeRoomRef.current && json.data.length > 0) {
           setActiveRoom(json.data[0]);
         }
       }
@@ -32,7 +38,7 @@ export function ChatView() {
     } finally {
       setLoading(false);
     }
-  }, [activeRoom]);
+  }, []);
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -57,72 +63,72 @@ export function ChatView() {
     }
   }, []);
 
+  // Initial load
   useEffect(() => {
     fetchRooms();
     fetchMembers();
   }, [fetchRooms, fetchMembers]);
 
-  // Global subscription for all chat messages (to update unread counts)
+  // Load messages when room changes
+  useEffect(() => {
+    if (activeRoom) fetchMessages(activeRoom.id);
+  }, [activeRoom, fetchMessages]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Global real-time subscription (runs once on mount)
   useEffect(() => {
     const supabase = createClient();
+    
     const globalChannel = supabase
-      .channel("chat-global")
+      .channel("chat-global-sub")
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
         table: "chat_messages",
-      }, () => {
-        console.log("[Chat Global] New message, refreshing rooms");
-        fetchRooms();
+      }, (payload) => {
+        console.log("[Chat Global] New message received:", payload);
+        // Refresh room list
+        fetch("/api/chat/rooms")
+          .then(res => res.json())
+          .then(json => {
+            if (json.data) {
+              setRooms(json.data);
+            }
+          });
+        
+        // If the message is for the active room, add it
+        const newRecord = payload.new as { id: string; room_id: string };
+        const currentRoom = activeRoomRef.current;
+        if (currentRoom && newRecord.room_id === currentRoom.id) {
+          // Fetch messages to get the new one with sender info
+          fetch("/api/chat/rooms/" + currentRoom.id + "/messages?limit=50")
+            .then(res => res.json())
+            .then(json => {
+              if (json.data) {
+                const newMsg = json.data.find((m: ChatMessage) => m.id === newRecord.id);
+                if (newMsg) {
+                  setMessages((prev) => {
+                    if (prev.some((m) => m.id === newMsg.id)) return prev;
+                    return [...prev, newMsg];
+                  });
+                }
+              }
+            });
+        }
       })
       .subscribe((status) => {
         console.log("[Chat Global] Subscription status:", status);
       });
 
-    return () => { supabase.removeChannel(globalChannel); };
-  }, [fetchRooms]);
-
-  useEffect(() => {
-    if (activeRoom) fetchMessages(activeRoom.id);
-  }, [activeRoom, fetchMessages]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Real-time subscription for active room messages
-  useEffect(() => {
-    if (!activeRoom) return;
-    const supabase = createClient();
-    const channel = supabase
-      .channel("chat-room-" + activeRoom.id)
-      .on("postgres_changes", {
-        event: "INSERT",
-        schema: "public",
-        table: "chat_messages",
-        filter: "room_id=eq." + activeRoom.id,
-      }, async (payload) => {
-        console.log("[Chat Room] New message:", payload);
-        const newRecord = payload.new as { id: string };
-        // Fetch messages to get the new one with sender info
-        const res = await fetch("/api/chat/rooms/" + activeRoom.id + "/messages?limit=50");
-        const json = await res.json();
-        if (res.ok && json.data) {
-          const newMsg = json.data.find((m: ChatMessage) => m.id === newRecord.id);
-          if (newMsg) {
-            setMessages((prev) => {
-              if (prev.some((m) => m.id === newMsg.id)) return prev;
-              return [...prev, newMsg];
-            });
-          }
-        }
-      })
-      .subscribe((status) => {
-        console.log("[Chat Room] Subscription status:", status);
-      });
-
-    return () => { supabase.removeChannel(channel); };
-  }, [activeRoom]);
+    return () => {
+      console.log("[Chat Global] Cleaning up subscription");
+      supabase.removeChannel(globalChannel);
+    };
+  }, []); // Empty deps - only run once
 
   const handleSendMessage = async (
     content: string,
@@ -137,7 +143,9 @@ export function ChatView() {
         body: JSON.stringify({ content, mentions, attachments }),
       });
       const json = await res.json();
-      if (res.ok && json.data) setMessages((prev) => [...prev, json.data]);
+      if (res.ok && json.data) {
+        setMessages((prev) => [...prev, json.data]);
+      }
     } catch (error) {
       console.error("Error sending message:", error);
     }
@@ -152,7 +160,6 @@ export function ChatView() {
       });
       const json = await res.json();
       if (res.ok && json.data) {
-        await fetchRooms();
         const roomsRes = await fetch("/api/chat/rooms");
         const roomsJson = await roomsRes.json();
         if (roomsRes.ok && roomsJson.data) {
