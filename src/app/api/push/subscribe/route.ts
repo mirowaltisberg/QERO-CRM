@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    
+    const adminSupabase = createAdminClient();
+
     // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -22,16 +27,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Save subscription to database
-    const { error } = await supabase
+    const { error } = await adminSupabase
       .from("push_subscriptions")
-      .upsert({
-        user_id: user.id,
-        endpoint: subscription.endpoint,
-        p256dh: subscription.keys.p256dh,
-        auth: subscription.keys.auth,
-      }, {
-        onConflict: "user_id,endpoint"
-      });
+      .upsert(
+        {
+          user_id: user.id,
+          endpoint: subscription.endpoint,
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth,
+        },
+        {
+          onConflict: "user_id,endpoint",
+        }
+      );
 
     if (error) {
       console.error("Error saving push subscription:", error);
@@ -54,9 +62,13 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient();
-    
+    const adminSupabase = createAdminClient();
+
     // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -72,7 +84,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete subscription
-    const { error } = await supabase
+    const { error } = await adminSupabase
       .from("push_subscriptions")
       .delete()
       .eq("user_id", user.id)
@@ -95,4 +107,3 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
-
