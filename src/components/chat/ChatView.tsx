@@ -206,10 +206,13 @@ export const ChatView = memo(function ChatView() {
       <aside className="w-80 border-r border-gray-200 bg-white">
         <ChatRoomList
           rooms={rooms}
-          activeRoom={activeRoom}
+          activeRoomId={activeRoom?.id || null}
           members={members}
           onSelectRoom={handleSelectRoom}
           onStartDM={handleStartDM}
+          searchQuery=""
+          onSearchChange={() => {}}
+          loading={loading}
         />
       </aside>
       <div className="flex flex-1 flex-col">
