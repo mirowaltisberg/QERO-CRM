@@ -97,15 +97,18 @@ export const ChatView = memo(function ChatView() {
         schema: "public",
         table: "chat_messages",
       }, async (payload) => {
-        console.log("[Chat] New message:", payload);
+        console.log("[Chat] New message received:", payload);
         const newRecord = payload.new as { id: string; room_id: string; sender_id: string; content: string; mentions: string[]; created_at: string };
+        
+        const currentRoom = activeRoomRef.current;
+        console.log("[Chat] Current room:", currentRoom?.id, "Message room:", newRecord.room_id);
         
         // Refresh rooms (for unread counts later)
         fetchRooms();
         
         // If message is for active room, add it directly
-        const currentRoom = activeRoomRef.current;
         if (currentRoom && newRecord.room_id === currentRoom.id) {
+          console.log("[Chat] Adding message to current room");
           // Find sender info from members ref
           const sender = membersRef.current.find(m => m.id === newRecord.sender_id);
           
