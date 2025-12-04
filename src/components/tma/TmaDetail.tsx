@@ -44,6 +44,8 @@ interface Props {
   onUpdatePosition: (value: string | null) => Promise<void> | void;
   onUpdateAddress: (payload: { city: string | null; street: string | null; postal_code: string | null }) => Promise<void> | void;
   onUpdatePhone: (value: string | null) => Promise<void> | void;
+  onClaim: () => Promise<void> | void;
+  onUnclaim: () => Promise<void> | void;
 }
 
 const STATUS_ORDER: TmaStatus[] = ["A", "B", "C"];
@@ -76,6 +78,8 @@ export function TmaDetail({
   onUpdatePosition,
   onUpdateAddress,
   onUpdatePhone,
+  onClaim,
+  onUnclaim,
 }: Props) {
   const initialFollowUpDate = candidate?.follow_up_at ? new Date(candidate.follow_up_at) : null;
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
@@ -224,11 +228,23 @@ export function TmaDetail({
                   )}
                 </div>
                 <span className="text-xs text-gray-500">{claimer.full_name}</span>
+                <button
+                  onClick={onUnclaim}
+                  className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  (Freigeben)
+                </button>
               </>
             ) : (
-              <span className="text-xs text-orange-600 font-medium">
-                Unclaimed
-              </span>
+              <>
+                <span className="text-xs text-orange-600 font-medium">Unclaimed</span>
+                <button
+                  onClick={onClaim}
+                  className="rounded-full border border-blue-500 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                >
+                  Claim
+                </button>
+              </>
             )}
           </div>
           <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">

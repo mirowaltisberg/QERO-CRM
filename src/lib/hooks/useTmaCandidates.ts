@@ -620,6 +620,43 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     [locationSearch.active, locationSearch.query, searchByLocation]
   );
 
+
+  // Claim a TMA candidate
+  const claimCandidate = useCallback(async () => {
+    if (!activeCandidate) return;
+    setActionState({ type: "saving", message: "Claiming candidate..." });
+    try {
+      const response = await fetch(`/api/tma/${activeCandidate.id}/claim`, {
+        method: "POST",
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "Failed to claim");
+      updateCandidateLocally(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to claim candidate");
+    } finally {
+      setActionState({ type: null });
+    }
+  }, [activeCandidate, updateCandidateLocally]);
+
+  // Unclaim a TMA candidate
+  const unclaimCandidate = useCallback(async () => {
+    if (!activeCandidate) return;
+    setActionState({ type: "saving", message: "Unclaiming candidate..." });
+    try {
+      const response = await fetch(`/api/tma/${activeCandidate.id}/claim`, {
+        method: "DELETE",
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "Failed to unclaim");
+      updateCandidateLocally(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to unclaim candidate");
+    } finally {
+      setActionState({ type: null });
+    }
+  }, [activeCandidate, updateCandidateLocally]);
+
   return {
     candidates: sortedCandidates,
     allCandidates: candidates,
@@ -642,6 +679,8 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     updateAddress,
     updatePhone,
     clearActivity,
+    claimCandidate,
+    unclaimCandidate,
     setCantonFilter,
     clearCantonFilter: () => setCantonFilter(null),
     setStatusFilter,

@@ -56,6 +56,8 @@ export function TmaView({ initialCandidates }: Props) {
     searchByLocation,
     clearLocationSearch,
     updateLocationRadius,
+    claimCandidate,
+    unclaimCandidate,
   } = useTmaCandidates({ initialCandidates });
   const [importOpen, setImportOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -293,6 +295,8 @@ export function TmaView({ initialCandidates }: Props) {
             onUpdatePosition={updatePosition}
             onUpdateAddress={updateAddress}
             onUpdatePhone={updatePhone}
+            onClaim={claimCandidate}
+            onUnclaim={unclaimCandidate}
           />
         </div>
       </div>
