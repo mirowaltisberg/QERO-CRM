@@ -150,6 +150,12 @@ export function ChatView() {
   }, [fetchMessages]);
 
   const handleSelectRoom = useCallback((room: ChatRoom) => {
+    // Optimistically clear unread count and mention badge
+    setRooms(prev => prev.map(r => 
+      r.id === room.id 
+        ? { ...r, unread_count: 0, has_mention: false }
+        : r
+    ));
     setActiveRoom(room);
     if (isMobile) {
       setMobileView("chat");
@@ -180,8 +186,11 @@ export function ChatView() {
           return [...prev, json.data];
         });
         
-        // Also do a full refresh to ensure consistency
-        setTimeout(() => fetchMessages(roomId, true), 100);
+        // Refresh messages and room list to update preview
+        setTimeout(() => {
+          fetchMessages(roomId, true);
+          fetchRooms(); // Update sidebar with new last_message
+        }, 100);
       }
     } catch (error) {
       console.error("Error sending message:", error);

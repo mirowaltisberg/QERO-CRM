@@ -1,4 +1,5 @@
 // QERO CRM Service Worker for Push Notifications
+// Compatible with iOS Safari 16.4+ and all modern browsers
 
 // Cache name for offline support
 const CACHE_NAME = 'qero-crm-v1';
@@ -31,6 +32,7 @@ self.addEventListener('push', (event) => {
   try {
     if (event.data) {
       const payload = event.data.json();
+      console.log('[SW] Push payload:', payload);
       data = {
         title: payload.title || 'QERO CRM',
         body: payload.body || 'Neue Nachricht',
@@ -47,22 +49,22 @@ self.addEventListener('push', (event) => {
     console.log('[SW] Error parsing push data:', e);
   }
   
+  // iOS-compatible notification options (no vibrate, no actions)
   const options = {
     body: data.body,
     icon: data.icon,
     badge: data.badge,
     tag: data.tag,
     data: data.data,
-    vibrate: [200, 100, 200],
-    requireInteraction: false,
-    actions: [
-      { action: 'open', title: 'Öffnen' },
-      { action: 'close', title: 'Schließen' }
-    ]
+    // Note: vibrate and actions not supported on iOS
   };
+  
+  console.log('[SW] Showing notification:', data.title, options);
   
   event.waitUntil(
     self.registration.showNotification(data.title, options)
+      .then(() => console.log('[SW] Notification shown successfully'))
+      .catch(err => console.error('[SW] Failed to show notification:', err))
   );
 });
 
@@ -71,10 +73,6 @@ self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked:', event);
   
   event.notification.close();
-  
-  if (event.action === 'close') {
-    return;
-  }
   
   const url = event.notification.data?.url || '/chat';
   
@@ -101,4 +99,3 @@ self.addEventListener('fetch', (event) => {
   // Let network requests pass through
   // We could add caching here for offline support
 });
-
