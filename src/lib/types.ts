@@ -354,3 +354,60 @@ export interface ContactCallLog {
     avatar_url: string | null;
   } | null;
 }
+
+// Chat types
+export interface ChatRoom {
+  id: string;
+  type: "all" | "team" | "dm";
+  name: string | null;
+  team_id: string | null;
+  created_at: string;
+  unread_count?: number;
+  last_message?: {
+    id: string;
+    content: string;
+    created_at: string;
+    sender?: { full_name: string };
+  } | null;
+  dm_user?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+    team_id: string | null;
+    team?: { name: string; color: string } | null;
+  } | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  room_id: string;
+  content: string;
+  mentions: string[];
+  created_at: string;
+  updated_at: string;
+  sender: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+    team_id: string | null;
+    team?: { name: string; color: string } | null;
+  };
+  attachments: ChatAttachment[];
+}
+
+export interface ChatAttachment {
+  id: string;
+  message_id: string;
+  file_name: string;
+  file_url: string;
+  file_type: string | null;
+  file_size: number | null;
+}
+
+export interface ChatMember {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+  team_id: string | null;
+  team?: { id: string; name: string; color: string } | null;
+}
