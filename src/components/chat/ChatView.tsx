@@ -5,6 +5,7 @@ import { ChatRoomList } from "./ChatRoomList";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 import { createClient } from "@/lib/supabase/client";
+import { chatCache } from "@/lib/chat-cache";
 import type { ChatRoom, ChatMessage, ChatMember } from "@/lib/types";
 
 export const ChatView = memo(function ChatView() {
@@ -37,6 +38,9 @@ export const ChatView = memo(function ChatView() {
         if (!activeRoomRef.current && json.data.length > 0) {
           setActiveRoom(json.data[0]);
         }
+        // Prefetch messages for all rooms in background
+        const roomIds = json.data.map((r: ChatRoom) => r.id);
+        chatCache.prefetchAll(roomIds);
       }
     } catch (err) {
       console.error("Error fetching rooms:", err);
@@ -56,12 +60,22 @@ export const ChatView = memo(function ChatView() {
     }
   }, []);
 
-  // Fetch messages when room changes
+  // Fetch messages - uses cache first, then refreshes
   const fetchMessages = useCallback(async (roomId: string) => {
+    // Show cached messages instantly
+    const cached = chatCache.get(roomId);
+    if (cached) {
+      setMessages(cached);
+    }
+
+    // Fetch fresh messages
     try {
       const res = await fetch("/api/chat/rooms/" + roomId + "/messages?limit=50");
       const json = await res.json();
-      if (json.data) setMessages(json.data);
+      if (json.data) {
+        setMessages(json.data);
+        chatCache.set(roomId, json.data);
+      }
     } catch (err) {
       console.error("Error fetching messages:", err);
     }
@@ -73,12 +87,12 @@ export const ChatView = memo(function ChatView() {
     fetchMembers();
   }, [fetchRooms, fetchMembers]);
 
-  // Load messages when active room changes + poll every 3 seconds
+  // Load messages when active room changes
   useEffect(() => {
     if (activeRoom) {
       fetchMessages(activeRoom.id);
       
-      // Poll every 3 seconds as fallback for realtime
+      // Poll every 3 seconds as fallback
       const interval = setInterval(() => {
         fetchMessages(activeRoom.id);
       }, 3000);
@@ -111,13 +125,10 @@ export const ChatView = memo(function ChatView() {
         const currentRoom = activeRoomRef.current;
         console.log("[Chat] Current room:", currentRoom?.id, "Message room:", newRecord.room_id);
         
-        // Refresh rooms (for unread counts later)
         fetchRooms();
         
-        // If message is for active room, add it directly
         if (currentRoom && newRecord.room_id === currentRoom.id) {
           console.log("[Chat] Adding message to current room");
-          // Find sender info from members ref
           const sender = membersRef.current.find(m => m.id === newRecord.sender_id);
           
           const newMessage: ChatMessage = {
@@ -140,9 +151,14 @@ export const ChatView = memo(function ChatView() {
           
           setMessages(prev => {
             if (prev.some(m => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
+            const updated = [...prev, newMessage];
+            chatCache.set(currentRoom.id, updated);
+            return updated;
           });
         }
+        
+        // Also update cache for the room even if not active
+        chatCache.addMessage(newRecord.room_id, payload.new);
       })
       .subscribe((status) => {
         console.log("[Chat] Subscription status:", status);
@@ -167,10 +183,11 @@ export const ChatView = memo(function ChatView() {
       });
       const json = await res.json();
       if (res.ok && json.data) {
-        // Add our own message immediately (realtime will handle others)
         setMessages(prev => {
           if (prev.some(m => m.id === json.data.id)) return prev;
-          return [...prev, json.data];
+          const updated = [...prev, json.data];
+          chatCache.set(activeRoom.id, updated);
+          return updated;
         });
       }
     } catch (err) {
