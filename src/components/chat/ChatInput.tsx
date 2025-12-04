@@ -56,6 +56,7 @@ export const ChatInput = memo(function ChatInput({
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const handleSendRef = useRef<() => void>(() => {});
 
   // Filter members based on room type and search query
   const filteredMembers = useMemo(() => {
@@ -147,10 +148,10 @@ export const ChatInput = memo(function ChatInput({
         }
       } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        handleSend();
+        handleSendRef.current();
       }
     },
-    [showMentions, filteredMembers, mentionIndex, insertMention, handleSend]
+    [showMentions, filteredMembers, mentionIndex]
   );
 
   // Insert a mention into the textarea
@@ -319,6 +320,11 @@ export const ChatInput = memo(function ChatInput({
       setSending(false);
     }
   }, [content, attachments, members, onSend, sending]);
+
+  // Keep ref updated for handleKeyDown
+  useEffect(() => {
+    handleSendRef.current = handleSend;
+  }, [handleSend]);
 
   // Cleanup object URLs on unmount
   useEffect(() => {
