@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Contact } from '@/lib/types';
 import type { CallOutcome, ContactStatus } from '@/lib/utils/constants';
+import { createClient } from "@/lib/supabase/client";
 
 interface UseContactsOptions {
   initialContacts?: Contact[];
@@ -22,6 +23,66 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
   const [actionState, setActionState] = useState<ActionState>({ type: null });
   const [error, setError] = useState<string | null>(null);
   const [cantonFilter, setCantonFilter] = useState<string | null>(null);
+
+  // Real-time subscription for contacts
+  useEffect(() => {
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel("contacts-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "contacts",
+        },
+        async (payload) => {
+          console.log("[Contacts Realtime] Change:", payload.eventType);
+
+          if (payload.eventType === "INSERT") {
+            // Fetch full contact data
+            try {
+              const res = await fetch(`/api/contacts/${payload.new.id}`);
+              if (res.ok) {
+                const json = await res.json();
+                if (json.data) {
+                  setContacts((prev) => [json.data, ...prev]);
+                }
+              }
+            } catch {
+              setContacts((prev) => [payload.new as Contact, ...prev]);
+            }
+          } else if (payload.eventType === "UPDATE") {
+            // Fetch updated contact
+            try {
+              const res = await fetch(`/api/contacts/${payload.new.id}`);
+              if (res.ok) {
+                const json = await res.json();
+                if (json.data) {
+                  setContacts((prev) =>
+                    prev.map((c) => (c.id === json.data.id ? json.data : c))
+                  );
+                }
+              }
+            } catch {
+              setContacts((prev) =>
+                prev.map((c) => (c.id === payload.new.id ? { ...c, ...payload.new } as Contact : c))
+              );
+            }
+          } else if (payload.eventType === "DELETE") {
+            setContacts((prev) => prev.filter((c) => c.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log("[Contacts Realtime] Subscription status:", status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const uniqueCantons = useMemo(
     () =>
@@ -295,4 +356,3 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
     clearCantonFilter: () => setCantonFilter(null),
   };
 }
-

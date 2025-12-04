@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Panel } from "@/components/ui/panel";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 import type { ContactNote, TmaNote } from "@/lib/types";
 
 type NoteType = ContactNote | TmaNote;
@@ -35,6 +36,9 @@ export const NotesPanel = memo(function NotesPanel({
     ? `/api/contacts/${entityId}/notes`
     : `/api/tma/${entityId}/notes`;
 
+  const tableName = entityType === "contact" ? "contact_notes" : "tma_notes";
+  const filterColumn = entityType === "contact" ? "contact_id" : "tma_id";
+
   // Fetch notes when entity changes
   useEffect(() => {
     if (!entityId) {
@@ -53,6 +57,68 @@ export const NotesPanel = memo(function NotesPanel({
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [entityId, apiPath]);
+
+  // Real-time subscription for notes
+  useEffect(() => {
+    if (!entityId) return;
+
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel(`notes-${entityType}-${entityId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: tableName,
+          filter: `${filterColumn}=eq.${entityId}`,
+        },
+        async (payload) => {
+          console.log(`[Notes Realtime] ${entityType} change:`, payload.eventType);
+
+          if (payload.eventType === "INSERT") {
+            // Fetch the full note with author info
+            try {
+              const res = await fetch(apiPath);
+              if (res.ok) {
+                const json = await res.json();
+                if (json.data) {
+                  setNotes(json.data);
+                }
+              }
+            } catch {
+              // Fallback: add without author info
+              setNotes((prev) => [payload.new as NoteType, ...prev]);
+            }
+          } else if (payload.eventType === "UPDATE") {
+            // Fetch updated notes
+            try {
+              const res = await fetch(apiPath);
+              if (res.ok) {
+                const json = await res.json();
+                if (json.data) {
+                  setNotes(json.data);
+                }
+              }
+            } catch {
+              setNotes((prev) =>
+                prev.map((n) => (n.id === payload.new.id ? { ...n, ...payload.new } as NoteType : n))
+              );
+            }
+          } else if (payload.eventType === "DELETE") {
+            setNotes((prev) => prev.filter((n) => n.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log(`[Notes Realtime] ${entityType} subscription status:`, status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [entityId, entityType, tableName, filterColumn, apiPath]);
 
   const handleSubmit = useCallback(async () => {
     if (!entityId || !newNote.trim()) return;
@@ -81,7 +147,7 @@ export const NotesPanel = memo(function NotesPanel({
     } finally {
       setSubmitting(false);
     }
-  }, [entityId, newNote, apiPath]);
+  }, [entityId, newNote, apiPath, onNoteAdded]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -319,4 +385,3 @@ function formatRelativeTime(dateStr: string): string {
     year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
   });
 }
-

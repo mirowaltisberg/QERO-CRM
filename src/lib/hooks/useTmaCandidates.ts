@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TmaCandidate, TmaRole } from "@/lib/types";
 import type { TmaStatus, TmaActivity } from "@/lib/utils/constants";
+import { createClient } from "@/lib/supabase/client";
 
 interface UseTmaCandidatesOptions {
   initialCandidates?: TmaCandidate[];
@@ -64,24 +65,67 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   const [roles, setRoles] = useState<TmaRole[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
 
-  // Auto-refresh every 5 seconds to keep data in sync across users
+  // Real-time subscription for TMA candidates
   useEffect(() => {
-    if (locationSearch.active) return;
+    if (locationSearch.active) return; // Skip realtime when doing location search
 
-    const pollInterval = setInterval(async () => {
-      try {
-        const response = await fetch("/api/tma");
-        const json = await response.json();
-        if (response.ok && json.data) {
-          setCandidates(json.data);
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel("tma-candidates-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Listen to INSERT, UPDATE, DELETE
+          schema: "public",
+          table: "tma_candidates",
+        },
+        async (payload) => {
+          console.log("[TMA Realtime] Change received:", payload.eventType);
+
+          if (payload.eventType === "INSERT") {
+            // Fetch the full candidate with claimer info
+            try {
+              const res = await fetch(`/api/tma/${payload.new.id}`);
+              if (res.ok) {
+                const json = await res.json();
+                if (json.data) {
+                  setCandidates((prev) => [json.data, ...prev]);
+                }
+              }
+            } catch {
+              // Fallback: add without claimer info
+              setCandidates((prev) => [payload.new as TmaCandidate, ...prev]);
+            }
+          } else if (payload.eventType === "UPDATE") {
+            // Fetch the updated candidate with claimer info
+            try {
+              const res = await fetch(`/api/tma/${payload.new.id}`);
+              if (res.ok) {
+                const json = await res.json();
+                if (json.data) {
+                  setCandidates((prev) =>
+                    prev.map((c) => (c.id === json.data.id ? json.data : c))
+                  );
+                }
+              }
+            } catch {
+              // Fallback: update with partial data
+              setCandidates((prev) =>
+                prev.map((c) => (c.id === payload.new.id ? { ...c, ...payload.new } as TmaCandidate : c))
+              );
+            }
+          } else if (payload.eventType === "DELETE") {
+            setCandidates((prev) => prev.filter((c) => c.id !== payload.old.id));
+          }
         }
-      } catch {
-        // Silently fail - will retry on next interval
-      }
-    }, 5000); // 5 seconds
+      )
+      .subscribe((status) => {
+        console.log("[TMA Realtime] Subscription status:", status);
+      });
 
     return () => {
-      clearInterval(pollInterval);
+      supabase.removeChannel(channel);
     };
   }, [locationSearch.active]);
 
@@ -620,5 +664,3 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     updateLocationRadius,
   };
 }
-
-

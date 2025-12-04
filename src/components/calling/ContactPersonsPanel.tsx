@@ -5,6 +5,7 @@ import { Panel } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { createClient } from "@/lib/supabase/client";
 import type { ContactPerson } from "@/lib/types";
 
 interface ContactPersonsPanelProps {
@@ -60,6 +61,38 @@ export function ContactPersonsPanel({ contactId }: ContactPersonsPanelProps) {
   useEffect(() => {
     loadPersons();
   }, [loadPersons]);
+
+  // Real-time subscription for contact persons
+  useEffect(() => {
+    if (!contactId) return;
+
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel(`contact-persons-${contactId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "contact_persons",
+          filter: `contact_id=eq.${contactId}`,
+        },
+        async (payload) => {
+          console.log("[ContactPersons Realtime] Change:", payload.eventType);
+
+          // Refetch to get the full data with profile info
+          await loadPersons();
+        }
+      )
+      .subscribe((status) => {
+        console.log("[ContactPersons Realtime] Subscription status:", status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [contactId, loadPersons]);
 
   const handleChange = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
