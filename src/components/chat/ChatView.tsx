@@ -13,6 +13,7 @@ export const ChatView = memo(function ChatView() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [members, setMembers] = useState<ChatMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const activeRoomRef = useRef<ChatRoom | null>(null);
   const membersRef = useRef<ChatMember[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -225,8 +226,8 @@ export const ChatView = memo(function ChatView() {
           members={members}
           onSelectRoom={handleSelectRoom}
           onStartDM={handleStartDM}
-          searchQuery=""
-          onSearchChange={() => {}}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
           loading={loading}
         />
       </aside>

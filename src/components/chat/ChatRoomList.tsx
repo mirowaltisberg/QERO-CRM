@@ -18,24 +18,41 @@ interface ChatRoomListProps {
 export const ChatRoomList = memo(function ChatRoomList({
   rooms, members, activeRoomId, onSelectRoom, onStartDM, searchQuery, onSearchChange, loading,
 }: ChatRoomListProps) {
+  // Get current user's team from members (the one that matches rooms)
+  const currentUserTeamId = useMemo(() => {
+    const teamRoom = rooms.find(r => r.type === "team");
+    return teamRoom?.team_id || null;
+  }, [rooms]);
+
   const { allRoom, teamRooms, dmRooms } = useMemo(() => ({
     allRoom: rooms.find((r) => r.type === "all") || null,
     teamRooms: rooms.filter((r) => r.type === "team"),
     dmRooms: rooms.filter((r) => r.type === "dm"),
   }), [rooms]);
 
-  const filteredMembers = useMemo(() => {
+  // Get IDs of users we already have DMs with
+  const existingDmUserIds = useMemo(() => {
+    return new Set(dmRooms.map((r) => r.dm_user?.id).filter(Boolean));
+  }, [dmRooms]);
+
+  // Team members (same team as current user) - shown in Direktnachrichten when no search
+  const teamMembers = useMemo(() => {
+    if (!currentUserTeamId) return [];
+    return members.filter(m => 
+      m.team_id === currentUserTeamId && !existingDmUserIds.has(m.id)
+    );
+  }, [members, currentUserTeamId, existingDmUserIds]);
+
+  // Search results - people from OTHER teams (when searching)
+  const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const query = searchQuery.toLowerCase();
     return members.filter((m) =>
-      m.full_name?.toLowerCase().includes(query) || m.team?.name?.toLowerCase().includes(query)
-    ).slice(0, 5);
-  }, [members, searchQuery]);
-
-  const membersWithoutDM = useMemo(() => {
-    const dmUserIds = new Set(dmRooms.map((r) => r.dm_user?.id).filter(Boolean));
-    return filteredMembers.filter((m) => !dmUserIds.has(m.id));
-  }, [filteredMembers, dmRooms]);
+      (m.full_name?.toLowerCase().includes(query) || m.team?.name?.toLowerCase().includes(query)) &&
+      m.team_id !== currentUserTeamId && // Only show people from other teams in search
+      !existingDmUserIds.has(m.id)
+    ).slice(0, 10);
+  }, [members, searchQuery, currentUserTeamId, existingDmUserIds]);
 
   if (loading) {
     return (
@@ -61,35 +78,55 @@ export const ChatRoomList = memo(function ChatRoomList({
         />
       </div>
       <div className="flex-1 overflow-y-auto p-2">
-        {allRoom && (
+        {/* Search results - only show when searching */}
+        {searchQuery && searchResults.length > 0 && (
           <div className="mb-4">
-            <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Alle</p>
-            <RoomItem room={allRoom} isActive={activeRoomId === allRoom.id} onClick={() => onSelectRoom(allRoom)} />
-          </div>
-        )}
-        {teamRooms.length > 0 && (
-          <div className="mb-4">
-            <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Teams</p>
-            {teamRooms.map((room) => (
-              <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} />
+            <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Suchergebnisse</p>
+            {searchResults.map((member) => (
+              <MemberItem key={member.id} member={member} onClick={() => { onStartDM(member.id); onSearchChange(""); }} />
             ))}
           </div>
         )}
-        {dmRooms.length > 0 && (
-          <div className="mb-4">
-            <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Direktnachrichten</p>
-            {dmRooms.map((room) => (
-              <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} />
-            ))}
+
+        {/* Show no results message */}
+        {searchQuery && searchResults.length === 0 && (
+          <div className="mb-4 px-2">
+            <p className="text-sm text-gray-500">Keine Personen gefunden</p>
           </div>
         )}
-        {membersWithoutDM.length > 0 && (
-          <div className="mb-4">
-            <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Neue Unterhaltung</p>
-            {membersWithoutDM.map((member) => (
-              <MemberItem key={member.id} member={member} onClick={() => onStartDM(member.id)} />
-            ))}
-          </div>
+
+        {/* Normal view when not searching */}
+        {!searchQuery && (
+          <>
+            {allRoom && (
+              <div className="mb-4">
+                <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Alle</p>
+                <RoomItem room={allRoom} isActive={activeRoomId === allRoom.id} onClick={() => onSelectRoom(allRoom)} />
+              </div>
+            )}
+            {teamRooms.length > 0 && (
+              <div className="mb-4">
+                <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Teams</p>
+                {teamRooms.map((room) => (
+                  <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} />
+                ))}
+              </div>
+            )}
+            <div className="mb-4">
+              <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-gray-400">Direktnachrichten</p>
+              {/* Existing DM rooms */}
+              {dmRooms.map((room) => (
+                <RoomItem key={room.id} room={room} isActive={activeRoomId === room.id} onClick={() => onSelectRoom(room)} />
+              ))}
+              {/* Team members without DM yet */}
+              {teamMembers.map((member) => (
+                <MemberItem key={member.id} member={member} onClick={() => onStartDM(member.id)} />
+              ))}
+              {dmRooms.length === 0 && teamMembers.length === 0 && (
+                <p className="px-2 text-sm text-gray-400">Keine Teammitglieder</p>
+              )}
+            </div>
+          </>
         )}
       </div>
     </aside>
