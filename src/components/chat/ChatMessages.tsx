@@ -31,7 +31,7 @@ const MessageCard = memo(function MessageCard({ message, memberMap }: { message:
 
   const parsedContent = useMemo(() => {
     if (!message.content) return null;
-    const mentionRegex = /@(\w+(?:\s+\w+)?)/g;
+    const mentionRegex = /@([A-Za-zÀ-ÿ]+(?: [A-Za-zÀ-ÿ]+)*)/g;
     const parts: Array<{ type: "text" | "mention"; value: string }> = [];
     let lastIndex = 0;
     let match;

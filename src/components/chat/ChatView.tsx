@@ -218,7 +218,7 @@ export function ChatView() {
           )}
         </div>
         <div className="border-t border-gray-200 px-6 py-4">
-          <ChatInput members={members} onSend={handleSendMessage} disabled={!activeRoom} />
+          <ChatInput members={members} activeRoom={activeRoom} onSend={handleSendMessage} disabled={!activeRoom} />
         </div>
       </div>
     </div>
