@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "./NotificationContext";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 interface ChatMember {
   id: string;
@@ -11,31 +11,48 @@ interface ChatMember {
   avatar_url: string | null;
 }
 
+interface LatestMessage {
+  id: string;
+  room_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+}
+
+const POLL_INTERVAL = 10000; // 10 seconds
+const STORAGE_KEY = "last_seen_chat_message";
+
 export function ChatNotificationListener() {
   const { addNotification } = useNotifications();
   const router = useRouter();
+  const pathname = usePathname();
   const currentUserIdRef = useRef<string>("");
   const membersRef = useRef<Map<string, ChatMember>>(new Map());
-  const subscriptionSetUp = useRef(false);
-  const addNotificationRef = useRef(addNotification);
-  const routerRef = useRef(router);
+  const initializedRef = useRef(false);
 
-  // Keep refs updated
-  useEffect(() => {
-    addNotificationRef.current = addNotification;
-    routerRef.current = router;
-  }, [addNotification, router]);
+  const getLastSeenMessageId = useCallback((): string | null => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(STORAGE_KEY);
+  }, []);
+
+  const setLastSeenMessageId = useCallback((id: string) => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEY, id);
+  }, []);
 
   // Fetch current user and members on mount
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
     const supabase = createClient();
 
-    const fetchUserAndMembers = async () => {
+    const init = async () => {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         currentUserIdRef.current = user.id;
-        console.log("[Chat Global Listener] Current user:", user.id);
+        console.log("[Chat Notif] Current user:", user.id);
       }
 
       // Fetch all members for name lookup
@@ -47,75 +64,91 @@ export function ChatNotificationListener() {
           const map = new Map<string, ChatMember>();
           members.forEach(m => map.set(m.id, m));
           membersRef.current = map;
-          console.log("[Chat Global Listener] Loaded", members.length, "members");
+          console.log("[Chat Notif] Loaded", members.length, "members");
         }
       } catch (err) {
-        console.error("[Chat Global Listener] Failed to load members:", err);
+        console.error("[Chat Notif] Failed to load members:", err);
       }
     };
 
-    fetchUserAndMembers();
+    init();
   }, []);
 
-  // Subscribe to chat messages globally - only once
-  useEffect(() => {
-    if (subscriptionSetUp.current) {
-      console.log("[Chat Global Listener] Subscription already set up, skipping");
+  // Poll for new messages
+  const checkForNewMessages = useCallback(async () => {
+    // Skip if on chat page
+    if (pathname === "/chat") {
       return;
     }
-    subscriptionSetUp.current = true;
 
-    const supabase = createClient();
-    console.log("[Chat Global Listener] Setting up subscription...");
+    if (!currentUserIdRef.current) {
+      return;
+    }
 
-    const channel = supabase
-      .channel("global-chat-notifications-v2")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages" },
-        (payload) => {
-          console.log("[Chat Global Listener] New message received:", payload.new);
+    try {
+      // Get the latest message from any room I'm a member of
+      const res = await fetch("/api/chat/latest-message");
+      if (!res.ok) return;
 
-          const newRecord = payload.new as {
-            id: string;
-            room_id: string;
-            sender_id: string;
-            content: string;
-          };
+      const json = await res.json();
+      const latestMessage: LatestMessage | null = json.data;
 
-          // Don't notify for own messages
-          if (newRecord.sender_id === currentUserIdRef.current) {
-            console.log("[Chat Global Listener] Skipping - own message");
-            return;
-          }
+      if (!latestMessage) return;
 
-          // Get sender info
-          const sender = membersRef.current.get(newRecord.sender_id);
-          const senderName = sender?.full_name || "Neue Nachricht";
+      const lastSeenId = getLastSeenMessageId();
+      
+      // On first run, just set the ID
+      if (!lastSeenId) {
+        setLastSeenMessageId(latestMessage.id);
+        return;
+      }
 
-          console.log("[Chat Global Listener] Showing notification from:", senderName);
+      // If same message, no notification needed
+      if (lastSeenId === latestMessage.id) {
+        return;
+      }
 
-          addNotificationRef.current({
-            type: "chat",
-            title: senderName,
-            message: newRecord.content?.slice(0, 100) || "Hat eine Nachricht gesendet",
-            avatar: sender?.avatar_url || undefined,
-            onClick: () => {
-              routerRef.current.push("/chat");
-            },
-          });
-        }
-      )
-      .subscribe((status) => {
-        console.log("[Chat Global Listener] Subscription status:", status);
+      // Skip if message is from current user
+      if (latestMessage.sender_id === currentUserIdRef.current) {
+        setLastSeenMessageId(latestMessage.id);
+        return;
+      }
+
+      // Show notification
+      const sender = membersRef.current.get(latestMessage.sender_id);
+      const senderName = sender?.full_name || "Neue Nachricht";
+
+      console.log("[Chat Notif] New message from:", senderName);
+
+      addNotification({
+        type: "chat",
+        title: senderName,
+        message: latestMessage.content?.slice(0, 100) || "Hat eine Nachricht gesendet",
+        avatar: sender?.avatar_url || undefined,
+        onClick: () => {
+          router.push("/chat");
+        },
       });
 
-    // Don't clean up on re-renders - keep subscription alive
+      setLastSeenMessageId(latestMessage.id);
+    } catch (err) {
+      console.error("[Chat Notif] Error checking messages:", err);
+    }
+  }, [pathname, addNotification, router, getLastSeenMessageId, setLastSeenMessageId]);
+
+  // Initial check and set up polling
+  useEffect(() => {
+    // Initial check after 3 seconds
+    const initialTimeout = setTimeout(checkForNewMessages, 3000);
+
+    // Poll every 10 seconds
+    const interval = setInterval(checkForNewMessages, POLL_INTERVAL);
+
     return () => {
-      // Only clean up on actual unmount (app closing)
-      // The subscription will be cleaned up by Supabase when the page is closed
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
     };
-  }, []); // Empty dependency array - run only once
+  }, [checkForNewMessages]);
 
   return null;
 }
