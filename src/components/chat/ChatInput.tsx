@@ -150,7 +150,7 @@ export const ChatInput = memo(function ChatInput({
         handleSend();
       }
     },
-    [showMentions, filteredMembers, mentionIndex]
+    [showMentions, filteredMembers, mentionIndex, insertMention, handleSend]
   );
 
   // Insert a mention into the textarea
