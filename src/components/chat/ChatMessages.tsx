@@ -88,11 +88,7 @@ const MessageCard = memo(function MessageCard({
       .filter(name => name.length > 0)
       .sort((a, b) => b.length - a.length);
     
-    // DEBUG
-    if (text.includes("@")) {
-      console.log("[Mention Debug] Text:", text);
-      console.log("[Mention Debug] All names:", allNames);
-    }
+
     
     // Build regex pattern for all names + everyone
     const namePatterns = ["everyone", ...allNames].map(name => {
@@ -106,11 +102,7 @@ const MessageCard = memo(function MessageCard({
     // Match @name (case insensitive), word boundary after
     const mentionRegex = new RegExp("(@(?:" + namePatterns.join("|") + "))(?![A-Za-zÀ-ÿ])", "gi");
     
-    // DEBUG
-    if (text.includes("@")) {
-      console.log("[Mention Debug] Regex:", mentionRegex.toString());
-      console.log("[Mention Debug] Test match:", text.match(mentionRegex));
-    }
+
     
     let lastIndex = 0;
     let match;
