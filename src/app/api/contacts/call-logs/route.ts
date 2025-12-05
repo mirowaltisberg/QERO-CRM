@@ -13,7 +13,12 @@ export async function POST(request: NextRequest) {
       return respondError("Unauthorized", 401);
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    
+    if (!body) {
+      return respondError("Invalid JSON body", 400);
+    }
+
     const { contact_ids } = body;
 
     if (!Array.isArray(contact_ids) || contact_ids.length === 0) {
@@ -27,28 +32,16 @@ export async function POST(request: NextRequest) {
 
     const adminSupabase = createAdminClient();
 
-    // Get user's team
-    const { data: profile } = await adminSupabase
-      .from("profiles")
-      .select("team_id")
-      .eq("id", user.id)
-      .single();
+    // Filter to only valid UUID strings
+    const validContactIds = contact_ids.filter(
+      (id): id is string => typeof id === "string" && id.length > 0
+    );
 
-    if (!profile?.team_id) {
-      return respondError("User has no team", 400);
+    if (validContactIds.length === 0) {
+      return respondSuccess({});
     }
 
-    // Verify all contacts belong to user's team
-    const { data: validContacts } = await adminSupabase
-      .from("contacts")
-      .select("id")
-      .eq("team_id", profile.team_id)
-      .in("id", contact_ids);
-
-    const validContactIds = new Set(validContacts?.map(c => c.id) || []);
-
-    // Get latest call log for each contact using a subquery approach
-    // This gets the most recent call log per contact in a single query
+    // Get latest call log for each contact
     const { data: callLogs, error } = await adminSupabase
       .from("contact_call_logs")
       .select(`
@@ -62,7 +55,7 @@ export async function POST(request: NextRequest) {
           avatar_url
         )
       `)
-      .in("contact_id", Array.from(validContactIds))
+      .in("contact_id", validContactIds)
       .order("called_at", { ascending: false });
 
     if (error) {
