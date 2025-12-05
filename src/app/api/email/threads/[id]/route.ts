@@ -81,6 +81,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const body = await request.json();
     const { is_read, is_starred, folder, linked_contact_id, linked_tma_id } = body;
+    
+    console.log("[Email PATCH] Thread:", id, "Updates:", { is_read, is_starred, folder });
 
     // Get thread and verify ownership
     const { data: thread, error: threadError } = await supabase
@@ -90,6 +92,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .single();
 
     if (threadError || !thread || thread.account.user_id !== user.id) {
+      console.log("[Email PATCH] Thread not found or unauthorized:", threadError);
       return respondError("Thread not found", 404);
     }
 
@@ -112,31 +115,42 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         .single();
 
       if (account) {
-        const emailAccount = account as EmailAccount;
-        const accessToken = await ensureValidToken(emailAccount);
+        try {
+          const emailAccount = account as EmailAccount;
+          const accessToken = await ensureValidToken(emailAccount);
+          console.log("[Email PATCH] Got access token, syncing with Graph API...");
 
-        // Get all messages in thread to update
-        const { data: messages } = await supabase
-          .from("email_messages")
-          .select("graph_message_id")
-          .eq("thread_id", id);
+          // Get all messages in thread to update
+          const { data: messages } = await supabase
+            .from("email_messages")
+            .select("graph_message_id")
+            .eq("thread_id", id);
 
-        if (messages) {
-          for (const msg of messages) {
-            if (is_read !== undefined) {
-              await markMessageRead(accessToken, msg.graph_message_id, is_read);
-            }
-            if (folder !== undefined) {
-              const folderMap: Record<string, "archive" | "deleteditems" | "inbox"> = {
-                archive: "archive",
-                trash: "deleteditems",
-                inbox: "inbox",
-              };
-              if (folderMap[folder]) {
-                await moveMessage(accessToken, msg.graph_message_id, folderMap[folder]);
+          if (messages) {
+            for (const msg of messages) {
+              try {
+                if (is_read !== undefined) {
+                  await markMessageRead(accessToken, msg.graph_message_id, is_read);
+                }
+                if (folder !== undefined) {
+                  const folderMap: Record<string, "archive" | "deleteditems" | "inbox"> = {
+                    archive: "archive",
+                    trash: "deleteditems",
+                    inbox: "inbox",
+                  };
+                  if (folderMap[folder]) {
+                    await moveMessage(accessToken, msg.graph_message_id, folderMap[folder]);
+                  }
+                }
+              } catch (msgErr) {
+                console.error("[Email PATCH] Failed to update message", msg.graph_message_id, ":", msgErr);
+                // Continue with other messages
               }
             }
           }
+        } catch (graphErr) {
+          console.error("[Email PATCH] Graph API error:", graphErr);
+          // Continue with DB update even if Graph fails
         }
       }
     }
