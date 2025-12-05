@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { NotificationProvider } from "@/lib/notifications/NotificationContext";
 import { ToastContainer } from "@/components/ui/ToastContainer";
 import { FollowUpChecker } from "@/lib/notifications/FollowUpChecker";
@@ -11,15 +12,26 @@ interface ProvidersProps {
   children: React.ReactNode;
 }
 
+// Routes that don't require authentication
+const PUBLIC_ROUTES = ["/login", "/register", "/auth/callback", "/auth/confirm"];
+
 export function Providers({ children }: ProvidersProps) {
+  const pathname = usePathname();
+  const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname?.startsWith(route));
+
   return (
     <NotificationProvider>
       {children}
       <ToastContainer />
-      <FollowUpChecker />
-      <EmailChecker />
-      <ChatNotificationListener />
-      <BrowserNotificationPrompt />
+      {/* Only render auth-dependent components on protected routes */}
+      {!isPublicRoute && (
+        <>
+          <FollowUpChecker />
+          <EmailChecker />
+          <ChatNotificationListener />
+          <BrowserNotificationPrompt />
+        </>
+      )}
     </NotificationProvider>
   );
 }

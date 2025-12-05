@@ -94,8 +94,5 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Handle fetch for offline support (optional, minimal caching)
-self.addEventListener('fetch', (event) => {
-  // Let network requests pass through
-  // We could add caching here for offline support
-});
+// No fetch handler - let all network requests pass through normally
+// This prevents interference with Supabase auth and other API calls
