@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 interface EmailThread {
   id: string;
   subject: string;
-  participants: string;
+  participants: string | string[] | null;
   last_message_at: string;
 }
 
@@ -63,8 +63,13 @@ export function EmailChecker() {
       
       // Show notifications for new emails (max 3)
       for (const thread of newThreads.slice(0, 3)) {
-        // Extract sender name from participants
-        const sender = thread.participants?.split(",")[0]?.trim() || "Neue E-Mail";
+        // Extract sender name from participants (handle string, array, or null)
+        let sender = "Neue E-Mail";
+        if (Array.isArray(thread.participants)) {
+          sender = thread.participants[0]?.trim() || sender;
+        } else if (typeof thread.participants === "string") {
+          sender = thread.participants.split(",")[0]?.trim() || sender;
+        }
         
         addNotification({
           type: "email",
