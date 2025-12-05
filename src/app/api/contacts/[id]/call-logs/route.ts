@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { respondError, respondSuccess } from "@/lib/utils/api-response";
@@ -7,18 +8,52 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+function getBearerToken(request: NextRequest) {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader) return null;
+
+  const [scheme, token] = authHeader.split(" ");
+  if (scheme?.toLowerCase() === "bearer" && token) {
+    return token.trim();
+  }
+
+  return null;
+}
+
+async function resolveUser(
+  request: NextRequest,
+  adminSupabase: ReturnType<typeof createAdminClient>
+): Promise<User | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    return user;
+  }
+
+  const bearerToken = getBearerToken(request);
+  if (bearerToken) {
+    const { data: tokenUser, error } = await adminSupabase.auth.getUser(bearerToken);
+    if (!error && tokenUser?.user) {
+      return tokenUser.user;
+    }
+  }
+
+  return null;
+}
+
 // GET /api/contacts/[id]/call-logs - Get latest call log for a contact
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id: contactId } = await context.params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const adminSupabase = createAdminClient();
+    const user = await resolveUser(request, adminSupabase);
 
     if (!user) {
       return respondError("Unauthorized", 401);
     }
-
-    const adminSupabase = createAdminClient();
 
     // Get the latest call log with user info
     const { data: callLog, error } = await adminSupabase
@@ -55,14 +90,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { id: contactId } = await context.params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const adminSupabase = createAdminClient();
+    const user = await resolveUser(request, adminSupabase);
 
     if (!user) {
       return respondError("Unauthorized", 401);
     }
-
-    const adminSupabase = createAdminClient();
 
     // Verify contact exists and belongs to user's team
     const { data: profile } = await adminSupabase
@@ -133,4 +166,3 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return respondError("Failed to create call log", 500);
   }
 }
-

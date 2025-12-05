@@ -34,21 +34,43 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     clearStatus,
     setCantonFilter,
     clearCantonFilter,
-    searchQuery,
-    setSearchQuery,
   } = useContacts({ initialContacts });
+
+  const supabase = useMemo(() => createClient(), []);
 
   // Track call logs for contacts (contactId -> latest call log)
   const [callLogs, setCallLogs] = useState<Record<string, ContactCallLog>>({});
+  const [authToken, setAuthToken] = useState<string | null>(null);
   
   // Track if a call was initiated for the current contact (waiting for note)
   const [callInitiatedForContact, setCallInitiatedForContact] = useState<string | null>(null);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (isMounted) {
+        setAuthToken(session?.access_token ?? null);
+      }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (isMounted) {
+        setAuthToken(session?.access_token ?? null);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      authListener?.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
   // Fetch call logs for all contacts on mount and when contacts change
   useEffect(() => {
+    if (!contacts.length || !authToken) return;
+
     async function fetchCallLogs() {
-      if (contacts.length === 0) return;
-      
       try {
         // Fetch latest call log for each contact in parallel (batch of 10)
         const batchSize = 10;
@@ -59,7 +81,13 @@ export function CallingView({ initialContacts }: CallingViewProps) {
           const results = await Promise.all(
             batch.map(async (contact) => {
               try {
-                const res = await fetch(`/api/contacts/${contact.id}/call-logs`);
+                const res = await fetch(`/api/contacts/${contact.id}/call-logs`, {
+                  headers: {
+                    Authorization: `Bearer ${authToken}`,
+                  },
+                  credentials: "include",
+                  cache: "no-store",
+                });
                 if (res.ok) {
                   const json = await res.json();
                   return { contactId: contact.id, log: json.data };
@@ -85,12 +113,12 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     }
     
     fetchCallLogs();
-  }, [contacts]);
+  }, [contacts, authToken]);
 
   // Real-time subscription for call logs
   useEffect(() => {
-    const supabase = createClient();
-    
+    if (!authToken) return;
+
     // Subscribe to INSERT events on contact_call_logs
     const channel = supabase
       .channel("call-logs-realtime")
@@ -102,12 +130,17 @@ export function CallingView({ initialContacts }: CallingViewProps) {
           table: "contact_call_logs",
         },
         async (payload) => {
-          console.log("[Realtime] New call log received:", payload);
           // When a new call log is inserted, fetch the full data with caller info
           const newLog = payload.new as { id: string; contact_id: string; user_id: string; called_at: string };
           
           try {
-            const res = await fetch(`/api/contacts/${newLog.contact_id}/call-logs`);
+            const res = await fetch(`/api/contacts/${newLog.contact_id}/call-logs`, {
+              headers: {
+                Authorization: `Bearer ${authToken}`,
+              },
+              credentials: "include",
+              cache: "no-store",
+            });
             if (res.ok) {
               const json = await res.json();
               if (json.data) {
@@ -122,14 +155,12 @@ export function CallingView({ initialContacts }: CallingViewProps) {
           }
         }
       )
-      .subscribe((status) => {
-        console.log("[Realtime] Subscription status:", status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [supabase, authToken]);
 
   // Reset call initiated state when switching contacts
   useEffect(() => {
@@ -140,10 +171,17 @@ export function CallingView({ initialContacts }: CallingViewProps) {
 
   // Log a call to the API
   const logCallToApi = useCallback(async (contactId: string) => {
+    if (!authToken) return;
+
     try {
       const res = await fetch(`/api/contacts/${contactId}/call-logs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        credentials: "include",
+        cache: "no-store",
       });
       
       if (res.ok) {
@@ -158,7 +196,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     } catch (err) {
       console.error("Error logging call:", err);
     }
-  }, []);
+  }, [authToken]);
 
   const actionMessage = useMemo(() => {
     if (actionState.type && actionState.message) {
@@ -272,8 +310,6 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         activeCantonFilter={cantonFilter}
         availableCantons={uniqueCantons}
         callLogs={callLogs}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
       />
       <ContactDetail
         key={activeContact?.id ?? "empty"}
