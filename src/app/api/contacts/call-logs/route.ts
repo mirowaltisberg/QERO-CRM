@@ -21,8 +21,14 @@ export async function POST(request: NextRequest) {
 
     const { contact_ids } = body;
 
-    if (!Array.isArray(contact_ids) || contact_ids.length === 0) {
-      return respondError("contact_ids array required", 400);
+    // Allow empty arrays - just return empty result
+    if (!Array.isArray(contact_ids)) {
+      return respondError("contact_ids must be an array", 400);
+    }
+
+    // Return empty result for empty array
+    if (contact_ids.length === 0) {
+      return respondSuccess({});
     }
 
     // Limit batch size to prevent abuse
@@ -77,4 +83,3 @@ export async function POST(request: NextRequest) {
     return respondError("Failed to fetch call logs", 500);
   }
 }
-// Deployment trigger Fri Dec  5 16:21:57 CET 2025
