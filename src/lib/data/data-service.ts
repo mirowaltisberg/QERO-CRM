@@ -1,6 +1,7 @@
 /**
  * Data Service Layer
  * Uses Supabase for all data operations
+ * Personal settings (status, follow_up) are stored in user_contact_settings / user_tma_settings
  */
 
 import type {
@@ -16,10 +17,45 @@ import type {
 import type { CallOutcome, TmaStatus } from "../utils/constants";
 import type { TmaCreateInput } from "../validation/schemas";
 import { createClient } from "../supabase/client";
+import { personalSettingsService } from "./personal-settings-service";
 
 // Default page size - can handle up to 10k+ with pagination
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 1000;
+
+// Fields that are personal (stored in user_contact_settings, not on contacts table)
+const PERSONAL_CONTACT_FIELDS = ["status", "follow_up_at", "follow_up_note"];
+
+/**
+ * Helper to merge contacts with personal settings
+ */
+async function mergeContactsWithPersonalSettings(contacts: Contact[]): Promise<Contact[]> {
+  if (contacts.length === 0) return [];
+  
+  const contactIds = contacts.map(c => c.id);
+  const settings = await personalSettingsService.getContactSettings(contactIds);
+  
+  return contacts.map(contact => ({
+    ...contact,
+    // Override with personal settings if they exist
+    status: settings[contact.id]?.status ?? null,
+    follow_up_at: settings[contact.id]?.follow_up_at ?? null,
+    follow_up_note: settings[contact.id]?.follow_up_note ?? null,
+  }));
+}
+
+/**
+ * Helper to merge a single contact with personal settings
+ */
+async function mergeContactWithPersonalSettings(contact: Contact): Promise<Contact> {
+  const setting = await personalSettingsService.getContactSetting(contact.id);
+  return {
+    ...contact,
+    status: setting?.status ?? null,
+    follow_up_at: setting?.follow_up_at ?? null,
+    follow_up_note: setting?.follow_up_note ?? null,
+  };
+}
 
 /**
  * Contact Operations
@@ -32,17 +68,14 @@ export const contactService = {
   async getAll(filters?: ContactFilters): Promise<Contact[]> {
     const supabase = createClient();
     
-    // Fetch all contacts without pagination limit (Supabase default is 1000)
-    // We need to explicitly set a higher limit
     let query = supabase
       .from("contacts")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(10000); // Allow up to 10k contacts
+      .limit(10000);
 
-    if (filters?.status) {
-      query = query.eq("status", filters.status);
-    }
+    // NOTE: Status filter now needs to work differently since status is personal
+    // We'll filter after merging with personal settings
 
     if (filters?.canton) {
       query = query.eq("canton", filters.canton);
@@ -76,7 +109,15 @@ export const contactService = {
       return [];
     }
 
-    return data || [];
+    // Merge with personal settings
+    let contacts = await mergeContactsWithPersonalSettings(data || []);
+    
+    // Apply status filter after merging (since status is now personal)
+    if (filters?.status) {
+      contacts = contacts.filter(c => c.status === filters.status);
+    }
+
+    return contacts;
   },
 
   /**
@@ -89,22 +130,22 @@ export const contactService = {
     const pageSize = Math.min(filters?.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const offset = (page - 1) * pageSize;
 
-    // Build the base query for counting
+    // For status filtering, we need a different approach since status is personal
+    // If filtering by status, we fetch more and filter client-side
+    const isStatusFilter = !!filters?.status;
+
     let countQuery = supabase
       .from("contacts")
       .select("*", { count: "exact", head: true });
 
-    // Build the data query
     let dataQuery = supabase
       .from("contacts")
       .select("*")
-      .order("created_at", { ascending: false })
-      .range(offset, offset + pageSize - 1);
-
-    // Apply filters to both queries
-    if (filters?.status) {
-      countQuery = countQuery.eq("status", filters.status);
-      dataQuery = dataQuery.eq("status", filters.status);
+      .order("created_at", { ascending: false });
+    
+    // If no status filter, use normal pagination
+    if (!isStatusFilter) {
+      dataQuery = dataQuery.range(offset, offset + pageSize - 1);
     }
 
     if (filters?.canton) {
@@ -120,7 +161,6 @@ export const contactService = {
     }
 
     if (filters?.list_id) {
-      // First get contact IDs from list_members
       const { data: members } = await supabase
         .from("list_members")
         .select("contact_id")
@@ -135,7 +175,6 @@ export const contactService = {
       }
     }
 
-    // Execute both queries in parallel
     const [countResult, dataResult] = await Promise.all([
       countQuery,
       dataQuery,
@@ -146,11 +185,23 @@ export const contactService = {
       return { data: [], total: 0, page, pageSize, totalPages: 0 };
     }
 
+    // Merge with personal settings
+    let contacts = await mergeContactsWithPersonalSettings(dataResult.data || []);
+    
+    // Apply status filter and paginate after merging
+    if (isStatusFilter) {
+      contacts = contacts.filter(c => c.status === filters.status);
+      const total = contacts.length;
+      const totalPages = Math.ceil(total / pageSize);
+      const paginatedContacts = contacts.slice(offset, offset + pageSize);
+      return { data: paginatedContacts, total, page, pageSize, totalPages };
+    }
+
     const total = countResult.count ?? 0;
     const totalPages = Math.ceil(total / pageSize);
 
     return {
-      data: dataResult.data || [],
+      data: contacts,
       total,
       page,
       pageSize,
@@ -175,7 +226,8 @@ export const contactService = {
       return null;
     }
 
-    return data;
+    // Merge with personal settings
+    return mergeContactWithPersonalSettings(data);
   },
 
   /**
@@ -184,9 +236,20 @@ export const contactService = {
   async create(data: Omit<Contact, "id" | "created_at">): Promise<Contact> {
     const supabase = createClient();
     
+    // Separate personal fields from shared fields
+    const personalFields = {
+      status: data.status,
+      follow_up_at: data.follow_up_at,
+      follow_up_note: data.follow_up_note,
+    };
+    
+    // Remove personal fields from contact data using destructuring
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status: _s, follow_up_at: _fa, follow_up_note: _fn, ...contactData } = data;
+    
     const { data: newContact, error } = await supabase
       .from("contacts")
-      .insert(data)
+      .insert(contactData)
       .select()
       .single();
 
@@ -195,7 +258,12 @@ export const contactService = {
       throw new Error(error.message);
     }
 
-    return newContact;
+    // Save personal settings if any were provided
+    if (personalFields.status || personalFields.follow_up_at) {
+      await personalSettingsService.updateContactSettings(newContact.id, personalFields);
+    }
+
+    return mergeContactWithPersonalSettings(newContact);
   },
 
   /**
@@ -204,19 +272,42 @@ export const contactService = {
   async update(id: string, data: Partial<Contact>): Promise<Contact | null> {
     const supabase = createClient();
     
-    const { data: updated, error } = await supabase
-      .from("contacts")
-      .update(data)
-      .eq("id", id)
-      .select()
-      .single();
+    // Separate personal fields from shared fields
+    const personalFields: Record<string, unknown> = {};
+    const sharedFields: Record<string, unknown> = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      if (PERSONAL_CONTACT_FIELDS.includes(key)) {
+        personalFields[key] = value;
+      } else {
+        sharedFields[key] = value;
+      }
+    }
+    
+    // Update shared fields on contacts table (if any)
+    if (Object.keys(sharedFields).length > 0) {
+      const { error } = await supabase
+        .from("contacts")
+        .update(sharedFields)
+        .eq("id", id);
 
-    if (error) {
-      console.error("Error updating contact:", error);
-      return null;
+      if (error) {
+        console.error("Error updating contact:", error);
+        return null;
+      }
+    }
+    
+    // Update personal fields (if any)
+    if (Object.keys(personalFields).length > 0) {
+      await personalSettingsService.updateContactSettings(id, personalFields as {
+        status?: "hot" | "working" | "follow_up" | null;
+        follow_up_at?: string | null;
+        follow_up_note?: string | null;
+      });
     }
 
-    return updated;
+    // Fetch and return the updated contact
+    return this.getById(id);
   },
 
   /**
@@ -239,27 +330,24 @@ export const contactService = {
   },
 
   /**
-   * Bulk update contacts
+   * Bulk update contacts (personal settings only)
    */
   async bulkUpdate(
     ids: string[],
     data: Partial<Pick<Contact, "status" | "follow_up_at" | "follow_up_note">>
   ): Promise<number> {
-    const supabase = createClient();
     let updated = 0;
-    const payload: Partial<Contact> = { ...data };
+    const payload = { ...data };
+    
+    // Clear follow-up when status is not follow_up
     if (payload.status !== undefined && payload.status !== "follow_up") {
       payload.follow_up_at = null;
       payload.follow_up_note = null;
     }
 
     for (const id of ids) {
-      const { error } = await supabase
-        .from("contacts")
-        .update(payload)
-        .eq("id", id);
-
-      if (!error) {
+      const result = await personalSettingsService.updateContactSettings(id, payload);
+      if (result) {
         updated++;
       }
     }
@@ -292,9 +380,6 @@ export const contactService = {
  * Call Log Operations
  */
 export const callLogService = {
-  /**
-   * Get call logs for a contact
-   */
   async getByContactId(contactId: string): Promise<CallLog[]> {
     const supabase = createClient();
     
@@ -312,9 +397,6 @@ export const callLogService = {
     return data || [];
   },
 
-  /**
-   * Log a new call
-   */
   async create(data: {
     contact_id: string;
     outcome: CallOutcome;
@@ -322,7 +404,6 @@ export const callLogService = {
   }): Promise<CallLog> {
     const supabase = createClient();
     
-    // Create the call log
     const { data: newLog, error } = await supabase
       .from("call_logs")
       .insert({
@@ -338,6 +419,7 @@ export const callLogService = {
       throw new Error(error.message);
     }
 
+    // Update last_call on contact (shared field)
     const contactUpdates: Partial<Contact> = {
       last_call: newLog.timestamp,
       ...(data.notes && { notes: data.notes }),
@@ -351,9 +433,6 @@ export const callLogService = {
     return newLog;
   },
 
-  /**
-   * Get all call logs (for dashboard stats)
-   */
   async getAll(): Promise<CallLog[]> {
     const supabase = createClient();
     
@@ -375,9 +454,6 @@ export const callLogService = {
  * List Operations
  */
 export const listService = {
-  /**
-   * Get all lists
-   */
   async getAll(): Promise<List[]> {
     const supabase = createClient();
     
@@ -394,9 +470,6 @@ export const listService = {
     return data || [];
   },
 
-  /**
-   * Get a single list by ID
-   */
   async getById(id: string): Promise<List | null> {
     const supabase = createClient();
     
@@ -414,9 +487,6 @@ export const listService = {
     return data;
   },
 
-  /**
-   * Create a new list
-   */
   async create(data: Omit<List, "id" | "created_at">): Promise<List> {
     const supabase = createClient();
     
@@ -434,9 +504,6 @@ export const listService = {
     return newList;
   },
 
-  /**
-   * Add contacts to a list
-   */
   async addContacts(listId: string, contactIds: string[]): Promise<number> {
     const supabase = createClient();
     let added = 0;
@@ -455,9 +522,6 @@ export const listService = {
     return added;
   },
 
-  /**
-   * Remove contacts from a list
-   */
   async removeContacts(listId: string, contactIds: string[]): Promise<number> {
     const supabase = createClient();
     
@@ -476,9 +540,6 @@ export const listService = {
     return data?.length || 0;
   },
 
-  /**
-   * Get contact count for a list
-   */
   async getContactCount(listId: string): Promise<number> {
     const supabase = createClient();
     
@@ -498,7 +559,38 @@ export const listService = {
 
 /**
  * TMA Candidate Operations
+ * Personal settings (status, follow_up) stored in user_tma_settings
  */
+
+// Fields that are personal for TMA
+const PERSONAL_TMA_FIELDS = ["status", "status_tags", "follow_up_at", "follow_up_note"];
+
+async function mergeTmaWithPersonalSettings(tma: TmaCandidate): Promise<TmaCandidate> {
+  const setting = await personalSettingsService.getTmaSetting(tma.id);
+  return {
+    ...tma,
+    status: setting?.status ?? null,
+    status_tags: setting?.status ? [setting.status] : [],
+    follow_up_at: setting?.follow_up_at ?? null,
+    follow_up_note: setting?.follow_up_note ?? null,
+  };
+}
+
+async function mergeTmasWithPersonalSettings(tmas: TmaCandidate[]): Promise<TmaCandidate[]> {
+  if (tmas.length === 0) return [];
+  
+  const tmaIds = tmas.map(t => t.id);
+  const settings = await personalSettingsService.getTmaSettings(tmaIds);
+  
+  return tmas.map(tma => ({
+    ...tma,
+    status: settings[tma.id]?.status ?? null,
+    status_tags: settings[tma.id]?.status ? [settings[tma.id].status!] : [],
+    follow_up_at: settings[tma.id]?.follow_up_at ?? null,
+    follow_up_note: settings[tma.id]?.follow_up_note ?? null,
+  }));
+}
+
 export const tmaService = {
   async getAll(filters?: TmaFilters): Promise<TmaCandidate[]> {
     const supabase = createClient();
@@ -510,9 +602,8 @@ export const tmaService = {
       `)
       .order("created_at", { ascending: false });
 
-    if (filters?.status) {
-      query = query.contains("status_tags", [filters.status]);
-    }
+    // Status filter will be applied after merging with personal settings
+
     if (filters?.canton) {
       query = query.eq("canton", filters.canton);
     }
@@ -528,7 +619,16 @@ export const tmaService = {
       console.error("Error fetching TMA candidates:", error);
       return [];
     }
-    return data ?? [];
+    
+    // Merge with personal settings
+    let tmas = await mergeTmasWithPersonalSettings(data ?? []);
+    
+    // Apply status filter after merging
+    if (filters?.status) {
+      tmas = tmas.filter(t => t.status === filters.status || t.status_tags?.includes(filters.status!));
+    }
+    
+    return tmas;
   },
 
   async getById(id: string): Promise<TmaCandidate | null> {
@@ -545,65 +645,93 @@ export const tmaService = {
       console.error("Error fetching TMA candidate:", error);
       return null;
     }
-    return data;
+    return mergeTmaWithPersonalSettings(data);
   },
 
   async create(data: TmaCreateInput): Promise<TmaCandidate> {
     const supabase = createClient();
-    const statusTags = data.status_tags ?? (data.status ? [data.status] : []);
-    const payload = {
-      ...data,
-      status_tags: statusTags,
-      status: statusTags[0] ?? data.status ?? null,
+    
+    // Separate personal fields
+    const personalFields = {
+      status: data.status_tags?.[0] ?? data.status ?? null,
+      follow_up_at: data.follow_up_at,
+      follow_up_note: data.follow_up_note,
     };
+    
+    // Remove personal fields from TMA data using destructuring
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status: _s, status_tags: _st, follow_up_at: _fa, follow_up_note: _fn, ...tmaData } = data;
+    
     const { data: created, error } = await supabase
       .from("tma_candidates")
-      .insert(payload)
-      .select()
+      .insert(tmaData)
+      .select(`
+        *,
+        claimer:profiles!claimed_by(id, full_name, avatar_url)
+      `)
       .single();
     if (error) {
       console.error("Error creating TMA candidate:", error);
       throw new Error(error.message);
     }
-    return created;
+    
+    // Save personal settings if any
+    if (personalFields.status || personalFields.follow_up_at) {
+      await personalSettingsService.updateTmaSettings(created.id, personalFields as {
+        status?: "A" | "B" | "C" | null;
+        follow_up_at?: string | null;
+        follow_up_note?: string | null;
+      });
+    }
+    
+    return mergeTmaWithPersonalSettings(created);
   },
 
   async update(id: string, data: Partial<TmaCandidate>): Promise<TmaCandidate | null> {
     const supabase = createClient();
-    const payload: Partial<TmaCandidate> = { ...data };
-    if (payload.status_tags) {
-      payload.status = payload.status_tags[0] ?? null;
-    } else if (payload.status !== undefined && payload.status_tags === undefined) {
-      payload.status_tags = payload.status ? [payload.status] as TmaStatus[] : [];
+    
+    // Separate personal fields from shared fields
+    const personalFields: Record<string, unknown> = {};
+    const sharedFields: Record<string, unknown> = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      if (PERSONAL_TMA_FIELDS.includes(key)) {
+        personalFields[key] = value;
+      } else {
+        sharedFields[key] = value;
+      }
     }
     
-    // First, perform the update
-    const { error: updateError } = await supabase
-      .from("tma_candidates")
-      .update(payload)
-      .eq("id", id);
-    
-    if (updateError) {
-      console.error("Error updating TMA candidate:", updateError);
-      return null;
+    // Handle status_tags -> status conversion for personal settings
+    if (personalFields.status_tags) {
+      const tags = personalFields.status_tags as string[];
+      personalFields.status = tags[0] ?? null;
+      delete personalFields.status_tags;
     }
     
-    // Then fetch the updated record with the claimer join
-    const { data: updated, error: fetchError } = await supabase
-      .from("tma_candidates")
-      .select(`
-        *,
-        claimer:profiles!claimed_by(id, full_name, avatar_url)
-      `)
-      .eq("id", id)
-      .single();
-    
-    if (fetchError) {
-      console.error("Error fetching updated TMA candidate:", fetchError);
-      return null;
+    // Update shared fields on tma_candidates table (if any)
+    if (Object.keys(sharedFields).length > 0) {
+      const { error: updateError } = await supabase
+        .from("tma_candidates")
+        .update(sharedFields)
+        .eq("id", id);
+      
+      if (updateError) {
+        console.error("Error updating TMA candidate:", updateError);
+        return null;
+      }
     }
     
-    return updated;
+    // Update personal fields (if any)
+    if (Object.keys(personalFields).length > 0) {
+      await personalSettingsService.updateTmaSettings(id, personalFields as {
+        status?: "A" | "B" | "C" | null;
+        follow_up_at?: string | null;
+        follow_up_note?: string | null;
+      });
+    }
+    
+    return this.getById(id);
   },
 
   async delete(id: string): Promise<boolean> {
@@ -617,14 +745,13 @@ export const tmaService = {
   },
 
   async bulkUpdate(ids: string[], status: TmaStatus): Promise<void> {
+    const payload = {
+      status: status || null,
+      ...(status !== "C" ? { follow_up_at: null, follow_up_note: null } : {}),
+    };
+    
     await Promise.all(
-      ids.map((id) =>
-        this.update(id, {
-          status,
-          status_tags: status ? [status] as TmaStatus[] : [],
-          ...(status !== "C" ? { follow_up_at: null, follow_up_note: null } : {}),
-        })
-      )
+      ids.map((id) => personalSettingsService.updateTmaSettings(id, payload))
     );
   },
 };
@@ -641,7 +768,6 @@ export const statsService = {
     const weekStart = new Date(todayStart);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
 
-    // Get all call logs
     const { data: allLogs } = await supabase
       .from("call_logs")
       .select("*")
@@ -649,7 +775,6 @@ export const statsService = {
 
     const logs = allLogs || [];
 
-    // Calculate stats
     const callsToday = logs.filter(
       (log) => new Date(log.timestamp) >= todayStart
     ).length;
@@ -658,16 +783,13 @@ export const statsService = {
       (log) => new Date(log.timestamp) >= weekStart
     ).length;
 
-    const nowIso = new Date().toISOString();
-
-    // Get follow-ups count (due now or overdue)
+    // Get current user's follow-ups count from personal settings
     const { count: followUpsDue } = await supabase
-      .from("contacts")
+      .from("user_contact_settings")
       .select("*", { count: "exact", head: true })
       .eq("status", "follow_up")
-      .or(`follow_up_at.is.null,follow_up_at.lte.${nowIso}`);
+      .not("follow_up_at", "is", null);
 
-    // Conversion rate
     const successfulOutcomes = logs.filter(
       (log) => log.outcome === "interested" || log.outcome === "meeting_set"
     ).length;
@@ -675,7 +797,6 @@ export const statsService = {
       ? Math.round((successfulOutcomes / logs.length) * 100)
       : 0;
 
-    // Get lists with counts
     const { data: lists } = await supabase
       .from("lists")
       .select("*");
@@ -684,7 +805,6 @@ export const statsService = {
       (lists || []).map(async (list) => {
         const contactCount = await listService.getContactCount(list.id);
         
-        // Get contact IDs in list
         const { data: members } = await supabase
           .from("list_members")
           .select("contact_id")
@@ -704,7 +824,6 @@ export const statsService = {
       })
     );
 
-    // Call trend data (last 14 days)
     const daysBack = 14;
     const callTrend = Array.from({ length: daysBack }).map((_, index) => {
       const day = new Date(todayStart);
@@ -716,22 +835,34 @@ export const statsService = {
       return { date: key, count };
     });
 
-    // Get follow-up contacts
-    const { data: followUps } = await supabase
-      .from("contacts")
-      .select("*")
+    // Get current user's follow-up contacts
+    const { data: followUpSettings } = await supabase
+      .from("user_contact_settings")
+      .select("contact_id")
       .eq("status", "follow_up")
-      .order("follow_up_at", { ascending: true, nullsFirst: true })
+      .order("follow_up_at", { ascending: true })
       .limit(5);
+    
+    const followUpContactIds = followUpSettings?.map(s => s.contact_id) || [];
+    let followUps: Contact[] = [];
+    
+    if (followUpContactIds.length > 0) {
+      const { data: contacts } = await supabase
+        .from("contacts")
+        .select("*")
+        .in("id", followUpContactIds);
+      
+      followUps = await mergeContactsWithPersonalSettings(contacts || []);
+    }
 
     return {
       callsToday,
       callsThisWeek,
-      followUpsDue: followUpsDue || 0,
+      followUpsDue: followUpsDue ?? 0,
       conversionRate,
       topLists: topLists.sort((a, b) => b.contactCount - a.contactCount),
       callTrend,
-      followUps: followUps || [],
+      followUps,
     };
   },
 };
