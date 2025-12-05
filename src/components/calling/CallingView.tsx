@@ -40,85 +40,43 @@ export function CallingView({ initialContacts }: CallingViewProps) {
 
   // Track call logs for contacts (contactId -> latest call log)
   const [callLogs, setCallLogs] = useState<Record<string, ContactCallLog>>({});
-  const [authToken, setAuthToken] = useState<string | null>(null);
   
   // Track if a call was initiated for the current contact (waiting for note)
   const [callInitiatedForContact, setCallInitiatedForContact] = useState<string | null>(null);
 
+  // Fetch call logs for all contacts in a SINGLE batched request
   useEffect(() => {
-    let isMounted = true;
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (isMounted) {
-        setAuthToken(session?.access_token ?? null);
-      }
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isMounted) {
-        setAuthToken(session?.access_token ?? null);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      authListener?.subscription.unsubscribe();
-    };
-  }, [supabase]);
-
-  // Fetch call logs for all contacts on mount and when contacts change
-  useEffect(() => {
-    if (!contacts.length || !authToken) return;
+    if (!contacts.length) return;
 
     async function fetchCallLogs() {
       try {
-        // Fetch latest call log for each contact in parallel (batch of 10)
-        const batchSize = 10;
-        const logs: Record<string, ContactCallLog> = {};
+        const contactIds = contacts.map(c => c.id);
         
-        for (let i = 0; i < contacts.length; i += batchSize) {
-          const batch = contacts.slice(i, i + batchSize);
-          const results = await Promise.all(
-            batch.map(async (contact) => {
-              try {
-                const res = await fetch(`/api/contacts/${contact.id}/call-logs`, {
-                  headers: {
-                    Authorization: `Bearer ${authToken}`,
-                  },
-                  credentials: "include",
-                  cache: "no-store",
-                });
-                if (res.ok) {
-                  const json = await res.json();
-                  return { contactId: contact.id, log: json.data };
-                }
-              } catch {
-                // Ignore errors for individual contacts
-              }
-              return { contactId: contact.id, log: null };
-            })
-          );
-          
-          results.forEach(({ contactId, log }) => {
-            if (log) {
-              logs[contactId] = log;
-            }
-          });
+        const res = await fetch("/api/contacts/call-logs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ contact_ids: contactIds }),
+          credentials: "include",
+          cache: "no-store",
+        });
+        
+        if (res.ok) {
+          const json = await res.json();
+          // json.data is already { contactId: callLog } format
+          setCallLogs(json.data || {});
         }
-        
-        setCallLogs(logs);
       } catch (err) {
         console.error("Error fetching call logs:", err);
       }
     }
     
     fetchCallLogs();
-  }, [contacts, authToken]);
+  }, [contacts]);
 
   // Real-time subscription for call logs
   useEffect(() => {
-    if (!authToken) return;
-
     // Subscribe to INSERT events on contact_call_logs
     const channel = supabase
       .channel("call-logs-realtime")
@@ -130,23 +88,26 @@ export function CallingView({ initialContacts }: CallingViewProps) {
           table: "contact_call_logs",
         },
         async (payload) => {
-          // When a new call log is inserted, fetch the full data with caller info
+          // When a new call log is inserted, fetch just that one contact's log
           const newLog = payload.new as { id: string; contact_id: string; user_id: string; called_at: string };
           
           try {
-            const res = await fetch(`/api/contacts/${newLog.contact_id}/call-logs`, {
+            const res = await fetch("/api/contacts/call-logs", {
+              method: "POST",
               headers: {
-                Authorization: `Bearer ${authToken}`,
+                "Content-Type": "application/json",
               },
+              body: JSON.stringify({ contact_ids: [newLog.contact_id] }),
               credentials: "include",
               cache: "no-store",
             });
+            
             if (res.ok) {
               const json = await res.json();
-              if (json.data) {
+              if (json.data?.[newLog.contact_id]) {
                 setCallLogs((prev) => ({
                   ...prev,
-                  [newLog.contact_id]: json.data,
+                  [newLog.contact_id]: json.data[newLog.contact_id],
                 }));
               }
             }
@@ -160,25 +121,22 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, authToken]);
+  }, [supabase]);
 
   // Reset call initiated state when switching contacts
   useEffect(() => {
     if (activeContact?.id !== callInitiatedForContact) {
       setCallInitiatedForContact(null);
     }
-  }, [activeContact?.id]);
+  }, [activeContact?.id, callInitiatedForContact]);
 
-  // Log a call to the API
+  // Log a call to the API (still uses individual endpoint for POST)
   const logCallToApi = useCallback(async (contactId: string) => {
-    if (!authToken) return;
-
     try {
       const res = await fetch(`/api/contacts/${contactId}/call-logs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
         },
         credentials: "include",
         cache: "no-store",
@@ -196,7 +154,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     } catch (err) {
       console.error("Error logging call:", err);
     }
-  }, [authToken]);
+  }, []);
 
   const actionMessage = useMemo(() => {
     if (actionState.type && actionState.message) {
