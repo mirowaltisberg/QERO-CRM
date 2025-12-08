@@ -324,22 +324,16 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
 
   const setStatusTags = useCallback(
     async (statusTags: TmaStatus[]) => {
-      console.log("[TMA] setStatusTags called with:", statusTags, "activeCandidate:", activeCandidate?.id);
-      if (!activeCandidate) {
-        console.error("[TMA] No active candidate in setStatusTags!");
-        return;
-      }
+      if (!activeCandidate) return;
       const normalizedTags = sortStatusTags(statusTags);
       if (
         JSON.stringify(normalizedTags) ===
         JSON.stringify(getCandidateStatusTags(activeCandidate))
       ) {
-        console.log("[TMA] No change needed, tags are the same");
         return;
       }
       setActionState({ type: "saving", message: "Updating quality tags..." });
       try {
-        console.log("[TMA] Making PATCH request to update status_tags:", normalizedTags);
         const response = await fetch(`/api/tma/${activeCandidate.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -349,11 +343,9 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
           }),
         });
         const json = await response.json();
-        console.log("[TMA] Response:", response.ok, json);
         if (!response.ok) throw new Error(json.error || "Failed to update status");
         updateCandidateLocally(json.data);
       } catch (err) {
-        console.error("[TMA] Error updating status:", err);
         setError(err instanceof Error ? err.message : "Failed to update status");
       } finally {
         setActionState({ type: null });
@@ -364,17 +356,12 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
 
   const toggleStatusTag = useCallback(
     async (status: TmaStatus) => {
-      console.log("[TMA] toggleStatusTag called with:", status, "activeCandidate:", activeCandidate?.id);
-      if (!activeCandidate) {
-        console.error("[TMA] No active candidate when trying to toggle status!");
-        return;
-      }
+      if (!activeCandidate) return;
       const currentTags = getCandidateStatusTags(activeCandidate);
       const hasTag = currentTags.includes(status);
       const nextTags = hasTag
         ? currentTags.filter((tag) => tag !== status)
         : sortStatusTags([...currentTags, status]);
-      console.log("[TMA] Current tags:", currentTags, "Next tags:", nextTags);
       await setStatusTags(nextTags);
     },
     [activeCandidate, setStatusTags]
