@@ -65,7 +65,17 @@ export const VacancyDetail = memo(function VacancyDetail({
               <h1 className="text-xl font-semibold text-gray-900">{vacancy.title}</h1>
               <UrgencyBadge urgency={vacancy.urgency} size="md" />
             </div>
-            <p className="text-sm text-gray-500">{vacancy.contact?.company_name}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-sm text-gray-500">{vacancy.contact?.company_name}</p>
+              {vacancy.contact?.team && (
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded text-white"
+                  style={{ backgroundColor: vacancy.contact.team.color || "#9CA3AF" }}
+                >
+                  {vacancy.contact.team.name}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">

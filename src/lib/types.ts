@@ -49,6 +49,12 @@ export interface Contact {
   created_at: string; // ISO timestamp
   // Computed distance (only present in radius search results)
   distance_km?: number;
+  // Joined team info
+  team?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
 }
 
 export interface ContactPerson {
@@ -114,6 +120,12 @@ export interface TmaRole {
   color: string;
   note: string | null;
   created_at: string;
+  // Joined team info (for cross-team views)
+  team?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
 }
 
 /**

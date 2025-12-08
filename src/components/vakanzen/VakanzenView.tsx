@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import type { Vacancy, VacancyCandidate, TmaCandidate } from "@/lib/types";
+import type { Vacancy, VacancyCandidate, TmaCandidate, TmaRole, Team } from "@/lib/types";
 import type { VacancyStatus } from "@/lib/utils/constants";
 import { VacancyList } from "./VacancyList";
 import { VacancyDetail } from "./VacancyDetail";
@@ -20,11 +20,18 @@ interface ContactForVacancy {
   postal_code: string | null;
   latitude: number | null;
   longitude: number | null;
+  team_id: string | null;
+  team?: { id: string; name: string; color: string } | null;
 }
+
+// Sort options
+export type VacancySortBy = "date" | "urgency" | "status" | "candidates";
 
 interface Props {
   initialVacancies: Vacancy[];
   contacts: ContactForVacancy[];
+  roles: TmaRole[];
+  teams: Team[];
 }
 
 interface CandidateData {
@@ -32,16 +39,23 @@ interface CandidateData {
   suggested: (TmaCandidate & { distance_km: number; match_score: number })[];
 }
 
-export function VakanzenView({ initialVacancies, contacts }: Props) {
+export function VakanzenView({ initialVacancies, contacts, roles, teams }: Props) {
   // State
   const [vacancies, setVacancies] = useState<Vacancy[]>(initialVacancies);
   const [activeVacancy, setActiveVacancy] = useState<Vacancy | null>(null);
   const [candidates, setCandidates] = useState<CandidateData | null>(null);
   const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [allRoles, setAllRoles] = useState<TmaRole[]>(roles);
   
   // Filters
   const [statusFilter, setStatusFilter] = useState<VacancyStatus | null>(null);
+  const [roleFilter, setRoleFilter] = useState<string | null>(null);
+  const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Sort
+  const [sortBy, setSortBy] = useState<VacancySortBy>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   
   // Modals
   const [formOpen, setFormOpen] = useState(false);
@@ -59,14 +73,26 @@ export function VakanzenView({ initialVacancies, contacts }: Props) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Filter vacancies
+  // Filter and sort vacancies
   const filteredVacancies = useMemo(() => {
     let filtered = vacancies;
 
+    // Status filter
     if (statusFilter) {
       filtered = filtered.filter(v => v.status === statusFilter);
     }
 
+    // Role filter
+    if (roleFilter) {
+      filtered = filtered.filter(v => v.role?.toLowerCase() === roleFilter.toLowerCase());
+    }
+
+    // Team filter (via contact's team_id)
+    if (teamFilter) {
+      filtered = filtered.filter(v => v.contact?.team_id === teamFilter);
+    }
+
+    // Search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(v =>
@@ -77,8 +103,27 @@ export function VakanzenView({ initialVacancies, contacts }: Props) {
       );
     }
 
+    // Sorting
+    const sortMultiplier = sortDir === "asc" ? 1 : -1;
+    filtered = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case "date":
+          return sortMultiplier * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        case "urgency":
+          return sortMultiplier * ((a.urgency || 1) - (b.urgency || 1));
+        case "status": {
+          const statusOrder = { open: 0, interviewing: 1, filled: 2 };
+          return sortMultiplier * (statusOrder[a.status] - statusOrder[b.status]);
+        }
+        case "candidates":
+          return sortMultiplier * ((a.candidate_count || 0) - (b.candidate_count || 0));
+        default:
+          return 0;
+      }
+    });
+
     return filtered;
-  }, [vacancies, statusFilter, searchQuery]);
+  }, [vacancies, statusFilter, roleFilter, teamFilter, searchQuery, sortBy, sortDir]);
 
   // Load candidates when vacancy is selected
   const loadCandidates = useCallback(async (vacancyId: string) => {
@@ -95,6 +140,32 @@ export function VakanzenView({ initialVacancies, contacts }: Props) {
       setCandidatesLoading(false);
     }
   }, []);
+
+  // Refresh roles
+  const refreshRoles = useCallback(async () => {
+    try {
+      const res = await fetch("/api/tma/roles/all");
+      if (res.ok) {
+        const data = await res.json();
+        setAllRoles(data.data || []);
+      }
+    } catch (error) {
+      console.error("Error refreshing roles:", error);
+    }
+  }, []);
+
+  // Create role
+  const createRole = useCallback(async (payload: { name: string; color: string; note?: string | null }): Promise<TmaRole> => {
+    const res = await fetch("/api/tma/roles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Failed to create role");
+    const data = await res.json();
+    await refreshRoles();
+    return data.data;
+  }, [refreshRoles]);
 
   // Select vacancy
   const selectVacancy = useCallback((id: string) => {
@@ -264,6 +335,10 @@ export function VakanzenView({ initialVacancies, contacts }: Props) {
         onSubmit={editingVacancy ? handleUpdate : handleCreate}
         contacts={contacts}
         vacancy={editingVacancy}
+        roles={allRoles}
+        teams={teams}
+        onCreateRole={createRole}
+        onRefreshRoles={refreshRoles}
       />
 
       {/* Desktop Layout */}
@@ -277,8 +352,18 @@ export function VakanzenView({ initialVacancies, contacts }: Props) {
             onCreateNew={() => setFormOpen(true)}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
+            roleFilter={roleFilter}
+            onRoleFilterChange={setRoleFilter}
+            teamFilter={teamFilter}
+            onTeamFilterChange={setTeamFilter}
+            sortBy={sortBy}
+            onSortByChange={setSortBy}
+            sortDir={sortDir}
+            onSortDirChange={setSortDir}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            roles={allRoles}
+            teams={teams}
           />
 
           {/* Detail */}
@@ -326,8 +411,18 @@ export function VakanzenView({ initialVacancies, contacts }: Props) {
               onCreateNew={() => setFormOpen(true)}
               statusFilter={statusFilter}
               onStatusFilterChange={setStatusFilter}
+              roleFilter={roleFilter}
+              onRoleFilterChange={setRoleFilter}
+              teamFilter={teamFilter}
+              onTeamFilterChange={setTeamFilter}
+              sortBy={sortBy}
+              onSortByChange={setSortBy}
+              sortDir={sortDir}
+              onSortDirChange={setSortDir}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
+              roles={allRoles}
+              teams={teams}
               isMobile
             />
           </div>

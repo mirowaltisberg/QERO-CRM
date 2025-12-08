@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import type { Vacancy, VacancyUrgency } from "@/lib/types";
+import type { Vacancy, VacancyUrgency, TmaRole, Team } from "@/lib/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { TMA_STATUS_LIST } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
 import { UrgencySelector } from "./UrgencyBadge";
+import { VacancyRoleDropdown } from "./VacancyRoleDropdown";
 
 // Simplified contact type for vacancy form
 interface ContactForVacancy {
@@ -20,6 +21,8 @@ interface ContactForVacancy {
   postal_code: string | null;
   latitude: number | null;
   longitude: number | null;
+  team_id: string | null;
+  team?: { id: string; name: string; color: string } | null;
 }
 
 interface Props {
@@ -28,9 +31,13 @@ interface Props {
   onSubmit: (data: Partial<Vacancy>) => void;
   contacts: ContactForVacancy[];
   vacancy?: Vacancy | null;
+  roles: TmaRole[];
+  teams: Team[];
+  onCreateRole: (payload: { name: string; color: string; note?: string | null }) => Promise<TmaRole>;
+  onRefreshRoles: () => Promise<void>;
 }
 
-export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy }: Props) {
+export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, roles, teams, onCreateRole, onRefreshRoles }: Props) {
   const isEditing = !!vacancy;
   
   // Form state
@@ -214,12 +221,14 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy }: Pr
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
             Rolle (für TMA-Matching)
           </label>
-          <input
-            type="text"
-            placeholder="z.B. Elektroinstallateur"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-gray-300 focus:outline-none focus:ring-0"
+          <VacancyRoleDropdown
+            value={role || null}
+            roles={roles}
+            teams={teams}
+            onChange={(roleName) => setRole(roleName || "")}
+            onCreateRole={onCreateRole}
+            onRefreshRoles={onRefreshRoles}
+            placeholder="Rolle auswählen..."
           />
           <p className="mt-1 text-xs text-gray-400">
             Wird verwendet um passende TMA-Kandidaten vorzuschlagen

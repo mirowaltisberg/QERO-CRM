@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from("vacancies")
       .select(`
         *,
-        contact:contacts(id, company_name, phone, email, city, street, postal_code, canton),
+        contact:contacts(id, company_name, phone, email, city, street, postal_code, canton, team_id, team:teams(id, name, color)),
         creator:profiles!vacancies_created_by_fkey(id, full_name, avatar_url)
       `)
       .eq("id", id)
@@ -98,7 +98,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .eq("id", id)
       .select(`
         *,
-        contact:contacts(id, company_name, phone, email, city, canton),
+        contact:contacts(id, company_name, phone, email, city, canton, team_id, team:teams(id, name, color)),
         creator:profiles!vacancies_created_by_fkey(id, full_name, avatar_url)
       `)
       .single();

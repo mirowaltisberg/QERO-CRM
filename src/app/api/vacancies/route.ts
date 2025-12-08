@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       .from("vacancies")
       .select(`
         *,
-        contact:contacts(id, company_name, phone, email, city, canton),
+        contact:contacts(id, company_name, phone, email, city, canton, team_id, team:teams(id, name, color)),
         creator:profiles!vacancies_created_by_fkey(id, full_name, avatar_url)
       `)
       .order("created_at", { ascending: false });
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        contact:contacts(id, company_name, phone, email, city, canton),
+        contact:contacts(id, company_name, phone, email, city, canton, team_id, team:teams(id, name, color)),
         creator:profiles!vacancies_created_by_fkey(id, full_name, avatar_url)
       `)
       .single();
