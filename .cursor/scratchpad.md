@@ -94,15 +94,31 @@ user_tma_settings (
 - [x] Task 18: Login CORS fix
 - [x] **Task 19: Personal follow-ups & status** ✅ COMPLETE
 - [x] **Task 20: Fix call-log 400s & realtime flapping** ✅ COMPLETE
+- [x] **Task 21: Diagnose and fix non-working status/follow-up buttons** ✅ COMPLETE
 
 # Current Status / Progress Tracking
 - **Task 20 COMPLETE** ✅
+- **Task 21 COMPLETE** ✅
 - Call-log 400 errors fixed: client-side batching prevents requests >500 IDs
-- Deployed to production (commit: 23673c7)
-- Ready for manual testing to verify:
-  - No more 400 errors on call-log fetches
-  - Realtime channels remain stable (no SUBSCRIBED → CLOSED flapping)
-  - Follow-ups and status are personal per user
+- Status/follow-up button fix deployed (commit: a38da18)
+  - Added detailed error logging to diagnose upsert failures
+  - Removed auto-clear logic that interfered with independent status/follow-up
+  - Created migration application guide in `supabase/migrations/APPLY_MIGRATIONS.md`
+
+**⚠️ CRITICAL NEXT STEP: Apply Migration 021 to Production**
+
+The buttons will work ONLY after migration `021_personal_followups.sql` is applied to production Supabase.
+
+Follow instructions in `supabase/migrations/APPLY_MIGRATIONS.md` to:
+1. Verify migration status (check if tables exist)
+2. Apply migration via Supabase Dashboard SQL Editor
+3. Test buttons - they should work immediately after migration
+
+Once migration is applied:
+- Browser console will show detailed logs: `[Personal Settings] Updating contact settings`
+- Status buttons ("Working", "Hot") will update immediately
+- Follow-up scheduling will persist per-user
+- Different users see different statuses for same contact
 
 # Executor's Feedback or Assistance Requests
 - None - awaiting user testing
