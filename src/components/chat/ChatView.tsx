@@ -245,7 +245,10 @@ export function ChatView() {
   // ==================== MOBILE ====================
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 bg-gray-50">
+      <div 
+        className="fixed inset-0 z-40 bg-gray-50"
+        style={{ bottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}
+      >
         {/* Room List */}
         <div
           className={`absolute inset-0 bg-gray-50 transition-transform duration-300 ease-out ${
