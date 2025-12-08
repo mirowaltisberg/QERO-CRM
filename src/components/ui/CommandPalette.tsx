@@ -3,10 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
+import { looksLikeSwissLocation } from "@/lib/geo/client";
 
 interface TeamInfo {
   name: string;
   color: string;
+}
+
+interface LocationInfo {
+  name: string;
+  plz: string;
+  lat: number;
+  lng: number;
 }
 
 interface SearchResultContact {
@@ -18,6 +26,7 @@ interface SearchResultContact {
   canton: string | null;
   team_id: string | null;
   team: TeamInfo | null;
+  distance_km?: number;
 }
 
 interface SearchResultTma {
@@ -31,6 +40,7 @@ interface SearchResultTma {
   canton: string | null;
   team_id: string | null;
   team: TeamInfo | null;
+  distance_km?: number;
 }
 
 type SearchResult = SearchResultContact | SearchResultTma;
@@ -48,6 +58,9 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [tma, setTma] = useState<SearchResultTma[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isLocationMode, setIsLocationMode] = useState(false);
+  const [radius, setRadius] = useState(25);
+  const [location, setLocation] = useState<LocationInfo | null>(null);
 
   // Combined results for keyboard navigation
   const allResults: SearchResult[] = [
@@ -62,15 +75,28 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       setContacts([]);
       setTma([]);
       setSelectedIndex(0);
+      setIsLocationMode(false);
+      setLocation(null);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
 
-  // Search on query change
+  // Detect if query looks like a location
+  useEffect(() => {
+    if (query.length >= 2) {
+      const looksLikeLocation = looksLikeSwissLocation(query);
+      setIsLocationMode(looksLikeLocation);
+    } else {
+      setIsLocationMode(false);
+    }
+  }, [query]);
+
+  // Search on query change or radius change
   useEffect(() => {
     if (!query || query.length < 2) {
       setContacts([]);
       setTma([]);
+      setLocation(null);
       return;
     }
 
@@ -78,13 +104,19 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     const timeoutId = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
-          signal: controller.signal,
-        });
+        let url: string;
+        if (isLocationMode) {
+          url = `/api/search?location=${encodeURIComponent(query)}&radius=${radius}`;
+        } else {
+          url = `/api/search?q=${encodeURIComponent(query)}`;
+        }
+
+        const res = await fetch(url, { signal: controller.signal });
         if (res.ok) {
           const json = await res.json();
           setContacts(json.data?.contacts || []);
           setTma(json.data?.tma || []);
+          setLocation(json.data?.location || null);
           setSelectedIndex(0);
         }
       } catch (err) {
@@ -100,16 +132,14 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [query]);
+  }, [query, isLocationMode, radius]);
 
   // Handle result selection
   const handleSelect = useCallback(
     (result: SearchResult) => {
       if (result.type === "contact") {
-        // Navigate to calling page with contact selected
         router.push(`/calling?select=${result.id}`);
       } else {
-        // Navigate to TMA page with candidate selected
         router.push(`/tma?select=${result.id}`);
       }
       onClose();
@@ -159,14 +189,18 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl overflow-hidden">
         {/* Search input */}
         <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-3">
-          <SearchIcon className="h-5 w-5 text-gray-400" />
+          {isLocationMode ? (
+            <LocationIcon className="h-5 w-5 text-blue-500" />
+          ) : (
+            <SearchIcon className="h-5 w-5 text-gray-400" />
+          )}
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Suche nach Firma oder TMA..."
+            placeholder="Suche nach Firma, TMA oder Ort (z.B. Zürich, 8001)..."
             className="flex-1 bg-transparent text-gray-900 placeholder-gray-400 outline-none text-base"
           />
           {loading && (
@@ -177,15 +211,49 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           </kbd>
         </div>
 
+        {/* Location mode indicator + radius slider */}
+        {isLocationMode && query.length >= 2 && (
+          <div className="flex items-center gap-4 border-b border-gray-200 bg-blue-50 px-4 py-2">
+            <span className="text-xs font-medium text-blue-700">
+              📍 Standortsuche
+              {location && `: ${location.name} (${location.plz})`}
+            </span>
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-xs text-blue-600">{radius} km</span>
+              <input
+                type="range"
+                min="5"
+                max="100"
+                step="5"
+                value={radius}
+                onChange={(e) => setRadius(parseInt(e.target.value))}
+                className="w-24 h-1 accent-blue-500"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Results */}
         <div className="max-h-[60vh] overflow-y-auto">
           {query.length < 2 ? (
             <div className="px-4 py-8 text-center text-sm text-gray-500">
-              Mindestens 2 Zeichen eingeben...
+              <p>Mindestens 2 Zeichen eingeben...</p>
+              <p className="mt-2 text-xs text-gray-400">
+                Tippe einen Ort (z.B. &quot;Zürich&quot; oder &quot;8001&quot;) für Standortsuche
+              </p>
             </div>
           ) : allResults.length === 0 && !loading ? (
             <div className="px-4 py-8 text-center text-sm text-gray-500">
-              Keine Ergebnisse für &quot;{query}&quot;
+              {isLocationMode ? (
+                <>
+                  <p>Keine Ergebnisse im Umkreis von {radius} km</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Versuche einen grösseren Radius
+                  </p>
+                </>
+              ) : (
+                <p>Keine Ergebnisse für &quot;{query}&quot;</p>
+              )}
             </div>
           ) : (
             <>
@@ -193,7 +261,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               {contacts.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
-                    Firmen
+                    {isLocationMode ? "Firmen in der Nähe" : "Firmen"}
                   </div>
                   {contacts.map((contact, idx) => {
                     const globalIndex = idx;
@@ -213,17 +281,22 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                               <span className="font-medium text-gray-900 truncate">
                                 {contact.company_name}
                               </span>
-                              {contact.team && (
-                                <TeamTag team={contact.team} />
-                              )}
+                              {contact.team && <TeamTag team={contact.team} />}
                             </div>
                             <div className="text-sm text-gray-500 truncate">
                               {contact.contact_name || contact.email || "—"}
                             </div>
                           </div>
-                          {contact.canton && (
-                            <span className="text-xs text-gray-400">{contact.canton}</span>
-                          )}
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            {contact.distance_km !== undefined && (
+                              <span className="font-medium text-blue-600">
+                                {contact.distance_km} km
+                              </span>
+                            )}
+                            {contact.canton && !contact.distance_km && (
+                              <span>{contact.canton}</span>
+                            )}
+                          </div>
                         </div>
                       </ResultItem>
                     );
@@ -235,7 +308,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               {tma.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
-                    TMA Kandidaten
+                    {isLocationMode ? "TMA Kandidaten in der Nähe" : "TMA Kandidaten"}
                   </div>
                   {tma.map((candidate, idx) => {
                     const globalIndex = contacts.length + idx;
@@ -255,17 +328,22 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                               <span className="font-medium text-gray-900 truncate">
                                 {candidate.first_name} {candidate.last_name}
                               </span>
-                              {candidate.team && (
-                                <TeamTag team={candidate.team} />
-                              )}
+                              {candidate.team && <TeamTag team={candidate.team} />}
                             </div>
                             <div className="text-sm text-gray-500 truncate">
                               {candidate.position_title || candidate.email || "—"}
                             </div>
                           </div>
-                          {candidate.canton && (
-                            <span className="text-xs text-gray-400">{candidate.canton}</span>
-                          )}
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            {candidate.distance_km !== undefined && (
+                              <span className="font-medium text-blue-600">
+                                {candidate.distance_km} km
+                              </span>
+                            )}
+                            {candidate.canton && !candidate.distance_km && (
+                              <span>{candidate.canton}</span>
+                            )}
+                          </div>
                         </div>
                       </ResultItem>
                     );
@@ -342,6 +420,15 @@ function SearchIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+    </svg>
+  );
+}
+
+function LocationIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
     </svg>
   );
 }

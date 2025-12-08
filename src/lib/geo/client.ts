@@ -8,6 +8,43 @@ import {
 let dataset: PlzEntry[] | null = null;
 let datasetPromise: Promise<PlzEntry[]> | null = null;
 
+// Common Swiss city names for quick detection
+const COMMON_SWISS_CITIES = new Set([
+  "zurich", "zürich", "zuerich", "geneva", "genève", "genf", "basel", "bern",
+  "lausanne", "winterthur", "luzern", "lucerne", "st. gallen", "st gallen",
+  "lugano", "biel", "thun", "köniz", "fribourg", "freiburg", "chur", "schaffhausen",
+  "vernier", "uster", "sion", "neuchâtel", "neuchatel", "emmen", "yverdon",
+  "zug", "kriens", "rapperswil", "dübendorf", "montreux", "frauenfeld", "dietikon",
+  "wettingen", "baden", "aarau", "olten", "solothurn", "bellinzona", "locarno"
+]);
+
+/**
+ * Check if a query looks like a Swiss location (PLZ or city name)
+ */
+export function looksLikeSwissLocation(query: string): boolean {
+  const trimmed = query.trim().toLowerCase();
+  if (trimmed.length < 2) return false;
+
+  // Check if it starts with digits (PLZ)
+  if (/^\d{2,4}/.test(trimmed)) {
+    return true;
+  }
+
+  // Check if it matches a common city name
+  if (COMMON_SWISS_CITIES.has(trimmed)) {
+    return true;
+  }
+
+  // Check if it starts with a common city prefix
+  for (const city of COMMON_SWISS_CITIES) {
+    if (city.startsWith(trimmed) && trimmed.length >= 3) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 async function loadDataset(): Promise<PlzEntry[]> {
   if (dataset) return dataset;
   if (!datasetPromise) {

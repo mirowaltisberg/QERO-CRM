@@ -35,6 +35,11 @@ export interface Contact {
   phone: string | null;
   email: string | null;
   canton: string | null;
+  city: string | null;
+  street: string | null;
+  postal_code: string | null;
+  latitude: number | null;
+  longitude: number | null;
   status: ContactStatus | null;
   follow_up_at: string | null;
   follow_up_note: string | null;
@@ -42,6 +47,8 @@ export interface Contact {
   notes: string | null;
   team_id: string | null; // Which industry vertical this contact belongs to
   created_at: string; // ISO timestamp
+  // Computed distance (only present in radius search results)
+  distance_km?: number;
 }
 
 export interface ContactPerson {
