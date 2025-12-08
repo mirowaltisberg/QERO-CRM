@@ -105,20 +105,21 @@ user_tma_settings (
   - Removed auto-clear logic that interfered with independent status/follow-up
   - Created migration application guide in `supabase/migrations/APPLY_MIGRATIONS.md`
 
-**⚠️ CRITICAL NEXT STEP: Apply Migration 021 to Production**
+**✅ Migration 022 Successfully Applied to Production**
 
-The buttons will work ONLY after migration `021_personal_followups.sql` is applied to production Supabase.
+Migration `022_personal_followups_fix.sql` has been applied to production Supabase via `supabase db push`.
+- Tables `user_contact_settings` and `user_tma_settings` exist ✅
+- All indexes created ✅
+- RLS policies recreated (ensured correct) ✅
 
-Follow instructions in `supabase/migrations/APPLY_MIGRATIONS.md` to:
-1. Verify migration status (check if tables exist)
-2. Apply migration via Supabase Dashboard SQL Editor
-3. Test buttons - they should work immediately after migration
-
-Once migration is applied:
-- Browser console will show detailed logs: `[Personal Settings] Updating contact settings`
-- Status buttons ("Working", "Hot") will update immediately
-- Follow-up scheduling will persist per-user
-- Different users see different statuses for same contact
+**Ready for Testing:**
+1. Refresh the app in browser
+2. Open browser console (F12)
+3. Click a status button ("Working" or "Hot")
+4. Should see: `[Personal Settings] Updating contact settings: {...}`
+5. Should see: `[Personal Settings] Successfully updated: {...}`
+6. Status should persist after page refresh
+7. Different users should see different statuses for the same contact
 
 # Executor's Feedback or Assistance Requests
 - None - awaiting user testing
