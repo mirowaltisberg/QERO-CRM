@@ -23,7 +23,12 @@ export const serverContactService = {
     const supabase = await createClient();
     
     // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    console.log("[Server Data] User auth check:", { 
+      hasUser: !!user, 
+      userId: user?.id,
+      authError: authError?.message 
+    });
     
     // First get the total count
     let countQuery = supabase
