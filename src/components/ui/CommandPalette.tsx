@@ -65,7 +65,16 @@ interface SearchResultChat {
   created_at: string;
 }
 
-type SearchResult = SearchResultContact | SearchResultTma | SearchResultEmail | SearchResultChat;
+interface SearchResultChatRoom {
+  id: string;
+  type: "chat_room";
+  room_id: string;
+  room_type: "dm";
+  user_name: string;
+  user_avatar: string | null;
+}
+
+type SearchResult = SearchResultContact | SearchResultTma | SearchResultEmail | SearchResultChat | SearchResultChatRoom;
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -82,6 +91,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [tma, setTma] = useState<SearchResultTma[]>([]);
   const [emails, setEmails] = useState<SearchResultEmail[]>([]);
   const [chat, setChat] = useState<SearchResultChat[]>([]);
+  const [chatRooms, setChatRooms] = useState<SearchResultChatRoom[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isLocationMode, setIsLocationMode] = useState(false);
@@ -93,13 +103,15 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const filteredContacts = filter === "all" || filter === "contacts" ? contacts : [];
   const filteredTma = filter === "all" || filter === "tma" ? tma : [];
   const filteredEmails = filter === "all" || filter === "emails" ? emails : [];
+  const filteredChatRooms = filter === "all" || filter === "chat" ? chatRooms : [];
   const filteredChat = filter === "all" || filter === "chat" ? chat : [];
 
-  // Combined results for keyboard navigation
+  // Combined results for keyboard navigation (chat rooms come before chat messages)
   const allResults: SearchResult[] = [
     ...filteredContacts.map((c) => ({ ...c, type: "contact" as const })),
     ...filteredTma.map((t) => ({ ...t, type: "tma" as const })),
     ...filteredEmails.map((e) => ({ ...e, type: "email" as const })),
+    ...filteredChatRooms.map((r) => ({ ...r, type: "chat_room" as const })),
     ...filteredChat.map((c) => ({ ...c, type: "chat" as const })),
   ];
 
@@ -108,7 +120,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     contacts: contacts.length,
     tma: tma.length,
     emails: emails.length,
-    chat: chat.length,
+    chat: chatRooms.length + chat.length,
   };
   const totalCount = counts.contacts + counts.tma + counts.emails + counts.chat;
 
@@ -120,6 +132,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       setTma([]);
       setEmails([]);
       setChat([]);
+      setChatRooms([]);
       setSelectedIndex(0);
       setIsLocationMode(false);
       setLocation(null);
@@ -145,6 +158,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       setTma([]);
       setEmails([]);
       setChat([]);
+      setChatRooms([]);
       setLocation(null);
       return;
     }
@@ -167,6 +181,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           setTma(json.data?.tma || []);
           setEmails(json.data?.emails || []);
           setChat(json.data?.chat || []);
+          setChatRooms(json.data?.chat_rooms || []);
           setLocation(json.data?.location || null);
           setSelectedIndex(0);
         }
@@ -195,6 +210,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       } else if (result.type === "email") {
         router.push(`/email?thread=${result.thread_id}`);
       } else if (result.type === "chat") {
+        router.push(`/chat?room=${result.room_id}`);
+      } else if (result.type === "chat_room") {
         router.push(`/chat?room=${result.room_id}`);
       }
       onClose();
@@ -240,7 +257,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const contactStartIndex = 0;
   const tmaStartIndex = filteredContacts.length;
   const emailStartIndex = tmaStartIndex + filteredTma.length;
-  const chatStartIndex = emailStartIndex + filteredEmails.length;
+  const chatRoomStartIndex = emailStartIndex + filteredEmails.length;
+  const chatStartIndex = chatRoomStartIndex + filteredChatRooms.length;
 
   return (
     <div
@@ -501,11 +519,53 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 </div>
               )}
 
-              {/* Chat section */}
+              {/* Chat Rooms section (DMs matching user name) */}
+              {filteredChatRooms.length > 0 && (
+                <div>
+                  <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
+                    Chats
+                  </div>
+                  {filteredChatRooms.map((room, idx) => {
+                    const globalIndex = chatRoomStartIndex + idx;
+                    return (
+                      <ResultItem
+                        key={room.id}
+                        isSelected={selectedIndex === globalIndex}
+                        onClick={() => handleSelect(room)}
+                        onMouseEnter={() => setSelectedIndex(globalIndex)}
+                      >
+                        <div className="flex items-center gap-3">
+                          {room.user_avatar ? (
+                            <img
+                              src={room.user_avatar}
+                              alt={room.user_name}
+                              className="h-9 w-9 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-orange-600 font-medium text-sm">
+                              {room.user_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-900">
+                              {room.user_name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              Direktnachricht
+                            </div>
+                          </div>
+                        </div>
+                      </ResultItem>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Chat Messages section */}
               {filteredChat.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
-                    Chat
+                    Chat Nachrichten
                   </div>
                   {filteredChat.map((message, idx) => {
                     const globalIndex = chatStartIndex + idx;

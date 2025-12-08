@@ -52,7 +52,16 @@ export interface SearchResultChat {
   created_at: string;
 }
 
-export type SearchResult = SearchResultContact | SearchResultTma | SearchResultEmail | SearchResultChat;
+export interface SearchResultChatRoom {
+  id: string;
+  type: "chat_room";
+  room_id: string;
+  room_type: "dm";
+  user_name: string;
+  user_avatar: string | null;
+}
+
+export type SearchResult = SearchResultContact | SearchResultTma | SearchResultEmail | SearchResultChat | SearchResultChatRoom;
 
 interface LocationInfo {
   name: string;
@@ -103,6 +112,9 @@ async function handleTextSearch(
   const searchPattern = `%${query}%`;
   const adminSupabase = createAdminClient();
 
+  // Split query into words for multi-word name matching
+  const words = query.split(/\s+/).filter(w => w.length >= 2);
+
   // Search contacts across ALL teams
   const { data: contacts, error: contactsError } = await supabase
     .from("contacts")
@@ -122,23 +134,57 @@ async function handleTextSearch(
   }
 
   // Search TMA candidates across ALL teams
-  const { data: tma, error: tmaError } = await supabase
-    .from("tma_candidates")
-    .select(`
-      id,
-      first_name,
-      last_name,
-      email,
-      phone,
-      position_title,
-      canton,
-      team_id
-    `)
-    .or(`first_name.ilike.${searchPattern},last_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern}`)
-    .limit(MAX_RESULTS_PER_TYPE);
+  // For multi-word queries like "Luka Djuric", we need to match each word
+  let tma: Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string | null;
+    phone: string | null;
+    position_title: string | null;
+    canton: string | null;
+    team_id: string | null;
+  }> = [];
 
-  if (tmaError) {
-    console.error("[Search] TMA error:", tmaError);
+  if (words.length > 1) {
+    // Multi-word search: fetch all and filter in JS
+    const { data: allTma } = await supabase
+      .from("tma_candidates")
+      .select(`id, first_name, last_name, email, phone, position_title, canton, team_id`)
+      .limit(500);
+    
+    tma = (allTma || []).filter(t => {
+      const fullName = `${t.first_name} ${t.last_name}`.toLowerCase();
+      const email = (t.email || "").toLowerCase();
+      const phone = (t.phone || "").toLowerCase();
+      const queryLower = query.toLowerCase();
+      
+      // Check if full name contains the query
+      if (fullName.includes(queryLower)) return true;
+      
+      // Check if all words match first_name or last_name
+      return words.every(word => {
+        const wordLower = word.toLowerCase();
+        return (
+          t.first_name?.toLowerCase().includes(wordLower) ||
+          t.last_name?.toLowerCase().includes(wordLower) ||
+          email.includes(wordLower) ||
+          phone.includes(wordLower)
+        );
+      });
+    }).slice(0, MAX_RESULTS_PER_TYPE);
+  } else {
+    // Single word search: use original pattern
+    const { data, error } = await supabase
+      .from("tma_candidates")
+      .select(`id, first_name, last_name, email, phone, position_title, canton, team_id`)
+      .or(`first_name.ilike.${searchPattern},last_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern}`)
+      .limit(MAX_RESULTS_PER_TYPE);
+    
+    if (error) {
+      console.error("[Search] TMA error:", error);
+    }
+    tma = data || [];
   }
 
   // Search emails (user's own emails only via RLS)
@@ -161,8 +207,9 @@ async function handleTextSearch(
     console.error("[Search] Emails error:", emailsError);
   }
 
-  // Search chat messages - need to get user's rooms first
+  // Search chat - DM rooms by user name + messages by content
   let chatResults: SearchResultChat[] = [];
+  let chatRoomResults: SearchResultChatRoom[] = [];
   try {
     // Get user's room memberships
     const { data: memberships } = await adminSupabase
@@ -172,6 +219,62 @@ async function handleTextSearch(
 
     if (memberships && memberships.length > 0) {
       const roomIds = memberships.map(m => m.room_id);
+
+      // Get all rooms user is member of
+      const { data: rooms } = await adminSupabase
+        .from("chat_rooms")
+        .select("id, name, type")
+        .in("id", roomIds);
+      const roomsMap = new Map((rooms || []).map(r => [r.id, r]));
+
+      // Find DM rooms
+      const dmRoomIds = (rooms || []).filter(r => r.type === "dm").map(r => r.id);
+
+      // Search for DM rooms by other user's name
+      if (dmRoomIds.length > 0) {
+        // Get all members of DM rooms (excluding current user)
+        const { data: dmMembers } = await adminSupabase
+          .from("chat_room_members")
+          .select("room_id, user_id")
+          .in("room_id", dmRoomIds)
+          .neq("user_id", userId);
+
+        if (dmMembers && dmMembers.length > 0) {
+          const otherUserIds = [...new Set(dmMembers.map(m => m.user_id))];
+          
+          // Get profiles of other users
+          const { data: otherProfiles } = await adminSupabase
+            .from("profiles")
+            .select("id, full_name, avatar_url")
+            .in("id", otherUserIds);
+
+          // Filter profiles matching the search query
+          const matchingProfiles = (otherProfiles || []).filter(p => {
+            const fullName = (p.full_name || "").toLowerCase();
+            const queryLower = query.toLowerCase();
+            
+            // Check if full name contains query or all words match
+            if (fullName.includes(queryLower)) return true;
+            
+            return words.every(word => fullName.includes(word.toLowerCase()));
+          });
+
+          // Map matching profiles to their DM rooms
+          const profileToRoom = new Map<string, string>();
+          dmMembers.forEach(m => {
+            profileToRoom.set(m.user_id, m.room_id);
+          });
+
+          chatRoomResults = matchingProfiles.map(p => ({
+            id: `room-${profileToRoom.get(p.id)}`,
+            type: "chat_room" as const,
+            room_id: profileToRoom.get(p.id)!,
+            room_type: "dm" as const,
+            user_name: p.full_name || "Unknown",
+            user_avatar: p.avatar_url,
+          })).filter(r => r.room_id);
+        }
+      }
 
       // Search messages in user's rooms
       const { data: messages, error: messagesError } = await adminSupabase
@@ -193,13 +296,6 @@ async function handleTextSearch(
       }
 
       if (messages && messages.length > 0) {
-        // Get room info
-        const { data: rooms } = await adminSupabase
-          .from("chat_rooms")
-          .select("id, name, type")
-          .in("id", roomIds);
-        const roomsMap = new Map((rooms || []).map(r => [r.id, r]));
-
         // Get sender info
         const senderIds = [...new Set(messages.map(m => m.sender_id))];
         const { data: profiles } = await adminSupabase
@@ -272,6 +368,7 @@ async function handleTextSearch(
     tma: tmaResults,
     emails: emailResults,
     chat: chatResults,
+    chat_rooms: chatRoomResults,
   });
 }
 
