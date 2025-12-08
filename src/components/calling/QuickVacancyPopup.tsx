@@ -32,7 +32,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
   const [description, setDescription] = useState("");
   const [minQuality, setMinQuality] = useState<"A" | "B" | "C" | "">("");
   const [urgency, setUrgency] = useState<VacancyUrgency>(2);
-  const [radiusKm] = useState(25);
+  const [radiusKm, setRadiusKm] = useState(25);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [roles, setRoles] = useState<TmaRole[]>([]);
@@ -376,6 +376,43 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+
+          {/* Radius Slider */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+              Such-Radius: <span className="text-gray-700 font-semibold">{radiusKm} km</span>
+            </label>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-400">5</span>
+              <input
+                type="range"
+                min={5}
+                max={100}
+                step={5}
+                value={radiusKm}
+                onChange={(e) => setRadiusKm(Number(e.target.value))}
+                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
+              />
+              <span className="text-xs text-gray-400">100</span>
+            </div>
+            <div className="flex justify-between mt-1.5">
+              {[10, 25, 50, 75].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setRadiusKm(preset)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-xs font-medium transition-all",
+                    radiusKm === preset
+                      ? "bg-gray-900 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  )}
+                >
+                  {preset} km
+                </button>
+              ))}
             </div>
           </div>
 
