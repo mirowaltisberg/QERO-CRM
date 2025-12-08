@@ -46,6 +46,7 @@ interface Props {
   onUpdatePhone: (value: string | null) => Promise<void> | void;
   onClaim: () => Promise<void> | void;
   onUnclaim: () => Promise<void> | void;
+  isMobile?: boolean;
 }
 
 const STATUS_ORDER: TmaStatus[] = ["A", "B", "C"];
@@ -80,6 +81,7 @@ export function TmaDetail({
   onUpdatePhone,
   onClaim,
   onUnclaim,
+  isMobile = false,
 }: Props) {
   const initialFollowUpDate = candidate?.follow_up_at ? new Date(candidate.follow_up_at) : null;
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);

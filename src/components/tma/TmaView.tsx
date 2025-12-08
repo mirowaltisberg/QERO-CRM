@@ -18,6 +18,10 @@ interface Props {
 export function TmaView({ initialCandidates }: Props) {
   const searchParams = useSearchParams();
   const selectFromUrl = searchParams.get("select");
+  
+  // Mobile state
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
   const {
     candidates,
@@ -67,6 +71,34 @@ export function TmaView({ initialCandidates }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Reset to list view if active candidate is cleared on mobile
+  useEffect(() => {
+    if (isMobile && !activeCandidate && mobileView === "detail") {
+      setMobileView("list");
+    }
+  }, [isMobile, activeCandidate, mobileView]);
+
+  // Mobile candidate selection handler
+  const handleMobileSelectCandidate = useCallback((id: string) => {
+    selectCandidate(id);
+    if (isMobile) {
+      setMobileView("detail");
+    }
+  }, [selectCandidate, isMobile]);
+
+  // Mobile back handler
+  const handleMobileBack = useCallback(() => {
+    setMobileView("list");
+  }, []);
 
   // Handle URL-based selection (from command palette)
   useEffect(() => {
@@ -138,6 +170,249 @@ export function TmaView({ initialCandidates }: Props) {
     );
   }, [allCandidates]);
 
+  // ==================== MOBILE ====================
+  if (isMobile) {
+    return (
+      <>
+        <div className="relative h-full overflow-hidden bg-gray-50">
+          {/* TMA List */}
+          <div
+            className={`absolute inset-0 bg-gray-50 transition-transform duration-300 ease-out ${
+              mobileView === "detail" ? "-translate-x-full" : "translate-x-0"
+            }`}
+          >
+            {/* Mobile Header */}
+            <header 
+              className="border-b border-gray-200 bg-white px-4 py-3"
+              style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h1 className="text-lg font-semibold text-gray-900">TMA Kandidaten</h1>
+                  <p className="text-xs text-gray-500">{allCandidates.length} total</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setMenuOpen(!menuOpen)}>
+                  ⋯
+                </Button>
+              </div>
+              {/* Mobile filter pills */}
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                <button
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    statusFilter === "all" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"
+                  }`}
+                  onClick={() => setStatusFilter("all")}
+                >
+                  All
+                </button>
+                <button
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    statusFilter === "A" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600"
+                  }`}
+                  onClick={() => setStatusFilter("A")}
+                >
+                  A ({countByStatus.A})
+                </button>
+                <button
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    statusFilter === "B" ? "bg-yellow-500 text-white" : "bg-gray-100 text-gray-600"
+                  }`}
+                  onClick={() => setStatusFilter("B")}
+                >
+                  B ({countByStatus.B})
+                </button>
+                <button
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    statusFilter === "C" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-600"
+                  }`}
+                  onClick={() => setStatusFilter("C")}
+                >
+                  C ({countByStatus.C})
+                </button>
+                <div className="shrink-0 w-px bg-gray-200 mx-1" />
+                <button
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    activityFilter === "active" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600"
+                  }`}
+                  onClick={() => setActivityFilter(activityFilter === "active" ? "all" : "active")}
+                >
+                  Aktiv
+                </button>
+                <button
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    activityFilter === "inactive" ? "bg-gray-500 text-white" : "bg-gray-100 text-gray-600"
+                  }`}
+                  onClick={() => setActivityFilter(activityFilter === "inactive" ? "all" : "inactive")}
+                >
+                  Inaktiv
+                </button>
+              </div>
+            </header>
+            
+            <TmaList 
+              candidates={candidates} 
+              activeId={activeCandidate?.id ?? null} 
+              onSelect={handleMobileSelectCandidate}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              isMobile={true}
+            />
+          </div>
+
+          {/* TMA Detail */}
+          <div
+            className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-out ${
+              mobileView === "detail" ? "translate-x-0" : "translate-x-full"
+            }`}
+          >
+            {/* Mobile Detail Header */}
+            <header 
+              className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0"
+              style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
+            >
+              <button 
+                onClick={handleMobileBack}
+                className="flex items-center justify-center w-8 h-8 -ml-2 rounded-lg text-gray-600 active:bg-gray-100"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              
+              <div className="flex-1 min-w-0">
+                <h1 className="text-base font-semibold text-gray-900 truncate">
+                  {activeCandidate ? `${activeCandidate.first_name} ${activeCandidate.last_name}` : "Kandidat"}
+                </h1>
+                {activeCandidate?.position_title && (
+                  <p className="text-xs text-gray-500 truncate">{activeCandidate.position_title}</p>
+                )}
+              </div>
+
+              {/* Status badges */}
+              {activeCandidate && (
+                <div className="flex gap-1">
+                  {activeCandidate.status_tags?.includes("A") && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">A</span>
+                  )}
+                  {activeCandidate.status_tags?.includes("B") && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700">B</span>
+                  )}
+                  {activeCandidate.status_tags?.includes("C") && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">C</span>
+                  )}
+                </div>
+              )}
+            </header>
+
+            {/* Detail Content */}
+            <div className="flex-1 overflow-y-auto">
+              <TmaDetail
+                key={`${activeCandidate?.id ?? "empty"}-${activeCandidate?.status_tags?.join(",") ?? ""}-${activeCandidate?.follow_up_at ?? ""}-${activeCandidate?.activity ?? ""}`}
+                candidate={activeCandidate}
+                roles={roles}
+                rolesLoading={rolesLoading}
+                onCreateRole={createRole}
+                onUpdateRoleMetadata={updateRole}
+                onDeleteRole={deleteRole}
+                onRefreshRoles={refreshRolePresets}
+                onToggleStatusTag={toggleStatusTag}
+                onClearStatusTags={clearStatusTags}
+                onUpdateActivity={updateActivity}
+                onClearActivity={clearActivity}
+                onScheduleFollowUp={scheduleFollowUp}
+                onUpdateNotes={updateNotes}
+                onUpdateDocuments={updateDocuments}
+                onUpdatePosition={updatePosition}
+                onUpdateAddress={updateAddress}
+                onUpdatePhone={updatePhone}
+                onClaim={claimCandidate}
+                onUnclaim={unclaimCandidate}
+                isMobile={true}
+              />
+            </div>
+          </div>
+
+          {/* Mobile Menu Dropdown */}
+          {menuOpen && (
+            <div 
+              className="fixed inset-0 z-50"
+              onClick={() => setMenuOpen(false)}
+            >
+              <div 
+                className="absolute right-4 top-20 w-48 rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setImportOpen(true);
+                  }}
+                  className="w-full px-4 py-3 text-left text-sm text-gray-700 active:bg-gray-50"
+                >
+                  Import CSV
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    refreshCandidates();
+                  }}
+                  className="w-full px-4 py-3 text-left text-sm text-gray-700 active:bg-gray-50"
+                >
+                  Aktualisieren
+                </button>
+                {activeCandidate && (
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setDeleteConfirmOpen(true);
+                    }}
+                    className="w-full px-4 py-3 text-left text-sm text-red-600 active:bg-red-50"
+                  >
+                    Kandidat löschen
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modals */}
+        <Modal open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Kandidat löschen</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Möchtest du <strong>{activeCandidate?.first_name} {activeCandidate?.last_name}</strong> wirklich löschen?
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setDeleteConfirmOpen(false)}>
+                Abbrechen
+              </Button>
+              <Button 
+                onClick={handleDeleteCandidate}
+                disabled={deleting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleting ? "Löschen..." : "Löschen"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        <Modal open={importOpen} onClose={() => setImportOpen(false)}>
+          <TmaImporter
+            onImportComplete={() => {
+              setImportOpen(false);
+              refreshCandidates();
+            }}
+          />
+        </Modal>
+      </>
+    );
+  }
+
+  // ==================== DESKTOP ====================
   return (
     <div className="flex h-full">
       <TmaList 

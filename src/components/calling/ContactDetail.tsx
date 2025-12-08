@@ -25,7 +25,7 @@ interface ContactDetailProps {
   onClearFollowUp: () => Promise<void> | void;
   onClearStatus: () => Promise<void> | void;
   onNoteAdded?: () => void;
-  
+  isMobile?: boolean;
 }
 
 export const ContactDetail = memo(function ContactDetail({
@@ -39,6 +39,7 @@ export const ContactDetail = memo(function ContactDetail({
   onClearFollowUp,
   onClearStatus,
   onNoteAdded,
+  isMobile = false,
 }: ContactDetailProps) {
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [customDate, setCustomDate] = useState(() => getDefaultDateISO());
@@ -131,42 +132,52 @@ export const ContactDetail = memo(function ContactDetail({
 
   return (
     <>
-      <section className="flex flex-1 flex-col p-6 overflow-hidden">
-        {/* Header - fixed */}
-        <div className="flex items-center justify-between flex-shrink-0 mb-4">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-gray-400">Now calling</p>
-            <h1 className="text-2xl font-semibold text-gray-900">{contact.company_name}</h1>
-            <p className="text-sm text-gray-500">{contact.contact_name ?? "Hiring Team"}</p>
+      <section className={cn(
+        "flex flex-1 flex-col overflow-hidden",
+        isMobile ? "p-4" : "p-6"
+      )}>
+        {/* Header - hidden on mobile (shown in CallingView header) */}
+        {!isMobile && (
+          <div className="flex items-center justify-between flex-shrink-0 mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-400">Now calling</p>
+              <h1 className="text-2xl font-semibold text-gray-900">{contact.company_name}</h1>
+              <p className="text-sm text-gray-500">{contact.contact_name ?? "Hiring Team"}</p>
+            </div>
+            <Tag status={contact.status} tone="muted" fallbackLabel="Set status" />
           </div>
-          <Tag status={contact.status} tone="muted" fallbackLabel="Set status" />
-        </div>
+        )}
 
         {/* Call panel - fixed */}
         <div className="flex-shrink-0 mb-4">
           <Panel
             title="Kontakt"
-            description="Anrufen oder E-Mail senden"
+            description={isMobile ? undefined : "Anrufen oder E-Mail senden"}
             actions={
-              <div className="flex gap-2">
-                <Button onClick={onCall} size="lg">
-                  Anrufen
-                </Button>
-                <Button 
-                  onClick={handleOpenEmailPreview} 
-                  size="lg" 
-                  variant="secondary"
-                  disabled={loadingPreview}
-                >
-                  {loadingPreview ? "Laden..." : "E-Mail senden"}
-                </Button>
-              </div>
+              !isMobile ? (
+                <div className="flex gap-2">
+                  <Button onClick={onCall} size="lg">
+                    Anrufen
+                  </Button>
+                  <Button 
+                    onClick={handleOpenEmailPreview} 
+                    size="lg" 
+                    variant="secondary"
+                    disabled={loadingPreview}
+                  >
+                    {loadingPreview ? "Laden..." : "E-Mail senden"}
+                  </Button>
+                </div>
+              ) : undefined
             }
           >
-            <div className="grid gap-4 text-sm text-gray-600 md:grid-cols-3">
-              <InfoBlock label="Phone" value={displayPhone} />
-              <InfoBlock label="Email" value={displayEmail} />
-              <InfoBlock label="Canton">
+            <div className={cn(
+              "grid gap-4 text-sm text-gray-600",
+              isMobile ? "grid-cols-1" : "md:grid-cols-3"
+            )}>
+              <InfoBlock label="Phone" value={displayPhone} isMobile={isMobile} />
+              <InfoBlock label="Email" value={displayEmail} isMobile={isMobile} />
+              <InfoBlock label="Canton" isMobile={isMobile}>
                 <CantonTag canton={contact.canton} size="md" />
               </InfoBlock>
             </div>
@@ -179,6 +190,20 @@ export const ContactDetail = memo(function ContactDetail({
                 <span>
                   {[contact.street, contact.postal_code, contact.city].filter(Boolean).join(", ")}
                 </span>
+              </div>
+            )}
+            {/* Mobile email button */}
+            {isMobile && (
+              <div className="mt-4">
+                <Button 
+                  onClick={handleOpenEmailPreview} 
+                  size="lg" 
+                  variant="secondary"
+                  disabled={loadingPreview}
+                  className="w-full"
+                >
+                  {loadingPreview ? "Laden..." : "E-Mail senden"}
+                </Button>
               </div>
             )}
             {emailSent && (
@@ -383,15 +408,33 @@ const InfoBlock = memo(function InfoBlock({
   label,
   value,
   children,
+  isMobile = false,
 }: {
   label: string;
   value?: string;
   children?: React.ReactNode;
+  isMobile?: boolean;
 }) {
+  // Make phone and email tappable on mobile
+  const isPhone = label.toLowerCase() === "phone" && value && !value.includes("No ");
+  const isEmail = label.toLowerCase() === "email" && value && !value.includes("No ");
+  
   return (
-    <div>
+    <div className={isMobile ? "flex items-center justify-between py-2 border-b border-gray-100" : ""}>
       <p className="text-xs uppercase tracking-wide text-gray-400">{label}</p>
-      {children ? <div className="mt-1">{children}</div> : <p className="text-sm text-gray-900">{value}</p>}
+      {children ? (
+        <div className={isMobile ? "" : "mt-1"}>{children}</div>
+      ) : isPhone && isMobile ? (
+        <a href={`tel:${value?.replace(/\s+/g, "")}`} className="text-sm text-blue-600 font-medium">
+          {value}
+        </a>
+      ) : isEmail && isMobile ? (
+        <a href={`mailto:${value}`} className="text-sm text-blue-600 font-medium truncate max-w-[200px]">
+          {value}
+        </a>
+      ) : (
+        <p className={cn("text-sm text-gray-900", isMobile ? "" : "mt-1")}>{value}</p>
+      )}
     </div>
   );
 });

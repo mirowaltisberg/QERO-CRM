@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { AppShell } from "@/components/layout/AppShell";
 import { Providers } from "@/components/layout/Providers";
 import { getUser, getProfile } from "@/lib/auth/actions";
 
@@ -53,12 +53,9 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased`} suppressHydrationWarning>
         <Providers>
-          <div className="flex h-screen">
-            {user && <Sidebar user={user} profile={profile} />}
-            <main className={user ? "flex-1 overflow-hidden" : "flex-1"}>
-              {children}
-            </main>
-          </div>
+          <AppShell user={user} profile={profile}>
+            {children}
+          </AppShell>
         </Providers>
         <Analytics />
       </body>

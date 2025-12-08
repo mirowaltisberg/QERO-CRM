@@ -20,6 +20,7 @@ interface ContactListProps {
   callLogs?: Record<string, ContactCallLog>;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  isMobile?: boolean;
 }
 
 // Memoized list item to prevent re-renders
@@ -147,6 +148,7 @@ export const ContactList = memo(function ContactList({
   callLogs = {},
   searchQuery = "",
   onSearchChange,
+  isMobile = false,
 }: ContactListProps) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery ?? "");
@@ -178,8 +180,11 @@ export const ContactList = memo(function ContactList({
   );
 
   return (
-    <aside className="flex h-full w-80 flex-col border-r border-gray-200 bg-gray-50">
-      <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+    <aside className={`flex h-full flex-col border-r border-gray-200 bg-gray-50 ${isMobile ? "w-full" : "w-80"}`}>
+      <header 
+        className="flex items-center justify-between border-b border-gray-200 px-4 py-3"
+        style={isMobile ? { paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" } : undefined}
+      >
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-400">Companies</p>
           <p className="text-sm font-semibold text-gray-900">

@@ -6,6 +6,52 @@
 - **Make follow-ups and status PERSONAL per user (not shared across team)** ✅
 - New issue reported: repeated 400 errors on `POST /api/contacts/call-logs` plus realtime subscriptions flapping (SUBSCRIBED → CLOSED → SUBSCRIBED).
 - New regression: personal status still shows "Not set" after reload (Task 19 not stable).
+- **NEW: Task 25 - Complete Mobile UI Revamp** - Make the app feel native on iPhone 16 Pro/Pro Max
+
+---
+
+# Task 25: Mobile UI Revamp (Native iOS Feel)
+
+## Goal
+Transform the mobile experience to feel like a native iOS app, specifically optimized for iPhone 16 Pro/Pro Max.
+
+## Current Problems
+1. Desktop sidebar shows on mobile (except Chat) - cramped & unusable
+2. No bottom tab navigation (standard iOS pattern)
+3. List+Detail views lack proper slide transitions
+4. No safe area handling for Dynamic Island or home indicator
+5. Touch targets too small, spacing too tight
+
+## High-level Task Breakdown
+
+### Phase 1: Global Mobile Shell
+- [ ] **1.1** Create `MobileNavBar` - iOS-style bottom tab bar (5 tabs: Calling, Companies, TMA, Email, Chat)
+- [ ] **1.2** Modify `layout.tsx` - Sidebar for desktop (≥768px), MobileNavBar for mobile
+- [ ] **1.3** Safe areas - `env(safe-area-inset-*)` for Dynamic Island + home indicator
+
+### Phase 2: Calling Page Mobile  
+- [ ] **2.1** Mobile detection + state management (`isMobile`, `mobileView: 'list' | 'detail'`)
+- [ ] **2.2** Slide transitions (translateX) like ChatView
+- [ ] **2.3** Mobile header with back button + contact name
+- [ ] **2.4** Optimize ContactDetail for touch (44px targets, better spacing)
+
+### Phase 3: TMA Page Mobile
+- [ ] **3.1** List/detail split with transitions
+- [ ] **3.2** Filters in collapsible sheet or pill bar
+- [ ] **3.3** Candidate cards with key info visible
+
+### Phase 4: Other Pages
+- [ ] **4.1** Email - folder selector + thread transitions
+- [ ] **4.2** Dashboard - single column cards
+- [ ] **4.3** Settings/Profile - move to nav bar menu
+
+### Design Specs
+- **Bottom nav height**: 83px (49pt tabs + 34pt home indicator)
+- **Touch targets**: min 44px
+- **Transitions**: 300ms ease-out
+- **Safe areas**: top (Dynamic Island ~59pt), bottom (home indicator ~34pt)
+
+---
 
 # Key Challenges and Analysis
 

@@ -18,6 +18,10 @@ interface CallingViewProps {
 export function CallingView({ initialContacts }: CallingViewProps) {
   const searchParams = useSearchParams();
   const selectFromUrl = searchParams.get("select");
+  
+  // Mobile state
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
   const {
     contacts,
@@ -40,6 +44,37 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     setCantonFilter,
     clearCantonFilter,
   } = useContacts({ initialContacts });
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Reset to list view if active contact is cleared on mobile
+  useEffect(() => {
+    if (isMobile && !activeContact && mobileView === "detail") {
+      setMobileView("list");
+    }
+  }, [isMobile, activeContact, mobileView]);
+
+  // Mobile contact selection handler
+  const handleMobileSelectContact = useCallback((id: string) => {
+    selectContact(id);
+    if (isMobile) {
+      setMobileView("detail");
+    }
+  }, [selectContact, isMobile]);
+
+  // Mobile back handler
+  const handleMobileBack = useCallback(() => {
+    setMobileView("list");
+  }, []);
 
   // Handle URL-based selection (from command palette)
   useEffect(() => {
@@ -287,6 +322,96 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     },
   ]);
 
+  // ==================== MOBILE ====================
+  if (isMobile) {
+    return (
+      <div className="relative h-full overflow-hidden bg-gray-50">
+        {/* Contact List */}
+        <div
+          className={`absolute inset-0 bg-gray-50 transition-transform duration-300 ease-out ${
+            mobileView === "detail" ? "-translate-x-full" : "translate-x-0"
+          }`}
+        >
+          <ContactList
+            contacts={contacts}
+            activeContactId={activeContact?.id ?? null}
+            onSelect={handleMobileSelectContact}
+            loading={loading}
+            onRefresh={refreshContacts}
+            onFilterByCanton={setCantonFilter}
+            onClearCantonFilter={clearCantonFilter}
+            activeCantonFilter={cantonFilter}
+            availableCantons={uniqueCantons}
+            callLogs={callLogs}
+            isMobile={true}
+          />
+        </div>
+
+        {/* Contact Detail */}
+        <div
+          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-out ${
+            mobileView === "detail" ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          {/* Mobile Header */}
+          <header 
+            className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0"
+            style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
+          >
+            <button 
+              onClick={handleMobileBack}
+              className="flex items-center justify-center w-8 h-8 -ml-2 rounded-lg text-gray-600 active:bg-gray-100"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            
+            <div className="flex-1 min-w-0">
+              <h1 className="text-base font-semibold text-gray-900 truncate">
+                {activeContact?.company_name || "Firma auswählen"}
+              </h1>
+              {activeContact?.canton && (
+                <p className="text-xs text-gray-500">{activeContact.canton}</p>
+              )}
+            </div>
+
+            {/* Call button in header */}
+            {activeContact?.phone && (
+              <button
+                onClick={handleCall}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white active:bg-green-600"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 01.85-.25 11.36 11.36 0 003.55.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.57 3.55 1 1 0 01-.25.85l-2.2 2.2z" />
+                </svg>
+              </button>
+            )}
+          </header>
+
+          {/* Detail Content */}
+          <div className="flex-1 overflow-y-auto">
+            <ContactDetail
+              key={activeContact?.id ?? "empty"}
+              contact={activeContact}
+              onCall={handleCall}
+              onNext={goToNextContact}
+              onSaveNotes={updateNotes}
+              actionMessage={actionMessage}
+              onUpdateStatus={updateStatus}
+              onScheduleFollowUp={scheduleFollowUp}
+              onClearFollowUp={clearFollowUp}
+              onClearStatus={clearStatus}
+              onNoteAdded={handleNoteAdded}
+              isMobile={true}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==================== DESKTOP ====================
   return (
     <div className="flex h-full">
       <ContactList
