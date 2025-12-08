@@ -145,7 +145,7 @@ export const personalSettingsService = {
     if (tmaIds.length === 0) return {};
     
     const supabase = createClient();
-    const { data, error} = await supabase
+    const { data, error } = await supabase
       .from("user_tma_settings")
       .select("*")
       .in("tma_id", tmaIds);
