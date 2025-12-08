@@ -132,3 +132,4 @@ Migration `022_personal_followups_fix.sql` has been applied to production Supaba
 - `src/app/favicon.ico` overrides `public/favicon.ico` in Next.js app router
 - Use object destructuring instead of `delete` operator for TypeScript compatibility
 - Client-side batching prevents 400 errors when dataset exceeds API limits (batch size <50% of server limit for safety margin)
+- **CRITICAL: NEVER use Cursor worktree for code changes, OR if used, ALWAYS sync to main repo immediately** - changes in worktree don't deploy to production!
