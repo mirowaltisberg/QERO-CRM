@@ -17,9 +17,13 @@ export const serverContactService = {
   /**
    * Get all contacts (up to 10k) - for server components
    * Fetches in batches to work around Supabase 1000 row limit
+   * Merges personal settings (status, follow_up_at, follow_up_note) for current user
    */
   async getAll(filters?: ContactFilters): Promise<Contact[]> {
     const supabase = await createClient();
+    
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
     
     // First get the total count
     let countQuery = supabase
@@ -96,6 +100,44 @@ export const serverContactService = {
       if (data) {
         allContacts.push(...data);
       }
+    }
+
+    // Merge personal settings for current user
+    if (user && allContacts.length > 0) {
+      const contactIds = allContacts.map((c) => c.id);
+      
+      // Fetch personal settings for all contacts in batches
+      const settingsMap: Record<string, any> = {};
+      const settingsBatches = Math.ceil(contactIds.length / BATCH_SIZE);
+      
+      for (let i = 0; i < settingsBatches; i++) {
+        const batchIds = contactIds.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
+        const { data: settings } = await supabase
+          .from("user_contact_settings")
+          .select("*")
+          .eq("user_id", user.id)
+          .in("contact_id", batchIds);
+        
+        if (settings) {
+          for (const setting of settings) {
+            settingsMap[setting.contact_id] = setting;
+          }
+        }
+      }
+      
+      // Merge personal settings into contacts
+      return allContacts.map((contact) => {
+        const personalSettings = settingsMap[contact.id];
+        if (personalSettings) {
+          return {
+            ...contact,
+            status: personalSettings.status ?? contact.status,
+            follow_up_at: personalSettings.follow_up_at ?? contact.follow_up_at,
+            follow_up_note: personalSettings.follow_up_note ?? contact.follow_up_note,
+          };
+        }
+        return contact;
+      });
     }
 
     return allContacts;
