@@ -9,9 +9,13 @@
 import { createClient } from "../supabase/server";
 import type { PersonalContactSettings, PersonalTmaSettings } from "./personal-settings-service";
 
+// Batch size for .in() queries to avoid URL length limits
+const SETTINGS_BATCH_SIZE = 200;
+
 export const serverPersonalSettingsService = {
   /**
    * Get personal settings for multiple contacts (for the current user)
+   * Batches requests to avoid Supabase URL length limits
    */
   async getContactSettings(contactIds: string[]): Promise<Record<string, PersonalContactSettings>> {
     if (contactIds.length === 0) return {};
@@ -25,24 +29,35 @@ export const serverPersonalSettingsService = {
       return {};
     }
     
-    const { data, error } = await supabase
-      .from("user_contact_settings")
-      .select("*")
-      .eq("user_id", user.id)
-      .in("contact_id", contactIds);
-
-    if (error) {
-      console.error("[Server Personal Settings] Error fetching contact settings:", error);
-      return {};
-    }
-
-    // Index by contact_id for easy lookup
+    console.log(`[Server Personal Settings] Fetching settings for ${contactIds.length} contacts in batches of ${SETTINGS_BATCH_SIZE}`);
+    
+    // Batch the requests to avoid URL length limits
     const settingsMap: Record<string, PersonalContactSettings> = {};
-    for (const setting of data || []) {
-      settingsMap[setting.contact_id] = setting;
+    const batches = Math.ceil(contactIds.length / SETTINGS_BATCH_SIZE);
+    
+    for (let i = 0; i < batches; i++) {
+      const batchIds = contactIds.slice(i * SETTINGS_BATCH_SIZE, (i + 1) * SETTINGS_BATCH_SIZE);
+      
+      const { data, error } = await supabase
+        .from("user_contact_settings")
+        .select("*")
+        .eq("user_id", user.id)
+        .in("contact_id", batchIds);
+
+      if (error) {
+        console.error(`[Server Personal Settings] Error fetching batch ${i + 1}/${batches}:`, error);
+        continue; // Continue with other batches even if one fails
+      }
+
+      // Add to settings map
+      for (const setting of data || []) {
+        settingsMap[setting.contact_id] = setting;
+      }
+      
+      console.log(`[Server Personal Settings] Batch ${i + 1}/${batches}: found ${data?.length || 0} settings`);
     }
     
-    console.log(`[Server Personal Settings] Found ${Object.keys(settingsMap).length} settings for user ${user.id}`);
+    console.log(`[Server Personal Settings] Total: ${Object.keys(settingsMap).length} settings for user ${user.id}`);
     return settingsMap;
   },
 
@@ -159,6 +174,7 @@ export const serverPersonalSettingsService = {
 
   /**
    * Get personal settings for multiple TMA candidates (for the current user)
+   * Batches requests to avoid Supabase URL length limits
    */
   async getTmaSettings(tmaIds: string[]): Promise<Record<string, PersonalTmaSettings>> {
     if (tmaIds.length === 0) return {};
@@ -171,22 +187,32 @@ export const serverPersonalSettingsService = {
       return {};
     }
     
-    const { data, error } = await supabase
-      .from("user_tma_settings")
-      .select("*")
-      .eq("user_id", user.id)
-      .in("tma_id", tmaIds);
-
-    if (error) {
-      console.error("[Server Personal Settings] Error fetching TMA settings:", error);
-      return {};
-    }
-
-    // Index by tma_id for easy lookup
+    console.log(`[Server Personal Settings] Fetching TMA settings for ${tmaIds.length} candidates in batches`);
+    
+    // Batch the requests to avoid URL length limits
     const settingsMap: Record<string, PersonalTmaSettings> = {};
-    for (const setting of data || []) {
-      settingsMap[setting.tma_id] = setting;
+    const batches = Math.ceil(tmaIds.length / SETTINGS_BATCH_SIZE);
+    
+    for (let i = 0; i < batches; i++) {
+      const batchIds = tmaIds.slice(i * SETTINGS_BATCH_SIZE, (i + 1) * SETTINGS_BATCH_SIZE);
+      
+      const { data, error } = await supabase
+        .from("user_tma_settings")
+        .select("*")
+        .eq("user_id", user.id)
+        .in("tma_id", batchIds);
+
+      if (error) {
+        console.error(`[Server Personal Settings] Error fetching TMA batch ${i + 1}/${batches}:`, error);
+        continue;
+      }
+
+      for (const setting of data || []) {
+        settingsMap[setting.tma_id] = setting;
+      }
     }
+    
+    console.log(`[Server Personal Settings] Total TMA settings: ${Object.keys(settingsMap).length}`);
     return settingsMap;
   },
 
