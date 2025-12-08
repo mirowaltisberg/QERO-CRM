@@ -271,6 +271,7 @@ export const contactService = {
    */
   async update(id: string, data: Partial<Contact>): Promise<Contact | null> {
     const supabase = createClient();
+    console.log("[Data Service] Update called with:", { id, data });
     
     // Separate personal fields from shared fields
     const personalFields: Record<string, unknown> = {};
@@ -299,11 +300,14 @@ export const contactService = {
     
     // Update personal fields (if any)
     if (Object.keys(personalFields).length > 0) {
+      console.log("[Data Service] Calling updateContactSettings with:", { id, personalFields });
       await personalSettingsService.updateContactSettings(id, personalFields as {
         status?: "hot" | "working" | "follow_up" | null;
         follow_up_at?: string | null;
         follow_up_note?: string | null;
       });
+    } else {
+      console.log("[Data Service] No personal fields to update");
     }
 
     // Fetch and return the updated contact
