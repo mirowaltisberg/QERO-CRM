@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import type { TmaCandidate } from "@/lib/types";
 import { useTmaCandidates } from "@/lib/hooks/useTmaCandidates";
 import { TmaList } from "./TmaList";
@@ -15,6 +16,9 @@ interface Props {
 }
 
 export function TmaView({ initialCandidates }: Props) {
+  const searchParams = useSearchParams();
+  const selectFromUrl = searchParams.get("select");
+
   const {
     candidates,
     allCandidates,
@@ -63,6 +67,18 @@ export function TmaView({ initialCandidates }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Handle URL-based selection (from command palette)
+  useEffect(() => {
+    if (selectFromUrl && allCandidates.length > 0) {
+      const candidateExists = allCandidates.find((c) => c.id === selectFromUrl);
+      if (candidateExists) {
+        selectCandidate(selectFromUrl);
+        // Clear the URL param without navigation
+        window.history.replaceState({}, "", "/tma");
+      }
+    }
+  }, [selectFromUrl, allCandidates, selectCandidate]);
 
   const handleDeleteCandidate = useCallback(async () => {
     if (!activeCandidate) return;

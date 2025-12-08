@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { ContactList } from "./ContactList";
 import { ContactDetail } from "./ContactDetail";
 import type { Contact, ContactCallLog } from "@/lib/types";
@@ -15,6 +16,9 @@ interface CallingViewProps {
 }
 
 export function CallingView({ initialContacts }: CallingViewProps) {
+  const searchParams = useSearchParams();
+  const selectFromUrl = searchParams.get("select");
+
   const {
     contacts,
     activeContact,
@@ -36,6 +40,18 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     setCantonFilter,
     clearCantonFilter,
   } = useContacts({ initialContacts });
+
+  // Handle URL-based selection (from command palette)
+  useEffect(() => {
+    if (selectFromUrl && contacts.length > 0) {
+      const contactExists = contacts.find((c) => c.id === selectFromUrl);
+      if (contactExists) {
+        selectContact(selectFromUrl);
+        // Clear the URL param without navigation
+        window.history.replaceState({}, "", "/calling");
+      }
+    }
+  }, [selectFromUrl, contacts, selectContact]);
 
   const supabase = useMemo(() => createClient(), []);
 
