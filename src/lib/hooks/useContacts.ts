@@ -29,6 +29,7 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
   // Fetch and merge personal settings on client side
   useEffect(() => {
     if (personalSettingsLoaded || initialContacts.length === 0) return;
+    console.log("[useContacts] Starting personal settings fetch...");
     
     async function loadPersonalSettings() {
       try {
