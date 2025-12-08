@@ -55,6 +55,7 @@ export function ContactsImporter({ onImportComplete }: ContactsImporterProps) {
       // Split into batches to avoid timeout
       const batches = chunkArray(mapped, BATCH_SIZE);
       let totalCreated = 0;
+      let totalUpdated = 0;
       let totalErrors = 0;
 
       setMessage(`Importiere ${mapped.length} Firmen…`);
@@ -76,8 +77,9 @@ export function ContactsImporter({ onImportComplete }: ContactsImporterProps) {
             totalErrors += batch.length;
           } else {
             const json = await response.json();
-            totalCreated += json.created?.length ?? batch.length;
-            totalErrors += json.errors?.length ?? 0;
+            totalCreated += json.data?.created?.length ?? 0;
+            totalUpdated += json.data?.updated?.length ?? 0;
+            totalErrors += json.data?.errors?.length ?? 0;
           }
         } catch (err) {
           console.error(`Batch ${i + 1} error:`, err);
@@ -99,7 +101,10 @@ export function ContactsImporter({ onImportComplete }: ContactsImporterProps) {
       setStatus("success");
       setProgress(null);
       
-      const successMsg = `✓ ${totalCreated.toLocaleString()} Firmen importiert!`;
+      const parts: string[] = [];
+      if (totalCreated > 0) parts.push(`${totalCreated} neu`);
+      if (totalUpdated > 0) parts.push(`${totalUpdated} aktualisiert`);
+      const successMsg = `✓ ${parts.join(", ")}`;
       const errorMsg = totalErrors > 0 ? ` (${totalErrors} Fehler)` : "";
       setMessage(successMsg + errorMsg);
 
