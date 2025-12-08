@@ -5,9 +5,20 @@ import type { Vacancy, VacancyCandidate, TmaCandidate } from "@/lib/types";
 import { VACANCY_CANDIDATE_STATUS_LIST, VACANCY_CANDIDATE_STATUS_LABELS, VACANCY_CANDIDATE_STATUS_COLORS } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
 
+interface ScoreBreakdown {
+  base: number;
+  location: number;
+  closeness: number;
+  quality: number;
+  qualityPenalty: number;
+  activity: number;
+  role: number;
+  total: number;
+}
+
 interface CandidateData {
   assigned: VacancyCandidate[];
-  suggested: (TmaCandidate & { distance_km: number; match_score: number })[];
+  suggested: (TmaCandidate & { distance_km: number; match_score: number; score_breakdown?: ScoreBreakdown })[];
 }
 
 interface Props {
@@ -36,10 +47,46 @@ const QualityBadge = ({ tags }: { tags: string[] | null }) => {
   );
 };
 
+const ScoreBreakdownPopup = ({ breakdown, onClose }: { breakdown: ScoreBreakdown; onClose: () => void }) => {
+  const items = [
+    { label: "Basis", value: breakdown.base, color: "text-gray-500" },
+    { label: "Standort", value: breakdown.location, color: breakdown.location >= 0 ? "text-green-600" : "text-red-500" },
+    { label: "Nähe-Bonus", value: breakdown.closeness, color: "text-green-600", show: breakdown.closeness > 0 },
+    { label: "Qualität", value: breakdown.quality, color: "text-blue-600", show: breakdown.quality > 0 },
+    { label: "Qualität unter Min.", value: breakdown.qualityPenalty, color: "text-red-500", show: breakdown.qualityPenalty !== 0 },
+    { label: "Aktiv", value: breakdown.activity, color: "text-green-600", show: breakdown.activity > 0 },
+    { label: "Rolle passt", value: breakdown.role, color: "text-purple-600", show: breakdown.role > 0 },
+  ].filter(item => item.show !== false);
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="absolute left-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+        <div className="text-xs font-medium text-gray-700 mb-2">Score-Aufschlüsselung</div>
+        <div className="space-y-1">
+          {items.map((item) => (
+            <div key={item.label} className="flex justify-between text-xs">
+              <span className="text-gray-500">{item.label}</span>
+              <span className={cn("font-medium", item.color)}>
+                {item.value > 0 ? `+${item.value}` : item.value}
+              </span>
+            </div>
+          ))}
+          <div className="border-t border-gray-100 pt-1 mt-1 flex justify-between text-xs font-semibold">
+            <span className="text-gray-700">Gesamt</span>
+            <span className="text-gray-900">{breakdown.total}</span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 const CandidateCard = memo(function CandidateCard({
   tma,
   distance,
   matchScore,
+  scoreBreakdown,
   status,
   onAdd,
   onUpdateStatus,
@@ -49,6 +96,7 @@ const CandidateCard = memo(function CandidateCard({
   tma: TmaCandidate;
   distance?: number;
   matchScore?: number;
+  scoreBreakdown?: ScoreBreakdown;
   status?: string;
   onAdd?: () => void;
   onUpdateStatus?: (status: string) => void;
@@ -56,6 +104,7 @@ const CandidateCard = memo(function CandidateCard({
   isAssigned: boolean;
 }) {
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [showScoreBreakdown, setShowScoreBreakdown] = useState(false);
 
   return (
     <div className="rounded-lg border border-gray-200 p-3 hover:border-gray-300 transition-colors">
@@ -81,7 +130,23 @@ const CandidateCard = memo(function CandidateCard({
               </span>
             )}
             {typeof matchScore === "number" && (
-              <span className="text-blue-500">{matchScore}% Match</span>
+              <div className="relative">
+                <button
+                  onClick={() => scoreBreakdown && setShowScoreBreakdown(!showScoreBreakdown)}
+                  className={cn(
+                    "text-blue-500 hover:text-blue-700 transition-colors",
+                    scoreBreakdown && "underline decoration-dotted cursor-pointer"
+                  )}
+                >
+                  {matchScore}% Match
+                </button>
+                {showScoreBreakdown && scoreBreakdown && (
+                  <ScoreBreakdownPopup 
+                    breakdown={scoreBreakdown} 
+                    onClose={() => setShowScoreBreakdown(false)} 
+                  />
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -303,6 +368,7 @@ export const CandidateMatches = memo(function CandidateMatches({
                   tma={tma}
                   distance={tma.distance_km}
                   matchScore={tma.match_score}
+                  scoreBreakdown={tma.score_breakdown}
                   onAdd={() => onAddCandidate(tma.id)}
                   isAssigned={false}
                 />

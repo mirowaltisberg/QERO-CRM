@@ -68,7 +68,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Score all candidates - more lenient matching, sort by relevance
-    const suggestedCandidates: Array<TmaCandidate & { distance_km: number; match_score: number }> = [];
+    interface ScoreBreakdown {
+      base: number;
+      location: number;
+      closeness: number;
+      quality: number;
+      qualityPenalty: number;
+      activity: number;
+      role: number;
+      total: number;
+    }
+
+    const suggestedCandidates: Array<TmaCandidate & { 
+      distance_km: number; 
+      match_score: number;
+      score_breakdown: ScoreBreakdown;
+    }> = [];
 
     for (const candidate of allCandidates || []) {
       // Skip already assigned candidates
@@ -100,45 +115,59 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       // Check if active
       const isActive = candidate.activity === "active";
 
-      // Calculate match score (0-100)
-      // PRIORITY: Location (40pts) + Quality (35pts) = 75% of score
-      let match_score = 10; // Base score
+      // Build score breakdown
+      const breakdown: ScoreBreakdown = {
+        base: 10,
+        location: 0,
+        closeness: 0,
+        quality: 0,
+        qualityPenalty: 0,
+        activity: 0,
+        role: 0,
+        total: 0,
+      };
 
       // === LOCATION (most important - up to 40 points) ===
       if (withinRadius) {
-        match_score += 40;
+        breakdown.location = 40;
         // Bonus for being closer (up to +10 more)
         if (vacancy.radius_km && distance_km > 0) {
-          const closenessBonus = Math.round(10 * (1 - distance_km / vacancy.radius_km));
-          match_score += Math.max(0, closenessBonus);
+          breakdown.closeness = Math.max(0, Math.round(10 * (1 - distance_km / vacancy.radius_km)));
         } else {
-          match_score += 10; // No location data = full bonus
+          breakdown.closeness = 10; // No location data = full bonus
         }
       } else {
-        // Outside radius - heavy penalty
-        match_score -= 20;
+        breakdown.location = -20; // Outside radius penalty
       }
 
       // === QUALITY (second most important - up to 35 points) ===
-      // A = 35pts, B = 25pts, C = 15pts, None = 0pts
-      if (candidateBestQuality === 3) match_score += 35; // A
-      else if (candidateBestQuality === 2) match_score += 25; // B
-      else if (candidateBestQuality === 1) match_score += 15; // C
+      if (candidateBestQuality === 3) breakdown.quality = 35; // A
+      else if (candidateBestQuality === 2) breakdown.quality = 25; // B
+      else if (candidateBestQuality === 1) breakdown.quality = 15; // C
 
       // Penalty if below minimum quality requirement
-      if (!meetsQuality) match_score -= 20;
+      if (!meetsQuality) breakdown.qualityPenalty = -20;
 
       // === SECONDARY FACTORS ===
-      // Activity bonus (+10 for active)
-      if (isActive) match_score += 10;
+      if (isActive) breakdown.activity = 10;
+      if (roleMatches && vacancy.role) breakdown.role = 5;
 
-      // Role match bonus (+5)
-      if (roleMatches && vacancy.role) match_score += 5;
+      // Calculate total
+      breakdown.total = Math.max(0, 
+        breakdown.base + 
+        breakdown.location + 
+        breakdown.closeness + 
+        breakdown.quality + 
+        breakdown.qualityPenalty + 
+        breakdown.activity + 
+        breakdown.role
+      );
 
       suggestedCandidates.push({
         ...candidate,
         distance_km: Math.round(distance_km * 10) / 10,
-        match_score: Math.max(0, Math.round(match_score)),
+        match_score: breakdown.total,
+        score_breakdown: breakdown,
       });
     }
 
