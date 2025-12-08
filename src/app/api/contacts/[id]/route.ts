@@ -45,14 +45,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const cleaned = removeUndefined(parsed.data);
 
-    if (cleaned.status !== undefined && cleaned.status !== "follow_up") {
-      cleaned.follow_up_at = null;
-      cleaned.follow_up_note = null;
-    }
-
+    // Note: status and follow-up are now independent personal settings
+    // Users can have both a status (hot/working) AND a scheduled follow-up
+    // Only auto-set status to "follow_up" if explicitly scheduling a follow-up without a status
     if (cleaned.follow_up_at && !cleaned.status) {
       cleaned.status = "follow_up";
     }
+    
     const updated = await contactService.update(id, cleaned);
 
     if (!updated) {

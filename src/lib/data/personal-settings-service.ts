@@ -77,9 +77,15 @@ export const personalSettingsService = {
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.error("No user for personal settings update");
+      console.error("[Personal Settings] No user authenticated");
       return null;
     }
+
+    console.log("[Personal Settings] Updating contact settings:", {
+      contactId,
+      userId: user.id,
+      settings,
+    });
 
     const { data, error } = await supabase
       .from("user_contact_settings")
@@ -95,9 +101,17 @@ export const personalSettingsService = {
       .single();
 
     if (error) {
-      console.error("Error updating contact settings:", error);
+      console.error("[Personal Settings] Error updating contact settings:", {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
       return null;
     }
+    
+    console.log("[Personal Settings] Successfully updated:", data);
     return data;
   },
 
@@ -131,7 +145,7 @@ export const personalSettingsService = {
     if (tmaIds.length === 0) return {};
     
     const supabase = createClient();
-    const { data, error } = await supabase
+    const { data, error} = await supabase
       .from("user_tma_settings")
       .select("*")
       .in("tma_id", tmaIds);
@@ -179,9 +193,15 @@ export const personalSettingsService = {
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.error("No user for personal settings update");
+      console.error("[Personal Settings] No user authenticated");
       return null;
     }
+
+    console.log("[Personal Settings] Updating TMA settings:", {
+      tmaId,
+      userId: user.id,
+      settings,
+    });
 
     const { data, error } = await supabase
       .from("user_tma_settings")
@@ -197,9 +217,17 @@ export const personalSettingsService = {
       .single();
 
     if (error) {
-      console.error("Error updating TMA settings:", error);
+      console.error("[Personal Settings] Error updating TMA settings:", {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
       return null;
     }
+    
+    console.log("[Personal Settings] Successfully updated:", data);
     return data;
   },
 
