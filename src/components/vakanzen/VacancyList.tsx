@@ -308,7 +308,10 @@ export const VacancyList = memo(function VacancyList({
       </header>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto">
+      <div 
+        className="flex-1 overflow-y-auto"
+        style={isMobile ? { paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)" } : undefined}
+      >
         {vacancies.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">

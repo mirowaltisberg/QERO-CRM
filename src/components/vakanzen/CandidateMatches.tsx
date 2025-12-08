@@ -311,7 +311,10 @@ export const CandidateMatches = memo(function CandidateMatches({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div 
+        className="flex-1 overflow-y-auto p-4"
+        style={isMobile ? { paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 100px)" } : undefined}
+      >
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-gray-900" />

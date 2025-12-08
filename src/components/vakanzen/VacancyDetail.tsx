@@ -101,7 +101,10 @@ export const VacancyDetail = memo(function VacancyDetail({
       </header>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div 
+        className="flex-1 overflow-y-auto p-6"
+        style={isMobile ? { paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 100px)" } : undefined}
+      >
         {/* Status Pipeline */}
         <div className="mb-6">
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Status</h2>
