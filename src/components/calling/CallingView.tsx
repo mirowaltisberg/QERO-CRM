@@ -8,6 +8,7 @@ import { useContacts } from "@/lib/hooks/useContacts";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { KEYBOARD_SHORTCUTS } from "@/lib/utils/constants";
 import { createClient } from "@/lib/supabase/client";
+import { chunkUnique } from "@/lib/utils/chunk";
 
 interface CallingViewProps {
   initialContacts: Contact[];
@@ -50,28 +51,43 @@ export function CallingView({ initialContacts }: CallingViewProps) {
 
     async function fetchCallLogs() {
       try {
-        const contactIds = contacts.map(c => c.id);
-        
-        const res = await fetch("/api/contacts/call-logs", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ contact_ids: contactIds }),
-          credentials: "include",
-          cache: "no-store",
-        });
-        
-        if (res.ok) {
-          const json = await res.json();
-          // json.data is already { contactId: callLog } format
-          setCallLogs(json.data || {});
-        }
+        const batches = chunkUnique(
+          contacts.map((c) => c.id),
+          200 // stay well below server limit of 500
+        );
+
+        const batchResults = await Promise.all(
+          batches.map(async (batch) => {
+            const res = await fetch("/api/contacts/call-logs", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ contact_ids: batch }),
+              credentials: "include",
+              cache: "no-store",
+            });
+
+            const json = await res.json().catch(() => null);
+            if (!res.ok) {
+              console.error("Error fetching call logs batch:", json?.error ?? res.statusText);
+              return {};
+            }
+            return (json?.data as Record<string, ContactCallLog>) ?? {};
+          })
+        );
+
+        const merged = batchResults.reduce<Record<string, ContactCallLog>>(
+          (acc, curr) => Object.assign(acc, curr),
+          {}
+        );
+
+        setCallLogs(merged);
       } catch (err) {
         console.error("Error fetching call logs:", err);
       }
     }
-    
+
     fetchCallLogs();
   }, [contacts]);
 
