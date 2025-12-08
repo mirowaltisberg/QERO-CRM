@@ -362,8 +362,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           </div>
         )}
 
-        {/* TMA Sub-filters (Quality A/B/C and Activity) */}
-        {query.length >= 2 && counts.tma > 0 && (filter === "tma" || filter === "all") && !isLocationMode && (
+        {/* TMA Sub-filters (Quality A/B/C and Activity) - shown in both text and location search */}
+        {query.length >= 2 && counts.tma > 0 && (filter === "tma" || filter === "all" || isLocationMode) && (
           <div className="flex items-center gap-4 border-b border-gray-200 px-4 py-2 bg-purple-50/50">
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-gray-500 mr-1">Qualität:</span>
@@ -523,6 +523,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                   </div>
                   {filteredTma.map((candidate, idx) => {
                     const globalIndex = tmaStartIndex + idx;
+                    const statusTags = candidate.status_tags || [];
                     return (
                       <ResultItem
                         key={candidate.id}
@@ -535,24 +536,31 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                             <UserIcon className="h-4 w-4" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-900 truncate">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-gray-900">
                                 {candidate.first_name} {candidate.last_name}
                               </span>
+                              {/* Quality badges */}
+                              {statusTags.map((tag) => (
+                                <QualityBadge key={tag} quality={tag} />
+                              ))}
+                              {/* Activity badge */}
+                              <ActivityBadge activity={candidate.activity} />
+                              {/* Team tag */}
                               {candidate.team && <TeamTag team={candidate.team} />}
                             </div>
                             <div className="text-sm text-gray-500 truncate">
                               {candidate.position_title || candidate.email || "—"}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <div className="flex flex-col items-end gap-0.5 text-xs shrink-0">
                             {candidate.distance_km !== undefined && (
-                              <span className="font-medium text-blue-600">
+                              <span className="font-semibold text-blue-600">
                                 {candidate.distance_km} km
                               </span>
                             )}
-                            {candidate.canton && !candidate.distance_km && (
-                              <span>{candidate.canton}</span>
+                            {candidate.canton && (
+                              <span className="text-gray-400">{candidate.canton}</span>
                             )}
                           </div>
                         </div>
@@ -855,6 +863,42 @@ function RoomTag({ roomType, roomName }: { roomType: string; roomName: string | 
   return (
     <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium", style.bg, style.text)}>
       {label}
+    </span>
+  );
+}
+
+// Quality badge component (A/B/C)
+function QualityBadge({ quality }: { quality: string }) {
+  const colors: Record<string, string> = {
+    A: "bg-green-100 text-green-700 border-green-300",
+    B: "bg-yellow-100 text-yellow-700 border-yellow-300",
+    C: "bg-red-100 text-red-700 border-red-300",
+  };
+  
+  return (
+    <span className={cn(
+      "inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold border",
+      colors[quality] || "bg-gray-100 text-gray-600 border-gray-300"
+    )}>
+      {quality}
+    </span>
+  );
+}
+
+// Activity badge component
+function ActivityBadge({ activity }: { activity: string | null }) {
+  if (!activity) return null;
+  
+  const isActive = activity === "active";
+  
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border",
+      isActive 
+        ? "bg-green-50 text-green-600 border-green-300" 
+        : "bg-gray-50 text-gray-500 border-gray-300"
+    )}>
+      {isActive ? "Active" : "Not Active"}
     </span>
   );
 }
