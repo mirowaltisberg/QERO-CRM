@@ -293,7 +293,7 @@ export function TmaView({ initialCandidates }: Props) {
         {error && <p className="px-6 py-2 text-xs text-red-500">{error}</p>}
         <div className="flex-1 overflow-y-auto">
           <TmaDetail
-            key={activeCandidate?.id ?? "empty"}
+            key={`${activeCandidate?.id ?? "empty"}-${activeCandidate?.status_tags?.join(",") ?? ""}-${activeCandidate?.follow_up_at ?? ""}-${activeCandidate?.activity ?? ""}`}
             candidate={activeCandidate}
             roles={roles}
             rolesLoading={rolesLoading}
