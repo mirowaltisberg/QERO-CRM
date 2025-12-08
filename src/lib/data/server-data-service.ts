@@ -104,6 +104,7 @@ export const serverContactService = {
 
     // Merge personal settings for current user
     if (user && allContacts.length > 0) {
+      console.log("[Server Data] Merging personal settings for user:", user.id);
       const contactIds = allContacts.map((c) => c.id);
       
       // Fetch personal settings for all contacts in batches
@@ -112,18 +113,25 @@ export const serverContactService = {
       
       for (let i = 0; i < settingsBatches; i++) {
         const batchIds = contactIds.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
-        const { data: settings } = await supabase
+        const { data: settings, error } = await supabase
           .from("user_contact_settings")
           .select("*")
           .eq("user_id", user.id)
           .in("contact_id", batchIds);
         
+        if (error) {
+          console.error("[Server Data] Error fetching personal settings:", error);
+        }
+        
         if (settings) {
+          console.log(`[Server Data] Found ${settings.length} personal settings in batch ${i + 1}`);
           for (const setting of settings) {
             settingsMap[setting.contact_id] = setting;
           }
         }
       }
+      
+      console.log(`[Server Data] Total personal settings found: ${Object.keys(settingsMap).length}`);
       
       // Merge personal settings into contacts
       return allContacts.map((contact) => {
@@ -138,6 +146,8 @@ export const serverContactService = {
         }
         return contact;
       });
+    } else {
+      console.log("[Server Data] No user authenticated or no contacts to merge");
     }
 
     return allContacts;

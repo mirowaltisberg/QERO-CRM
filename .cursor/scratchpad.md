@@ -120,14 +120,16 @@ Tested in production (2025-12-08):
 3. ✅ Personal settings saved to `user_contact_settings` table
 4. ✅ Server logs show `[Personal Settings]` logs (visible in Vercel logs, not browser console)
 
-**Known UI Display Issues** (non-critical, data is correct):
-- Sidebar still shows shared `contact.status` instead of personal `user_contact_settings.status`
-- Header "SET STATUS" tag doesn't update to reflect current status
-- Status buttons DO work and highlight correctly when selected
+**Task 23: Fix Sidebar Display** (IN PROGRESS)
+- Updated `server-data-service.ts` to merge personal settings on initial page load
+- Deployed (commit: 4aacc09)
+- Testing shows sidebar still displays "NOT SET" instead of personal status
+- Need to investigate why server-side merge isn't working
 
 # Executor's Feedback or Assistance Requests
-- **Core functionality COMPLETE** - Status buttons work, data persists
-- UI display bugs are cosmetic only (consider fixing in future iteration)
+- Server-side personal settings merge not working as expected
+- Sidebar and header still show incorrect status after reload
+- May need to check user authentication in server context
 
 # Lessons
 - VAPID keys are free to generate
