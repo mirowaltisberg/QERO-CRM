@@ -109,7 +109,7 @@ export function Modal({
           </header>
         )}
 
-        <div className="px-4 py-4 text-sm text-gray-700">{children}</div>
+        <div className="px-4 py-4 text-sm text-gray-700 max-h-[60vh] overflow-y-auto">{children}</div>
 
         {footer && <footer className="border-t border-gray-100 px-4 py-3">{footer}</footer>}
       </div>

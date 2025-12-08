@@ -325,10 +325,7 @@ export function ChatView() {
           </div>
 
           {/* Input */}
-          <div 
-            className="flex-shrink-0 px-4 py-3 bg-white border-t border-gray-200"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
-          >
+          <div className="flex-shrink-0 px-4 py-3 pb-4 bg-white border-t border-gray-200">
             <ChatInput
               members={members}
               activeRoom={activeRoom}
