@@ -11,7 +11,7 @@ interface HoldToConfirmButtonProps {
   successLabel?: string;
   className?: string;
   variant?: "danger" | "warning" | "default";
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   disabled?: boolean;
 }
 
@@ -109,9 +109,10 @@ export function HoldToConfirmButton({
   };
 
   const sizeClasses = {
-    sm: "h-8 px-3 text-xs min-w-[100px]",
-    md: "h-10 px-4 text-sm min-w-[120px]",
-    lg: "h-12 px-5 text-base min-w-[140px]",
+    xs: "h-6 px-2 text-[10px] min-w-[70px]",
+    sm: "h-7 px-2.5 text-[11px] min-w-[80px]",
+    md: "h-8 px-3 text-xs min-w-[100px]",
+    lg: "h-10 px-4 text-sm min-w-[120px]",
   };
 
   const variantClasses = {
@@ -157,7 +158,7 @@ export function HoldToConfirmButton({
         sizeClasses[size],
         variantClasses[variant][state],
         state === "holding" && "scale-[0.98] cursor-grabbing",
-        state === "success" && "scale-[1.02]",
+        state === "success" && "animate-[success-shake_0.4s_ease-out]",
         disabled && "opacity-50 cursor-not-allowed",
         className
       )}
@@ -165,7 +166,10 @@ export function HoldToConfirmButton({
       {/* Progress ring */}
       {state === "holding" && (
         <svg
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 h-5 w-5"
+          className={cn(
+            "absolute right-1.5 top-1/2 -translate-y-1/2",
+            size === "xs" || size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4"
+          )}
           viewBox="0 0 36 36"
         >
           {/* Background ring */}
@@ -175,7 +179,7 @@ export function HoldToConfirmButton({
             r="15.9155"
             fill="none"
             stroke="currentColor"
-            strokeWidth="3"
+            strokeWidth="4"
             className="opacity-20"
           />
           {/* Progress ring */}
@@ -184,7 +188,7 @@ export function HoldToConfirmButton({
             cy="18"
             r="15.9155"
             fill="none"
-            strokeWidth="3"
+            strokeWidth="4"
             strokeLinecap="round"
             className={progressColor[variant]}
             style={{
@@ -197,29 +201,32 @@ export function HoldToConfirmButton({
         </svg>
       )}
 
-      {/* Success checkmark */}
+      {/* Success checkmark with confetti-like burst */}
       {state === "success" && (
-        <svg
-          className="h-4 w-4 animate-[pop-in_0.3s_ease-out]"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={3}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M5 13l4 4L19 7"
-          />
-        </svg>
+        <span className="relative flex items-center justify-center">
+          <span className="absolute inset-0 animate-[success-burst_0.5s_ease-out]" />
+          <svg
+            className="h-3.5 w-3.5 animate-[pop-in_0.3s_ease-out]"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={3}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        </span>
       )}
 
       {/* Label */}
       <span
         className={cn(
           "transition-all duration-200",
-          state === "holding" && "pr-5",
-          state === "success" && "font-semibold"
+          state === "holding" && (size === "xs" || size === "sm" ? "pr-3" : "pr-4"),
+          state === "success" && "font-medium"
         )}
       >
         {getLabel()}

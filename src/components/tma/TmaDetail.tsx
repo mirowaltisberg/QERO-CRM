@@ -235,9 +235,9 @@ export function TmaDetail({
                   onConfirm={onUnclaim}
                   label="Freigeben"
                   confirmLabel="Halten..."
-                  successLabel="Freigegeben!"
+                  successLabel="✓"
                   variant="danger"
-                  size="sm"
+                  size="xs"
                   holdDuration={1200}
                 />
               </>
