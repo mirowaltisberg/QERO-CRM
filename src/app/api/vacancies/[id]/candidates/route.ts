@@ -54,28 +54,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const assignedTmaIds = new Set(assignedCandidates?.map(c => c.tma_id) || []);
 
-    // Build query for TMA candidates
-    let query = supabase
+    // Build query for TMA candidates - fetch all, filter/score in JS
+    const { data: allCandidates, error: candidatesError } = await supabase
       .from("tma_candidates")
       .select(`
         *,
         claimer:profiles!tma_candidates_claimed_by_fkey(id, full_name, avatar_url)
-      `)
-      .eq("activity", "active"); // Only active candidates
-
-    // Filter by role if specified
-    if (vacancy.role) {
-      query = query.ilike("position_title", `%${vacancy.role}%`);
-    }
-
-    const { data: allCandidates, error: candidatesError } = await query;
+      `);
 
     if (candidatesError) {
       console.error("[Candidates API] Error fetching candidates:", candidatesError);
       return NextResponse.json({ error: candidatesError.message }, { status: 500 });
     }
 
-    // Filter and score candidates
+    // Score all candidates - more lenient matching, sort by relevance
     const suggestedCandidates: Array<TmaCandidate & { distance_km: number; match_score: number }> = [];
 
     for (const candidate of allCandidates || []) {
@@ -84,6 +76,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
       // Calculate distance if vacancy has location
       let distance_km = 0;
+      let withinRadius = true;
       if (vacancy.latitude && vacancy.longitude && candidate.latitude && candidate.longitude) {
         distance_km = haversineDistance(
           vacancy.latitude,
@@ -91,50 +84,60 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           candidate.latitude,
           candidate.longitude
         );
-
-        // Skip if outside radius
-        if (vacancy.radius_km && distance_km > vacancy.radius_km) continue;
+        withinRadius = !vacancy.radius_km || distance_km <= vacancy.radius_km;
       }
 
-      // Check quality requirement
+      // Check quality
       const candidateQualities: string[] = candidate.status_tags || (candidate.status ? [candidate.status] : []);
       const minQualityRank = vacancy.min_quality ? QUALITY_RANK[vacancy.min_quality] : 0;
       const candidateBestQuality = Math.max(...candidateQualities.map((q: string) => QUALITY_RANK[q] || 0), 0);
+      const meetsQuality = minQualityRank === 0 || candidateBestQuality >= minQualityRank;
 
-      // Skip if quality doesn't meet minimum
-      if (minQualityRank > 0 && candidateBestQuality < minQualityRank) continue;
+      // Check role match
+      const roleMatches = !vacancy.role || 
+        candidate.position_title?.toLowerCase().includes(vacancy.role.toLowerCase());
+
+      // Check if active
+      const isActive = candidate.activity === "active";
 
       // Calculate match score (0-100)
-      let match_score = 50; // Base score
+      let match_score = 30; // Base score
+
+      // Activity bonus (+20 for active)
+      if (isActive) match_score += 20;
 
       // Quality bonus (up to +30)
       match_score += candidateBestQuality * 10;
 
-      // Distance penalty (up to -20 for far candidates)
-      if (vacancy.radius_km && distance_km > 0) {
-        const distancePenalty = Math.min(20, (distance_km / vacancy.radius_km) * 20);
-        match_score -= distancePenalty;
+      // Role match bonus (+15)
+      if (roleMatches && vacancy.role) match_score += 15;
+
+      // Location bonus (+15 if within radius, penalty if outside)
+      if (withinRadius) {
+        match_score += 15;
+        // Small distance penalty within radius
+        if (vacancy.radius_km && distance_km > 0) {
+          const distancePenalty = Math.min(10, (distance_km / vacancy.radius_km) * 10);
+          match_score -= distancePenalty;
+        }
+      } else {
+        match_score -= 10; // Penalty for being outside radius
       }
 
-      // Role match bonus (+10 if exact match)
-      if (vacancy.role && candidate.position_title?.toLowerCase().includes(vacancy.role.toLowerCase())) {
-        match_score += 10;
-      }
+      // Quality penalty if below minimum
+      if (!meetsQuality) match_score -= 15;
 
       suggestedCandidates.push({
         ...candidate,
         distance_km: Math.round(distance_km * 10) / 10,
-        match_score: Math.round(match_score),
+        match_score: Math.max(0, Math.round(match_score)),
       });
     }
 
-    // Sort by quality (A first), then by distance
+    // Sort by match score (highest first), then by distance
     suggestedCandidates.sort((a, b) => {
-      const aQuality = Math.max(...(a.status_tags || []).map((q: string) => QUALITY_RANK[q] || 0), 0);
-      const bQuality = Math.max(...(b.status_tags || []).map((q: string) => QUALITY_RANK[q] || 0), 0);
-      
-      if (bQuality !== aQuality) return bQuality - aQuality; // Higher quality first
-      return a.distance_km - b.distance_km; // Closer first
+      if (b.match_score !== a.match_score) return b.match_score - a.match_score;
+      return a.distance_km - b.distance_km; // Closer first as tiebreaker
     });
 
     // Format assigned candidates with distance
