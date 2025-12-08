@@ -1,14 +1,26 @@
 "use client";
 
-import { memo, useState, useCallback, useEffect } from "react";
+import { memo, useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import { Panel } from "@/components/ui/panel";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import type { ContactNote, TmaNote } from "@/lib/types";
+import { QuickVacancyPopup } from "./QuickVacancyPopup";
 
 type NoteType = ContactNote | TmaNote;
+
+// Contact info needed for vacancy creation
+interface ContactForVacancy {
+  id: string;
+  company_name: string;
+  city: string | null;
+  postal_code: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  team_id: string | null;
+}
 
 interface NotesPanelProps {
   entityId: string | null;
@@ -17,6 +29,8 @@ interface NotesPanelProps {
   onSaveLegacyNotes?: (value: string | null) => Promise<void>;
   onNoteAdded?: () => void;
   currentUserId?: string;
+  // Contact data for quick vacancy creation (only for contacts)
+  contactForVacancy?: ContactForVacancy | null;
 }
 
 export const NotesPanel = memo(function NotesPanel({
@@ -26,11 +40,16 @@ export const NotesPanel = memo(function NotesPanel({
   onSaveLegacyNotes,
   onNoteAdded,
   currentUserId,
+  contactForVacancy,
 }: NotesPanelProps) {
   const [notes, setNotes] = useState<NoteType[]>([]);
   const [newNote, setNewNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Quick vacancy popup state
+  const [showVacancyPopup, setShowVacancyPopup] = useState(false);
+  const lastTriggerRef = useRef<string>("");
 
   const apiPath = entityType === "contact" 
     ? `/api/contacts/${entityId}/notes`
@@ -120,6 +139,30 @@ export const NotesPanel = memo(function NotesPanel({
     };
   }, [entityId, entityType, tableName, filterColumn, apiPath]);
 
+  // Detect "sucht:" trigger for quick vacancy creation
+  useEffect(() => {
+    // Only trigger for contacts with vacancy data available
+    if (entityType !== "contact" || !contactForVacancy) return;
+    
+    const lowerNote = newNote.toLowerCase();
+    const trigger = "sucht:";
+    
+    // Check if note ends with "sucht:" and we haven't already triggered for this
+    if (lowerNote.endsWith(trigger) && lastTriggerRef.current !== newNote) {
+      lastTriggerRef.current = newNote;
+      setShowVacancyPopup(true);
+    }
+  }, [newNote, entityType, contactForVacancy]);
+
+  // Handle vacancy created - optionally add note about it
+  const handleVacancyCreated = useCallback(() => {
+    // Clear the trigger word from the note
+    if (newNote.toLowerCase().endsWith("sucht:")) {
+      setNewNote(newNote.slice(0, -6).trimEnd());
+    }
+    lastTriggerRef.current = "";
+  }, [newNote]);
+
   const handleSubmit = useCallback(async () => {
     if (!entityId || !newNote.trim()) return;
 
@@ -164,6 +207,7 @@ export const NotesPanel = memo(function NotesPanel({
   }
 
   return (
+    <>
     <Panel title="Notes" description="Team notes with attribution" className="h-full flex flex-col min-h-0 overflow-hidden">
       {/* New note input */}
       <div className="mb-4 flex-shrink-0">
@@ -171,7 +215,10 @@ export const NotesPanel = memo(function NotesPanel({
           value={newNote}
           onChange={(e) => setNewNote(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Add a note... (Cmd+Enter to submit)"
+          placeholder={entityType === "contact" && contactForVacancy 
+            ? "Add a note... (type 'sucht:' to create vacancy)"
+            : "Add a note... (Cmd+Enter to submit)"
+          }
           className="min-h-[80px]"
         />
         <div className="mt-2 flex justify-end">
@@ -222,6 +269,20 @@ export const NotesPanel = memo(function NotesPanel({
         )}
       </div>
     </Panel>
+    
+    {/* Quick Vacancy Popup */}
+    {contactForVacancy && (
+      <QuickVacancyPopup
+        isOpen={showVacancyPopup}
+        onClose={() => {
+          setShowVacancyPopup(false);
+          lastTriggerRef.current = "";
+        }}
+        contact={contactForVacancy}
+        onCreated={handleVacancyCreated}
+      />
+    )}
+    </>
   );
 });
 

@@ -287,6 +287,15 @@ export const ContactDetail = memo(function ContactDetail({
             legacyNotes={contact.notes}
             onSaveLegacyNotes={onSaveNotes}
             onNoteAdded={onNoteAdded}
+            contactForVacancy={{
+              id: contact.id,
+              company_name: contact.company_name,
+              city: contact.city,
+              postal_code: contact.postal_code,
+              latitude: contact.latitude,
+              longitude: contact.longitude,
+              team_id: contact.team_id,
+            }}
           />
         </div>
 
