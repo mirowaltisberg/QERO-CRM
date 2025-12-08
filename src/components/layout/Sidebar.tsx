@@ -271,7 +271,7 @@ export function Sidebar({ user, profile }: SidebarProps) {
               <kbd className="kbd">Q</kbd>
             </div>
             <div className="flex items-center justify-between pt-1">
-              <span className="text-gray-300">v1.03.5</span>
+              <span className="text-gray-300">v1.03.6</span>
             </div>
           </div>
         ) : (

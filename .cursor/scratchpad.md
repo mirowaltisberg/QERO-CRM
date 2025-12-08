@@ -180,3 +180,6 @@ Root cause identified: API routes were using browser Supabase client (`createBro
 - Client-side batching prevents 400 errors when dataset exceeds API limits (batch size <50% of server limit for safety margin)
 - **CRITICAL: NEVER use Cursor worktree for code changes, OR if used, ALWAYS sync to main repo immediately** - changes in worktree don't deploy to production!
 - **API routes MUST use server Supabase client** - `createClient` from `@/lib/supabase/server`, NOT from `@/lib/supabase/client`. Browser client has no auth context in server context, so `auth.getUser()` returns null.
+- **CRITICAL: Never hardcode status_tags in API payloads** - The `scheduleFollowUp` was sending `status_tags: ["C"]` which wiped out existing quality ratings. Follow-ups should be independent from quality assessment.
+- **Realtime can cause race conditions** - When updating data, realtime subscription might fire and overwrite local state. Use a skip mechanism to ignore realtime updates for recently-modified records.
+- **ALWAYS update version number** on every deploy (format: v1.XX.X - major.middle.small)

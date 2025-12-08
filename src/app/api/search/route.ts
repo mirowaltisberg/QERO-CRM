@@ -27,6 +27,8 @@ export interface SearchResultTma {
   canton: string | null;
   team_id: string | null;
   team: { name: string; color: string } | null;
+  status_tags: string[] | null;
+  activity: string | null;
   distance_km?: number;
 }
 
@@ -144,13 +146,15 @@ async function handleTextSearch(
     position_title: string | null;
     canton: string | null;
     team_id: string | null;
+    status_tags: string[] | null;
+    activity: string | null;
   }> = [];
 
   if (words.length > 1) {
     // Multi-word search: fetch all and filter in JS
     const { data: allTma } = await supabase
       .from("tma_candidates")
-      .select(`id, first_name, last_name, email, phone, position_title, canton, team_id`)
+      .select(`id, first_name, last_name, email, phone, position_title, canton, team_id, status_tags, activity`)
       .limit(500);
     
     tma = (allTma || []).filter(t => {
@@ -177,7 +181,7 @@ async function handleTextSearch(
     // Single word search: use original pattern
     const { data, error } = await supabase
       .from("tma_candidates")
-      .select(`id, first_name, last_name, email, phone, position_title, canton, team_id`)
+      .select(`id, first_name, last_name, email, phone, position_title, canton, team_id, status_tags, activity`)
       .or(`first_name.ilike.${searchPattern},last_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern}`)
       .limit(MAX_RESULTS_PER_TYPE);
     
@@ -350,6 +354,8 @@ async function handleTextSearch(
     canton: t.canton,
     team_id: t.team_id,
     team: t.team_id ? teamsMap[t.team_id] || null : null,
+    status_tags: t.status_tags,
+    activity: t.activity,
   }));
 
   const emailResults: SearchResultEmail[] = (emails || []).map((e) => ({
@@ -429,7 +435,9 @@ async function handleLocationSearch(
       canton,
       team_id,
       latitude,
-      longitude
+      longitude,
+      status_tags,
+      activity
     `)
     .not("latitude", "is", null)
     .not("longitude", "is", null)
@@ -499,6 +507,8 @@ async function handleLocationSearch(
     canton: t.canton,
     team_id: t.team_id,
     team: t.team_id ? teamsMap[t.team_id] || null : null,
+    status_tags: t.status_tags,
+    activity: t.activity,
     distance_km: Math.round(t.distance_km * 10) / 10,
   }));
 

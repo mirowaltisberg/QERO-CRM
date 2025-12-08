@@ -40,6 +40,8 @@ interface SearchResultTma {
   canton: string | null;
   team_id: string | null;
   team: TeamInfo | null;
+  status_tags: string[] | null;
+  activity: string | null;
   distance_km?: number;
 }
 
@@ -82,6 +84,8 @@ interface CommandPaletteProps {
 }
 
 type FilterType = "all" | "contacts" | "tma" | "emails" | "chat";
+type TmaQualityFilter = "all" | "A" | "B" | "C";
+type TmaActivityFilter = "all" | "active" | "not_active";
 
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const router = useRouter();
@@ -98,10 +102,27 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [radius, setRadius] = useState(25);
   const [location, setLocation] = useState<LocationInfo | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [tmaQualityFilter, setTmaQualityFilter] = useState<TmaQualityFilter>("all");
+  const [tmaActivityFilter, setTmaActivityFilter] = useState<TmaActivityFilter>("all");
 
   // Filter results based on selected filter
   const filteredContacts = filter === "all" || filter === "contacts" ? contacts : [];
-  const filteredTma = filter === "all" || filter === "tma" ? tma : [];
+  
+  // Apply TMA sub-filters (quality and activity)
+  const filteredTma = (filter === "all" || filter === "tma" ? tma : []).filter((t) => {
+    // Quality filter
+    if (tmaQualityFilter !== "all") {
+      const tags = t.status_tags || [];
+      if (!tags.includes(tmaQualityFilter)) return false;
+    }
+    // Activity filter
+    if (tmaActivityFilter !== "all") {
+      if (tmaActivityFilter === "active" && t.activity !== "active") return false;
+      if (tmaActivityFilter === "not_active" && t.activity !== "not_active") return false;
+    }
+    return true;
+  });
+  
   const filteredEmails = filter === "all" || filter === "emails" ? emails : [];
   const filteredChatRooms = filter === "all" || filter === "chat" ? chatRooms : [];
   const filteredChat = filter === "all" || filter === "chat" ? chat : [];
@@ -137,6 +158,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       setIsLocationMode(false);
       setLocation(null);
       setFilter("all");
+      setTmaQualityFilter("all");
+      setTmaActivityFilter("all");
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
@@ -336,6 +359,66 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 Chat ({counts.chat})
               </FilterButton>
             )}
+          </div>
+        )}
+
+        {/* TMA Sub-filters (Quality A/B/C and Activity) */}
+        {query.length >= 2 && counts.tma > 0 && (filter === "tma" || filter === "all") && !isLocationMode && (
+          <div className="flex items-center gap-4 border-b border-gray-200 px-4 py-2 bg-purple-50/50">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500 mr-1">Qualität:</span>
+              <TmaSubFilterButton
+                active={tmaQualityFilter === "all"}
+                onClick={() => { setTmaQualityFilter("all"); setSelectedIndex(0); }}
+              >
+                Alle
+              </TmaSubFilterButton>
+              <TmaSubFilterButton
+                active={tmaQualityFilter === "A"}
+                onClick={() => { setTmaQualityFilter("A"); setSelectedIndex(0); }}
+                color="green"
+              >
+                A
+              </TmaSubFilterButton>
+              <TmaSubFilterButton
+                active={tmaQualityFilter === "B"}
+                onClick={() => { setTmaQualityFilter("B"); setSelectedIndex(0); }}
+                color="yellow"
+              >
+                B
+              </TmaSubFilterButton>
+              <TmaSubFilterButton
+                active={tmaQualityFilter === "C"}
+                onClick={() => { setTmaQualityFilter("C"); setSelectedIndex(0); }}
+                color="red"
+              >
+                C
+              </TmaSubFilterButton>
+            </div>
+            <div className="w-px h-4 bg-gray-300" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500 mr-1">Aktivität:</span>
+              <TmaSubFilterButton
+                active={tmaActivityFilter === "all"}
+                onClick={() => { setTmaActivityFilter("all"); setSelectedIndex(0); }}
+              >
+                Alle
+              </TmaSubFilterButton>
+              <TmaSubFilterButton
+                active={tmaActivityFilter === "active"}
+                onClick={() => { setTmaActivityFilter("active"); setSelectedIndex(0); }}
+                color="green"
+              >
+                Active
+              </TmaSubFilterButton>
+              <TmaSubFilterButton
+                active={tmaActivityFilter === "not_active"}
+                onClick={() => { setTmaActivityFilter("not_active"); setSelectedIndex(0); }}
+                color="gray"
+              >
+                Not Active
+              </TmaSubFilterButton>
+            </div>
           </div>
         )}
 
@@ -691,6 +774,51 @@ function FilterButton({
       onClick={onClick}
       className={cn(
         "px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap",
+        active ? colors[color].active : colors[color].inactive
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+// TMA sub-filter button component (smaller, more subtle)
+function TmaSubFilterButton({
+  children,
+  active,
+  onClick,
+  color = "gray",
+}: {
+  children: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+  color?: "gray" | "green" | "yellow" | "red";
+}) {
+  const colors = {
+    gray: {
+      active: "bg-gray-700 text-white",
+      inactive: "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200",
+    },
+    green: {
+      active: "bg-green-500 text-white",
+      inactive: "bg-white text-green-600 hover:bg-green-50 border border-green-200",
+    },
+    yellow: {
+      active: "bg-yellow-500 text-white",
+      inactive: "bg-white text-yellow-600 hover:bg-yellow-50 border border-yellow-200",
+    },
+    red: {
+      active: "bg-red-500 text-white",
+      inactive: "bg-white text-red-600 hover:bg-red-50 border border-red-200",
+    },
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "px-2 py-1 rounded text-[11px] font-medium transition-colors whitespace-nowrap",
         active ? colors[color].active : colors[color].inactive
       )}
     >
