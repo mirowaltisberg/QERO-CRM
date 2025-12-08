@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { NotesPanel } from "@/components/calling/NotesPanel";
 import { RoleDropdown } from "./RoleDropdown";
+import { HoldToConfirmButton } from "@/components/ui/HoldToConfirmButton";
 import type { TmaCandidate, TmaRole } from "@/lib/types";
 import { 
   TMA_STATUS_LIST, 
@@ -230,12 +231,15 @@ export function TmaDetail({
                   )}
                 </div>
                 <span className="text-xs text-gray-500">{claimer.full_name}</span>
-                <button
-                  onClick={onUnclaim}
-                  className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  (Freigeben)
-                </button>
+                <HoldToConfirmButton
+                  onConfirm={onUnclaim}
+                  label="Freigeben"
+                  confirmLabel="Halten..."
+                  successLabel="Freigegeben!"
+                  variant="danger"
+                  size="sm"
+                  holdDuration={1200}
+                />
               </>
             ) : (
               <>

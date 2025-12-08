@@ -83,34 +83,14 @@ TmaView / CommandPalette / etc. consume from cache (instant!)
 
 ### High-level Task Breakdown
 
-- [ ] **26.1** Create `TmaCacheContext` and `TmaCacheProvider`
-  - State: `candidates`, `loading`, `error`, `lastFetched`
-  - Methods: `refreshCache()`, `updateCandidate()`, `invalidate()`
-  
-- [ ] **26.2** Fetch TMA data on provider mount
-  - Call `/api/tma` endpoint
-  - Store in context state
-  - Set `lastFetched` timestamp
+- [x] **26.1** Create `TmaCacheContext` and `TmaCacheProvider` ✅
+- [x] **26.2** Fetch TMA data on provider mount ✅
+- [x] **26.3** Global realtime subscription ✅
+- [x] **26.4** Integrate with TmaView ✅
+- [x] **26.5** Integrate with CommandPalette ✅
+- [x] **26.6** Add cache invalidation strategy ✅
 
-- [ ] **26.3** Global realtime subscription
-  - Subscribe to `tma_candidates` table changes
-  - Handle INSERT: add to cache
-  - Handle UPDATE: merge into cache (respect local updates)
-  - Handle DELETE: remove from cache
-
-- [ ] **26.4** Integrate with TmaView
-  - Use cached data instead of server-fetched `initialCandidates`
-  - Fall back to server data if cache not ready
-  - Keep existing `useTmaCandidates` logic for local state
-
-- [ ] **26.5** Integrate with CommandPalette
-  - Search uses cached TMA data (instant results)
-  - No API call needed for TMA search if cache is fresh
-
-- [ ] **26.6** Add cache invalidation strategy
-  - Refresh if cache is older than 5 minutes
-  - Force refresh on visibility change (tab focus)
-  - Manual refresh button
+**COMPLETED** - Deployed v1.06.0
 
 ### Key Design Decisions
 - **Fetch on app load, not page load** - cache warms up immediately
