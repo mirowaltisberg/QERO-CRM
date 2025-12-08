@@ -420,3 +420,66 @@ export interface ChatMember {
   team_id: string | null;
   team?: { id: string; name: string; color: string } | null;
 }
+
+// ============================================
+// VAKANZEN (VACANCIES) TYPES
+// ============================================
+
+export type VacancyStatus = "open" | "interviewing" | "filled";
+export type VacancyCandidateStatus = "suggested" | "contacted" | "interviewing" | "rejected" | "hired";
+
+/**
+ * Vacancy - A job opening posted by a company
+ */
+export interface Vacancy {
+  id: string;
+  contact_id: string;
+  contact?: Contact; // Joined company info
+  title: string;
+  role: string | null; // For TMA matching
+  description: string | null;
+  city: string | null;
+  postal_code: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  radius_km: number;
+  min_quality: "A" | "B" | "C" | null;
+  status: VacancyStatus;
+  created_by: string;
+  creator?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
+  created_at: string;
+  updated_at: string;
+  // Computed fields
+  candidate_count?: number;
+}
+
+/**
+ * VacancyCandidate - A TMA candidate matched/assigned to a vacancy
+ */
+export interface VacancyCandidate {
+  id: string;
+  vacancy_id: string;
+  tma_id: string;
+  tma?: TmaCandidate; // Joined candidate info
+  status: VacancyCandidateStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  // Computed fields (from matching)
+  distance_km?: number;
+  match_score?: number;
+}
+
+/**
+ * Filter options for vacancies
+ */
+export interface VacancyFilters {
+  status?: VacancyStatus;
+  role?: string;
+  search?: string;
+  contact_id?: string;
+}

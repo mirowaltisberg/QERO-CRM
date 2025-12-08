@@ -93,6 +93,7 @@ const NAV_ITEMS = [
   { id: "nav-calling", name: "Calling", href: "/calling", icon: "📞", aliases: ["cal", "call", "anrufen", "phone"] },
   { id: "nav-companies", name: "Companies", href: "/contacts", icon: "🏢", aliases: ["comp", "firmen", "firma", "kontakte", "contacts"] },
   { id: "nav-tma", name: "TMA", href: "/tma", icon: "👥", aliases: ["kandidaten", "candidates"] },
+  { id: "nav-vakanzen", name: "Vakanzen", href: "/vakanzen", icon: "💼", aliases: ["vak", "jobs", "stellen", "vacancies", "vacancy"] },
   { id: "nav-email", name: "Email", href: "/email", icon: "✉️", aliases: ["mail", "emails", "nachrichten"] },
   { id: "nav-chat", name: "Chat", href: "/chat", icon: "💬", aliases: ["messages", "dm", "direct"] },
   { id: "nav-dashboard", name: "Dashboard", href: "/dashboard", icon: "📊", aliases: ["dash", "stats", "übersicht"] },

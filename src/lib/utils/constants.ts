@@ -152,3 +152,69 @@ export const SWISS_CANTONS = [
 
 export type SwissCanton = (typeof SWISS_CANTONS)[number];
 
+/**
+ * Vacancy Status Options
+ */
+export const VACANCY_STATUS = {
+  OPEN: "open",
+  INTERVIEWING: "interviewing",
+  FILLED: "filled",
+} as const;
+
+export type VacancyStatus = (typeof VACANCY_STATUS)[keyof typeof VACANCY_STATUS];
+
+export const VACANCY_STATUS_LIST = [
+  VACANCY_STATUS.OPEN,
+  VACANCY_STATUS.INTERVIEWING,
+  VACANCY_STATUS.FILLED,
+] as const;
+
+export const VACANCY_STATUS_LABELS: Record<VacancyStatus, string> = {
+  open: "Offen",
+  interviewing: "Im Gespräch",
+  filled: "Besetzt",
+};
+
+export const VACANCY_STATUS_COLORS: Record<VacancyStatus, string> = {
+  open: "bg-blue-100 text-blue-700 border-blue-200",
+  interviewing: "bg-amber-100 text-amber-700 border-amber-200",
+  filled: "bg-green-100 text-green-700 border-green-200",
+};
+
+/**
+ * Vacancy Candidate Status Options
+ */
+export const VACANCY_CANDIDATE_STATUS = {
+  SUGGESTED: "suggested",
+  CONTACTED: "contacted",
+  INTERVIEWING: "interviewing",
+  REJECTED: "rejected",
+  HIRED: "hired",
+} as const;
+
+export type VacancyCandidateStatus = (typeof VACANCY_CANDIDATE_STATUS)[keyof typeof VACANCY_CANDIDATE_STATUS];
+
+export const VACANCY_CANDIDATE_STATUS_LIST = [
+  VACANCY_CANDIDATE_STATUS.SUGGESTED,
+  VACANCY_CANDIDATE_STATUS.CONTACTED,
+  VACANCY_CANDIDATE_STATUS.INTERVIEWING,
+  VACANCY_CANDIDATE_STATUS.REJECTED,
+  VACANCY_CANDIDATE_STATUS.HIRED,
+] as const;
+
+export const VACANCY_CANDIDATE_STATUS_LABELS: Record<VacancyCandidateStatus, string> = {
+  suggested: "Vorgeschlagen",
+  contacted: "Kontaktiert",
+  interviewing: "Im Gespräch",
+  rejected: "Abgelehnt",
+  hired: "Eingestellt",
+};
+
+export const VACANCY_CANDIDATE_STATUS_COLORS: Record<VacancyCandidateStatus, string> = {
+  suggested: "bg-gray-100 text-gray-700 border-gray-200",
+  contacted: "bg-blue-100 text-blue-700 border-blue-200",
+  interviewing: "bg-amber-100 text-amber-700 border-amber-200",
+  rejected: "bg-red-100 text-red-700 border-red-200",
+  hired: "bg-green-100 text-green-700 border-green-200",
+};
+
