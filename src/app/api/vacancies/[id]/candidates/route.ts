@@ -101,31 +101,39 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const isActive = candidate.activity === "active";
 
       // Calculate match score (0-100)
-      let match_score = 30; // Base score
+      // PRIORITY: Location (40pts) + Quality (35pts) = 75% of score
+      let match_score = 10; // Base score
 
-      // Activity bonus (+20 for active)
-      if (isActive) match_score += 20;
-
-      // Quality bonus (up to +30)
-      match_score += candidateBestQuality * 10;
-
-      // Role match bonus (+15)
-      if (roleMatches && vacancy.role) match_score += 15;
-
-      // Location bonus (+15 if within radius, penalty if outside)
+      // === LOCATION (most important - up to 40 points) ===
       if (withinRadius) {
-        match_score += 15;
-        // Small distance penalty within radius
+        match_score += 40;
+        // Bonus for being closer (up to +10 more)
         if (vacancy.radius_km && distance_km > 0) {
-          const distancePenalty = Math.min(10, (distance_km / vacancy.radius_km) * 10);
-          match_score -= distancePenalty;
+          const closenessBonus = Math.round(10 * (1 - distance_km / vacancy.radius_km));
+          match_score += Math.max(0, closenessBonus);
+        } else {
+          match_score += 10; // No location data = full bonus
         }
       } else {
-        match_score -= 10; // Penalty for being outside radius
+        // Outside radius - heavy penalty
+        match_score -= 20;
       }
 
-      // Quality penalty if below minimum
-      if (!meetsQuality) match_score -= 15;
+      // === QUALITY (second most important - up to 35 points) ===
+      // A = 35pts, B = 25pts, C = 15pts, None = 0pts
+      if (candidateBestQuality === 3) match_score += 35; // A
+      else if (candidateBestQuality === 2) match_score += 25; // B
+      else if (candidateBestQuality === 1) match_score += 15; // C
+
+      // Penalty if below minimum quality requirement
+      if (!meetsQuality) match_score -= 20;
+
+      // === SECONDARY FACTORS ===
+      // Activity bonus (+10 for active)
+      if (isActive) match_score += 10;
+
+      // Role match bonus (+5)
+      if (roleMatches && vacancy.role) match_score += 5;
 
       suggestedCandidates.push({
         ...candidate,
