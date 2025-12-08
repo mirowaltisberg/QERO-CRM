@@ -34,13 +34,13 @@ function getItemStyles(status: string | null, hasVacancy: boolean, isActive: boo
   }
   if (status === "hot") {
     return isActive
-      ? "bg-orange-50 border-orange-200 shadow-sm"
-      : "bg-orange-50/60 border-orange-100 hover:bg-orange-50";
+      ? "bg-rose-50 border-rose-200 shadow-sm"
+      : "bg-rose-50/60 border-rose-100 hover:bg-rose-50";
   }
   if (hasFollowUp) {
     return isActive
-      ? "bg-amber-50 border-amber-200 shadow-sm"
-      : "bg-amber-50/60 border-amber-100 hover:bg-amber-50";
+      ? "bg-sky-50 border-sky-200 shadow-sm"
+      : "bg-sky-50/60 border-sky-100 hover:bg-sky-50";
   }
   if (status === "working") {
     return isActive
@@ -56,7 +56,7 @@ function getItemStyles(status: string | null, hasVacancy: boolean, isActive: boo
 const StatusBadge = memo(function StatusBadge({ status, hasFollowUp }: { status: string | null; hasFollowUp: boolean }) {
   if (status === "hot") {
     return (
-      <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-orange-100 text-orange-700">
+      <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-rose-100 text-rose-700">
         <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
         </svg>
@@ -66,7 +66,7 @@ const StatusBadge = memo(function StatusBadge({ status, hasFollowUp }: { status:
   }
   if (hasFollowUp) {
     return (
-      <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-amber-100 text-amber-700">
+      <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-sky-100 text-sky-700">
         <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
         </svg>
