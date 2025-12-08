@@ -33,6 +33,8 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
     async function loadPersonalSettings() {
       try {
         const contactIds = initialContacts.map(c => c.id);
+        console.log("[Personal Settings] Fetching for", contactIds.length, "contacts");
+        
         const response = await fetch("/api/contacts/personal-settings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -42,14 +44,24 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
         if (response.ok) {
           const { data } = await response.json();
           const settingsMap = data || {};
+          console.log("[Personal Settings] Received settings for", Object.keys(settingsMap).length, "contacts");
+          console.log("[Personal Settings] Settings map:", settingsMap);
           
           // Merge personal settings with contacts
-          setContacts(prev => prev.map(contact => ({
-            ...contact,
-            status: settingsMap[contact.id]?.status ?? contact.status,
-            follow_up_at: settingsMap[contact.id]?.follow_up_at ?? contact.follow_up_at,
-            follow_up_note: settingsMap[contact.id]?.follow_up_note ?? contact.follow_up_note,
-          })));
+          setContacts(prev => prev.map(contact => {
+            const merged = {
+              ...contact,
+              status: settingsMap[contact.id]?.status ?? contact.status,
+              follow_up_at: settingsMap[contact.id]?.follow_up_at ?? contact.follow_up_at,
+              follow_up_note: settingsMap[contact.id]?.follow_up_note ?? contact.follow_up_note,
+            };
+            if (settingsMap[contact.id]) {
+              console.log("[Personal Settings] Merged contact", contact.company_name, "- status:", merged.status);
+            }
+            return merged;
+          }));
+        } else {
+          console.error("[Personal Settings] API error:", response.status, await response.text());
         }
       } catch (err) {
         console.error("[Personal Settings] Failed to load:", err);
