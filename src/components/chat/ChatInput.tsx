@@ -132,6 +132,10 @@ export const ChatInput = memo(function ChatInput({
     []
   );
 
+  // Refs to hold latest function references for keyboard handler
+  const handleSendRef = useRef<() => void>(() => {});
+  const insertMentionRef = useRef<(member: ChatMember) => void>(() => {});
+
   // Handle keyboard navigation in mentions
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -148,14 +152,14 @@ export const ChatInput = memo(function ChatInput({
           e.preventDefault();
           const selectedMember = filteredMembers[mentionIndex];
           if (selectedMember) {
-            insertMention(selectedMember);
+            insertMentionRef.current(selectedMember);
           }
         } else if (e.key === "Escape") {
           setShowMentions(false);
         }
       } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        handleSend();
+        handleSendRef.current();
       }
     },
     [showMentions, filteredMembers, mentionIndex]
@@ -191,6 +195,9 @@ export const ChatInput = memo(function ChatInput({
     },
     [content]
   );
+
+  // Update ref for keyboard handler
+  insertMentionRef.current = insertMention;
 
   // Handle file selection
   const handleFileSelect = useCallback(
@@ -329,6 +336,9 @@ export const ChatInput = memo(function ChatInput({
       setSending(false);
     }
   }, [content, attachments, members, onSend, sending]);
+
+  // Update ref for keyboard handler
+  handleSendRef.current = handleSend;
 
   // Cleanup object URLs on unmount
   useEffect(() => {
