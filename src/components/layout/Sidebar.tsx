@@ -262,7 +262,7 @@ export function Sidebar({ user, profile }: SidebarProps) {
         </div>
       )}
 
-      {/* Keyboard hints */}
+      {/* Keyboard hints + version */}
       <div className="p-4 border-t border-border">
         {!isCollapsed ? (
           <div className="text-xs text-gray-400 space-y-1">
@@ -270,10 +270,14 @@ export function Sidebar({ user, profile }: SidebarProps) {
               <span>Command palette</span>
               <kbd className="kbd">Q</kbd>
             </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-gray-300">v1.00.0</span>
+            </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center text-xs text-gray-400">
+          <div className="flex flex-col items-center gap-1 text-xs text-gray-400">
             <kbd className="kbd">Q</kbd>
+            <span className="text-[10px] text-gray-300">v1.00.0</span>
           </div>
         )}
       </div>
