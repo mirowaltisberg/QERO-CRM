@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { looksLikeSwissLocation } from "@/lib/geo/client";
+import { useTmaCacheOptional } from "@/lib/cache/TmaCacheContext";
 
 interface TeamInfo {
   name: string;
@@ -109,12 +110,64 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [chatRooms, setChatRooms] = useState<SearchResultChatRoom[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  
+  // Get cached TMA data for instant search
+  const tmaCache = useTmaCacheOptional();
+  
   const [isLocationMode, setIsLocationMode] = useState(false);
   const [radius, setRadius] = useState(25);
   const [location, setLocation] = useState<LocationInfo | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
   const [tmaQualityFilter, setTmaQualityFilter] = useState<TmaQualityFilter>("all");
   const [tmaActivityFilter, setTmaActivityFilter] = useState<TmaActivityFilter>("all");
+
+  // Instant TMA search from cache (no API call needed)
+  const cachedTmaResults = useMemo(() => {
+    if (!tmaCache?.candidates.length || query.length < 2 || isLocationMode) {
+      return [];
+    }
+    
+    const q = query.toLowerCase();
+    const words = q.split(/\s+/).filter(Boolean);
+    
+    return tmaCache.candidates
+      .filter((c) => {
+        const fullName = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
+        const email = (c.email || "").toLowerCase();
+        const position = (c.position_title || "").toLowerCase();
+        
+        // Multi-word search: all words must match somewhere
+        if (words.length > 1) {
+          return words.every((word) =>
+            fullName.includes(word) ||
+            email.includes(word) ||
+            position.includes(word)
+          );
+        }
+        
+        // Single word search
+        return (
+          fullName.includes(q) ||
+          email.includes(q) ||
+          position.includes(q)
+        );
+      })
+      .slice(0, 20) // Limit results
+      .map((c): SearchResultTma => ({
+        id: c.id,
+        type: "tma",
+        first_name: c.first_name || "",
+        last_name: c.last_name || "",
+        email: c.email,
+        phone: c.phone,
+        position_title: c.position_title,
+        canton: c.canton,
+        team_id: c.team_id,
+        team: null, // Cache doesn't have team info
+        status_tags: c.status_tags,
+        activity: c.activity,
+      }));
+  }, [tmaCache?.candidates, query, isLocationMode]);
 
   // Filter navigation items based on query
   const filteredNavItems = query.length >= 1 
@@ -130,8 +183,16 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   // Filter results based on selected filter
   const filteredContacts = filter === "all" || filter === "contacts" ? contacts : [];
   
+  // Merge cached TMA with API TMA (API results take precedence for team info)
+  const mergedTma = useMemo(() => {
+    // If we have API results, use those (they have team info)
+    if (tma.length > 0) return tma;
+    // Otherwise use cached results for instant display
+    return cachedTmaResults;
+  }, [tma, cachedTmaResults]);
+
   // Apply TMA sub-filters (quality and activity)
-  const filteredTma = (filter === "all" || filter === "tma" ? tma : []).filter((t) => {
+  const filteredTma = (filter === "all" || filter === "tma" ? mergedTma : []).filter((t) => {
     // Quality filter
     if (tmaQualityFilter !== "all") {
       const tags = t.status_tags || [];
@@ -166,7 +227,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   // Count results per type (for filter badges)
   const counts = {
     contacts: contacts.length,
-    tma: tma.length,
+    tma: mergedTma.length,
     emails: emails.length,
     chat: chatRooms.length + chat.length,
   };

@@ -53,6 +53,79 @@ Transform the mobile experience to feel like a native iOS app, specifically opti
 
 ---
 
+# Task 26: Global TMA Cache for Real-time Performance
+
+## Problem
+- TMA data only loads when visiting `/tma` page → first load is slow
+- Realtime subscriptions only active on TMA page
+- Claimed status changes may be missed if user is on another page
+- Critical for business: accurate claiming prevents double-work
+
+## Current Flow
+```
+User visits /tma → Server fetches all candidates → TmaView renders → Realtime subscription starts
+```
+
+## Solution: Global TMA Cache
+
+### Architecture
+```
+App Mount (any authenticated page)
+    ↓
+TmaCacheProvider starts
+    ↓
+├── Fetch all TMA candidates immediately
+├── Start realtime subscription (INSERT/UPDATE/DELETE)
+├── Store in React Context
+    ↓
+TmaView / CommandPalette / etc. consume from cache (instant!)
+```
+
+### High-level Task Breakdown
+
+- [ ] **26.1** Create `TmaCacheContext` and `TmaCacheProvider`
+  - State: `candidates`, `loading`, `error`, `lastFetched`
+  - Methods: `refreshCache()`, `updateCandidate()`, `invalidate()`
+  
+- [ ] **26.2** Fetch TMA data on provider mount
+  - Call `/api/tma` endpoint
+  - Store in context state
+  - Set `lastFetched` timestamp
+
+- [ ] **26.3** Global realtime subscription
+  - Subscribe to `tma_candidates` table changes
+  - Handle INSERT: add to cache
+  - Handle UPDATE: merge into cache (respect local updates)
+  - Handle DELETE: remove from cache
+
+- [ ] **26.4** Integrate with TmaView
+  - Use cached data instead of server-fetched `initialCandidates`
+  - Fall back to server data if cache not ready
+  - Keep existing `useTmaCandidates` logic for local state
+
+- [ ] **26.5** Integrate with CommandPalette
+  - Search uses cached TMA data (instant results)
+  - No API call needed for TMA search if cache is fresh
+
+- [ ] **26.6** Add cache invalidation strategy
+  - Refresh if cache is older than 5 minutes
+  - Force refresh on visibility change (tab focus)
+  - Manual refresh button
+
+### Key Design Decisions
+- **Fetch on app load, not page load** - cache warms up immediately
+- **Single source of truth** - one realtime subscription for all components
+- **Optimistic updates** - UI reflects changes before server confirms
+- **Graceful degradation** - if cache fails, fall back to server fetch
+
+### Success Criteria
+- [ ] TMA page loads instantly (data already in cache)
+- [ ] Claimed status updates appear in <1 second everywhere
+- [ ] No stale data shown (realtime updates work globally)
+- [ ] Works across page navigations without re-fetching
+
+---
+
 # Key Challenges and Analysis
 
 ## Personal Follow-ups & Status ✅

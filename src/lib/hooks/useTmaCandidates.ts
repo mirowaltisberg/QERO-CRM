@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TmaCandidate, TmaRole } from "@/lib/types";
 import type { TmaStatus, TmaActivity } from "@/lib/utils/constants";
 import { createClient } from "@/lib/supabase/client";
+import { useTmaCacheOptional } from "@/lib/cache/TmaCacheContext";
 
 interface UseTmaCandidatesOptions {
   initialCandidates?: TmaCandidate[];
@@ -46,8 +47,14 @@ function getCandidateStatusTags(candidate: TmaCandidate | null) {
 }
 
 export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOptions) {
-  const [candidates, setCandidates] = useState<TmaCandidate[]>(initialCandidates);
-  const [activeId, setActiveId] = useState<string | null>(initialCandidates[0]?.id ?? null);
+  // Get global cache if available
+  const cache = useTmaCacheOptional();
+  
+  // Use cached candidates if available, otherwise fall back to initialCandidates
+  const sourceCandidates = cache?.candidates.length ? cache.candidates : initialCandidates;
+  
+  const [candidates, setCandidates] = useState<TmaCandidate[]>(sourceCandidates);
+  const [activeId, setActiveId] = useState<string | null>(sourceCandidates[0]?.id ?? null);
   const [actionState, setActionState] = useState<ActionState>({ type: null });
   const [error, setError] = useState<string | null>(null);
   const [cantonFilter, setCantonFilter] = useState<string | null>(null);
@@ -65,17 +72,25 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   const [roles, setRoles] = useState<TmaRole[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
 
-  // Real-time subscription for TMA candidates
   // Track recent local updates to avoid realtime overwriting them
   const recentLocalUpdates = useRef<Set<string>>(new Set());
   
+  // Sync local state with cache when cache updates (if not doing location search)
   useEffect(() => {
-    if (locationSearch.active) return; // Skip realtime when doing location search
+    if (cache && !locationSearch.active) {
+      setCandidates(cache.candidates);
+    }
+  }, [cache?.candidates, cache, locationSearch.active]);
+
+  // Real-time subscription - only if cache is NOT available (fallback mode)
+  useEffect(() => {
+    // Skip if we have global cache (it handles realtime) or doing location search
+    if (cache || locationSearch.active) return;
 
     const supabase = createClient();
 
     const channel = supabase
-      .channel("tma-candidates-realtime")
+      .channel("tma-candidates-realtime-fallback")
       .on(
         "postgres_changes",
         {
@@ -84,7 +99,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
           table: "tma_candidates",
         },
         async (payload) => {
-          console.log("[TMA Realtime] Change received:", payload.eventType);
+          console.log("[TMA Realtime Fallback] Change received:", payload.eventType);
 
           if (payload.eventType === "INSERT") {
             // Fetch the full candidate with claimer info
@@ -132,7 +147,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [locationSearch.active]);
+  }, [locationSearch.active, cache]);
   
   // Helper to mark a candidate as recently updated locally
   const markLocalUpdate = useCallback((id: string) => {
@@ -249,6 +264,13 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   }, []);
 
   const refreshCandidates = useCallback(async () => {
+    // Use cache refresh if available
+    if (cache) {
+      await cache.refreshCache();
+      return;
+    }
+    
+    // Fallback to direct fetch
     try {
       const response = await fetch("/api/tma");
       const json = await response.json();
@@ -259,7 +281,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to refresh candidates");
     }
-  }, []);
+  }, [cache]);
 
   const createRole = useCallback(
     async (payload: { name: string; color: string; note?: string | null }) => {
@@ -337,7 +359,11 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     // Mark this as a local update to prevent realtime from overwriting
     markLocalUpdate(updated.id);
     setCandidates((prev) => prev.map((candidate) => (candidate.id === updated.id ? updated : candidate)));
-  }, [markLocalUpdate]);
+    // Also update the global cache if available
+    if (cache) {
+      cache.updateCandidate(updated.id, updated);
+    }
+  }, [markLocalUpdate, cache]);
 
   const setStatusTags = useCallback(
     async (statusTags: TmaStatus[]) => {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { NotificationProvider } from "@/lib/notifications/NotificationContext";
+import { TmaCacheProvider } from "@/lib/cache/TmaCacheContext";
 import { ToastContainer } from "@/components/ui/ToastContainer";
 import { FollowUpChecker } from "@/lib/notifications/FollowUpChecker";
 import { EmailChecker } from "@/lib/notifications/EmailChecker";
@@ -49,9 +50,16 @@ export function Providers({ children }: ProvidersProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown, isPublicRoute]);
 
+  // Wrap content in TmaCacheProvider only for authenticated routes
+  const content = isPublicRoute ? (
+    children
+  ) : (
+    <TmaCacheProvider>{children}</TmaCacheProvider>
+  );
+
   return (
     <NotificationProvider>
-      {children}
+      {content}
       <ToastContainer />
       {/* Only render auth-dependent components on protected routes */}
       {!isPublicRoute && (
