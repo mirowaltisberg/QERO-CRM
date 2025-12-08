@@ -43,7 +43,29 @@ interface SearchResultTma {
   distance_km?: number;
 }
 
-type SearchResult = SearchResultContact | SearchResultTma;
+interface SearchResultEmail {
+  id: string;
+  type: "email";
+  thread_id: string;
+  subject: string | null;
+  sender_name: string | null;
+  sender_email: string;
+  body_preview: string | null;
+  sent_at: string | null;
+}
+
+interface SearchResultChat {
+  id: string;
+  type: "chat";
+  room_id: string;
+  room_name: string | null;
+  room_type: "all" | "team" | "dm";
+  content: string;
+  sender_name: string | null;
+  created_at: string;
+}
+
+type SearchResult = SearchResultContact | SearchResultTma | SearchResultEmail | SearchResultChat;
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -56,6 +78,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [contacts, setContacts] = useState<SearchResultContact[]>([]);
   const [tma, setTma] = useState<SearchResultTma[]>([]);
+  const [emails, setEmails] = useState<SearchResultEmail[]>([]);
+  const [chat, setChat] = useState<SearchResultChat[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isLocationMode, setIsLocationMode] = useState(false);
@@ -66,6 +90,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const allResults: SearchResult[] = [
     ...contacts.map((c) => ({ ...c, type: "contact" as const })),
     ...tma.map((t) => ({ ...t, type: "tma" as const })),
+    ...emails.map((e) => ({ ...e, type: "email" as const })),
+    ...chat.map((c) => ({ ...c, type: "chat" as const })),
   ];
 
   // Focus input when opened
@@ -74,6 +100,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       setQuery("");
       setContacts([]);
       setTma([]);
+      setEmails([]);
+      setChat([]);
       setSelectedIndex(0);
       setIsLocationMode(false);
       setLocation(null);
@@ -96,6 +124,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     if (!query || query.length < 2) {
       setContacts([]);
       setTma([]);
+      setEmails([]);
+      setChat([]);
       setLocation(null);
       return;
     }
@@ -116,6 +146,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           const json = await res.json();
           setContacts(json.data?.contacts || []);
           setTma(json.data?.tma || []);
+          setEmails(json.data?.emails || []);
+          setChat(json.data?.chat || []);
           setLocation(json.data?.location || null);
           setSelectedIndex(0);
         }
@@ -139,8 +171,12 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     (result: SearchResult) => {
       if (result.type === "contact") {
         router.push(`/calling?select=${result.id}`);
-      } else {
+      } else if (result.type === "tma") {
         router.push(`/tma?select=${result.id}`);
+      } else if (result.type === "email") {
+        router.push(`/email?thread=${result.thread_id}`);
+      } else if (result.type === "chat") {
+        router.push(`/chat?room=${result.room_id}`);
       }
       onClose();
     },
@@ -181,6 +217,12 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   if (!isOpen) return null;
 
+  // Calculate global indices for each section
+  const contactStartIndex = 0;
+  const tmaStartIndex = contacts.length;
+  const emailStartIndex = tmaStartIndex + tma.length;
+  const chatStartIndex = emailStartIndex + emails.length;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[15vh]"
@@ -200,7 +242,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Suche nach Firma, TMA oder Ort (z.B. Zürich, 8001)..."
+            placeholder="Suche Firmen, TMA, E-Mails, Chat..."
             className="flex-1 bg-transparent text-gray-900 placeholder-gray-400 outline-none text-base"
           />
           {loading && (
@@ -239,7 +281,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             <div className="px-4 py-8 text-center text-sm text-gray-500">
               <p>Mindestens 2 Zeichen eingeben...</p>
               <p className="mt-2 text-xs text-gray-400">
-                Tippe einen Ort (z.B. &quot;Zürich&quot; oder &quot;8001&quot;) für Standortsuche
+                Suche nach Firmen, TMA, E-Mails oder Chat-Nachrichten
               </p>
             </div>
           ) : allResults.length === 0 && !loading ? (
@@ -264,7 +306,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                     {isLocationMode ? "Firmen in der Nähe" : "Firmen"}
                   </div>
                   {contacts.map((contact, idx) => {
-                    const globalIndex = idx;
+                    const globalIndex = contactStartIndex + idx;
                     return (
                       <ResultItem
                         key={contact.id}
@@ -311,7 +353,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                     {isLocationMode ? "TMA Kandidaten in der Nähe" : "TMA Kandidaten"}
                   </div>
                   {tma.map((candidate, idx) => {
-                    const globalIndex = contacts.length + idx;
+                    const globalIndex = tmaStartIndex + idx;
                     return (
                       <ResultItem
                         key={candidate.id}
@@ -343,6 +385,86 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                             {candidate.canton && !candidate.distance_km && (
                               <span>{candidate.canton}</span>
                             )}
+                          </div>
+                        </div>
+                      </ResultItem>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Emails section */}
+              {emails.length > 0 && (
+                <div>
+                  <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
+                    E-Mails
+                  </div>
+                  {emails.map((email, idx) => {
+                    const globalIndex = emailStartIndex + idx;
+                    return (
+                      <ResultItem
+                        key={email.id}
+                        isSelected={selectedIndex === globalIndex}
+                        onClick={() => handleSelect(email)}
+                        onMouseEnter={() => setSelectedIndex(globalIndex)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-100 text-green-600">
+                            <EmailIcon className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-900 truncate">
+                              {email.subject || "(Kein Betreff)"}
+                            </div>
+                            <div className="text-sm text-gray-500 truncate">
+                              {email.sender_name || email.sender_email}
+                              {email.body_preview && ` — ${email.body_preview}`}
+                            </div>
+                          </div>
+                          {email.sent_at && (
+                            <div className="text-xs text-gray-400 whitespace-nowrap">
+                              {formatDate(email.sent_at)}
+                            </div>
+                          )}
+                        </div>
+                      </ResultItem>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Chat section */}
+              {chat.length > 0 && (
+                <div>
+                  <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
+                    Chat
+                  </div>
+                  {chat.map((message, idx) => {
+                    const globalIndex = chatStartIndex + idx;
+                    return (
+                      <ResultItem
+                        key={message.id}
+                        isSelected={selectedIndex === globalIndex}
+                        onClick={() => handleSelect(message)}
+                        onMouseEnter={() => setSelectedIndex(globalIndex)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
+                            <ChatIcon className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900 truncate">
+                                {message.sender_name || "Unbekannt"}
+                              </span>
+                              <RoomTag roomType={message.room_type} roomName={message.room_name} />
+                            </div>
+                            <div className="text-sm text-gray-500 truncate">
+                              {message.content}
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-400 whitespace-nowrap">
+                            {formatDate(message.created_at)}
                           </div>
                         </div>
                       </ResultItem>
@@ -415,6 +537,40 @@ function TeamTag({ team }: { team: TeamInfo }) {
   );
 }
 
+// Room tag component
+function RoomTag({ roomType, roomName }: { roomType: string; roomName: string | null }) {
+  const colors: Record<string, { bg: string; text: string }> = {
+    all: { bg: "bg-gray-100", text: "text-gray-600" },
+    team: { bg: "bg-blue-100", text: "text-blue-600" },
+    dm: { bg: "bg-purple-100", text: "text-purple-600" },
+  };
+  const style = colors[roomType] || colors.dm;
+  const label = roomType === "dm" ? "DM" : roomName || roomType;
+
+  return (
+    <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium", style.bg, style.text)}>
+      {label}
+    </span>
+  );
+}
+
+// Format date helper
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return date.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
+  } else if (diffDays === 1) {
+    return "Gestern";
+  } else if (diffDays < 7) {
+    return date.toLocaleDateString("de-CH", { weekday: "short" });
+  } else {
+    return date.toLocaleDateString("de-CH", { day: "numeric", month: "short" });
+  }
+}
+
 // Icons
 function SearchIcon({ className }: { className?: string }) {
   return (
@@ -445,6 +601,22 @@ function UserIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+    </svg>
+  );
+}
+
+function EmailIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+    </svg>
+  );
+}
+
+function ChatIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
     </svg>
   );
 }

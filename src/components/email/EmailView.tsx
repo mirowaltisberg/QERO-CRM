@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { EmailFoldersRail } from "./EmailFoldersRail";
 import { EmailList } from "./EmailList";
 import { EmailDetail } from "./EmailDetail";
@@ -17,9 +17,12 @@ const PAGE_SIZE = 500;
 
 export function EmailView({ account }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const threadIdFromUrl = searchParams.get("thread");
   const [folder, setFolder] = useState<EmailFolder>("inbox");
   const [threads, setThreads] = useState<EmailThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<EmailThread | null>(null);
+  const [pendingThreadId, setPendingThreadId] = useState<string | null>(threadIdFromUrl);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -152,6 +155,19 @@ export function EmailView({ account }: Props) {
     setSelectedThread(null);
     fetchThreads(1, false);
   }, [folder]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle URL param for thread selection (from command palette)
+  useEffect(() => {
+    if (pendingThreadId && threads.length > 0) {
+      const thread = threadMapRef.current.get(pendingThreadId);
+      if (thread) {
+        setSelectedThread(thread);
+        setPendingThreadId(null);
+        // Clear URL param
+        window.history.replaceState({}, "", "/email");
+      }
+    }
+  }, [pendingThreadId, threads]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

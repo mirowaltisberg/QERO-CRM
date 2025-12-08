@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { ChatRoomList } from "./ChatRoomList";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
@@ -8,8 +9,11 @@ import { createClient } from "@/lib/supabase/client";
 import type { ChatRoom, ChatMessage, ChatMember } from "@/lib/types";
 
 export function ChatView() {
+  const searchParams = useSearchParams();
+  const roomIdFromUrl = searchParams.get("room");
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
+  const [pendingRoomId, setPendingRoomId] = useState<string | null>(roomIdFromUrl);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [members, setMembers] = useState<ChatMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +97,22 @@ export function ChatView() {
     fetchRooms(); 
     fetchMembers(); 
   }, [fetchRooms, fetchMembers]);
+
+  // Handle URL param for room selection (from command palette)
+  useEffect(() => {
+    if (pendingRoomId && rooms.length > 0) {
+      const room = rooms.find(r => r.id === pendingRoomId);
+      if (room) {
+        setActiveRoom(room);
+        setPendingRoomId(null);
+        if (isMobile) {
+          setMobileView("chat");
+        }
+        // Clear URL param
+        window.history.replaceState({}, "", "/chat");
+      }
+    }
+  }, [pendingRoomId, rooms, isMobile]);
 
   // Load messages when room changes
   useEffect(() => {
