@@ -537,8 +537,11 @@ function QuickEmojiButton({
   const holdDuration = 800; // 0.8 seconds to send
   const progressInterval = 16; // ~60fps
 
-  const startHold = useCallback(() => {
+  const startHold = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (disabled) return;
+    
+    // Prevent default to avoid long-press context menu on mobile
+    e.preventDefault();
     
     setIsHolding(true);
     setProgress(0);
@@ -562,7 +565,9 @@ function QuickEmojiButton({
     }, holdDuration);
   }, [emoji, onSend, disabled]);
 
-  const cancelHold = useCallback(() => {
+  const cancelHold = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
+    if (e) e.preventDefault();
+    
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
@@ -597,7 +602,7 @@ function QuickEmojiButton({
       onTouchCancel={cancelHold}
       disabled={disabled}
       className={cn(
-        "relative flex items-center justify-center w-11 h-11 rounded-full transition-all select-none",
+        "relative flex items-center justify-center w-11 h-11 rounded-full transition-all select-none touch-none",
         "border-2 border-gray-200 bg-white",
         "hover:border-gray-300 hover:bg-gray-50",
         "active:border-gray-400",
