@@ -81,8 +81,9 @@ export function VakanzenView({ initialVacancies, contacts, roles, teams }: Props
         const res = await fetch("/api/vacancies");
         if (res.ok) {
           const data = await res.json();
-          if (data.data) {
-            setVacancies(data.data);
+          // API returns array directly, not wrapped in { data: ... }
+          if (Array.isArray(data)) {
+            setVacancies(data);
           }
         }
       } catch (e) {
