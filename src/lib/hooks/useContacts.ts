@@ -24,6 +24,42 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
   const [error, setError] = useState<string | null>(null);
   const [cantonFilter, setCantonFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [personalSettingsLoaded, setPersonalSettingsLoaded] = useState(false);
+  
+  // Fetch and merge personal settings on client side
+  useEffect(() => {
+    if (personalSettingsLoaded || initialContacts.length === 0) return;
+    
+    async function loadPersonalSettings() {
+      try {
+        const contactIds = initialContacts.map(c => c.id);
+        const response = await fetch("/api/contacts/personal-settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contact_ids: contactIds }),
+        });
+        
+        if (response.ok) {
+          const { data } = await response.json();
+          const settingsMap = data || {};
+          
+          // Merge personal settings with contacts
+          setContacts(prev => prev.map(contact => ({
+            ...contact,
+            status: settingsMap[contact.id]?.status ?? contact.status,
+            follow_up_at: settingsMap[contact.id]?.follow_up_at ?? contact.follow_up_at,
+            follow_up_note: settingsMap[contact.id]?.follow_up_note ?? contact.follow_up_note,
+          })));
+        }
+      } catch (err) {
+        console.error("[Personal Settings] Failed to load:", err);
+      } finally {
+        setPersonalSettingsLoaded(true);
+      }
+    }
+    
+    loadPersonalSettings();
+  }, [initialContacts, personalSettingsLoaded]);
 
   // Real-time subscription for contacts
   useEffect(() => {
