@@ -2,8 +2,11 @@
 
 import { memo, useState, useCallback, useRef, useMemo, useEffect } from "react";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils/cn";
 import type { ChatMember, ChatRoom } from "@/lib/types";
+
+// Quick reply emojis
+const QUICK_EMOJIS = ["👍", "❤️", "🔥", "😂"];
 
 interface ChatInputProps {
   members: ChatMember[];
@@ -46,8 +49,22 @@ export const ChatInput = memo(function ChatInput({
   const [mentionIndex, setMentionIndex] = useState(0);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [sending, setSending] = useState(false);
+  const [sendingEmoji, setSendingEmoji] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Quick emoji send handler
+  const handleQuickEmoji = useCallback(async (emoji: string) => {
+    if (sending || disabled) return;
+    setSendingEmoji(emoji);
+    setSending(true);
+    try {
+      await onSend(emoji, [], []);
+    } finally {
+      setSending(false);
+      setSendingEmoji(null);
+    }
+  }, [onSend, sending, disabled]);
 
   // Filter members for @ autocomplete (with @everyone option)
   const filteredMembers = useMemo(() => {
@@ -429,6 +446,19 @@ export const ChatInput = memo(function ChatInput({
         </div>
       )}
 
+      {/* Quick emoji reactions */}
+      <div className="flex items-center justify-center gap-3 mb-3">
+        {QUICK_EMOJIS.map((emoji) => (
+          <QuickEmojiButton
+            key={emoji}
+            emoji={emoji}
+            onSend={handleQuickEmoji}
+            disabled={disabled || sending}
+            isSending={sendingEmoji === emoji}
+          />
+        ))}
+      </div>
+
       {/* Input area */}
       <div className="flex items-end gap-2">
         {/* Text input */}
@@ -487,3 +517,135 @@ export const ChatInput = memo(function ChatInput({
   );
 });
 
+// Quick emoji button with hold-to-send animation
+function QuickEmojiButton({
+  emoji,
+  onSend,
+  disabled,
+  isSending,
+}: {
+  emoji: string;
+  onSend: (emoji: string) => void;
+  disabled?: boolean;
+  isSending?: boolean;
+}) {
+  const [isHolding, setIsHolding] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [swoosh, setSwoosh] = useState(false);
+  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const holdDuration = 800; // 0.8 seconds to send
+  const progressInterval = 16; // ~60fps
+
+  const startHold = useCallback(() => {
+    if (disabled) return;
+    
+    setIsHolding(true);
+    setProgress(0);
+
+    // Progress animation
+    let currentProgress = 0;
+    progressIntervalRef.current = setInterval(() => {
+      currentProgress += (progressInterval / holdDuration) * 100;
+      setProgress(Math.min(currentProgress, 100));
+    }, progressInterval);
+
+    // Send after hold duration
+    holdTimerRef.current = setTimeout(() => {
+      setSwoosh(true);
+      setTimeout(() => {
+        onSend(emoji);
+        setSwoosh(false);
+        setIsHolding(false);
+        setProgress(0);
+      }, 200);
+    }, holdDuration);
+  }, [emoji, onSend, disabled]);
+
+  const cancelHold = useCallback(() => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    setIsHolding(false);
+    setProgress(0);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    };
+  }, []);
+
+  // Calculate scale based on progress (1 -> 1.4)
+  const scale = 1 + (progress / 100) * 0.4;
+
+  return (
+    <button
+      type="button"
+      onMouseDown={startHold}
+      onMouseUp={cancelHold}
+      onMouseLeave={cancelHold}
+      onTouchStart={startHold}
+      onTouchEnd={cancelHold}
+      onTouchCancel={cancelHold}
+      disabled={disabled}
+      className={cn(
+        "relative flex items-center justify-center w-11 h-11 rounded-full transition-all select-none",
+        "border-2 border-gray-200 bg-white",
+        "hover:border-gray-300 hover:bg-gray-50",
+        "active:border-gray-400",
+        disabled && "opacity-50 cursor-not-allowed",
+        isHolding && "border-blue-400 bg-blue-50",
+        swoosh && "animate-ping"
+      )}
+      style={{
+        transform: isHolding ? `scale(${scale})` : "scale(1)",
+        transition: isHolding ? "transform 0.05s linear" : "transform 0.2s ease-out",
+      }}
+    >
+      {/* Progress ring */}
+      {isHolding && progress > 0 && (
+        <svg
+          className="absolute inset-0 w-full h-full -rotate-90"
+          viewBox="0 0 44 44"
+        >
+          <circle
+            cx="22"
+            cy="22"
+            r="20"
+            fill="none"
+            stroke="#3B82F6"
+            strokeWidth="3"
+            strokeDasharray={`${(progress / 100) * 125.6} 125.6`}
+            className="transition-all duration-75"
+          />
+        </svg>
+      )}
+      
+      {/* Emoji */}
+      <span
+        className={cn(
+          "text-xl transition-transform",
+          swoosh && "scale-150 opacity-0"
+        )}
+        style={{
+          transform: swoosh ? "translateY(-20px) scale(1.5)" : undefined,
+          transition: "transform 0.2s ease-out, opacity 0.2s ease-out",
+        }}
+      >
+        {isSending ? (
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+        ) : (
+          emoji
+        )}
+      </span>
+    </button>
+  );
+}
