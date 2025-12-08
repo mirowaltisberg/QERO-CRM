@@ -313,8 +313,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           </kbd>
         </div>
 
-        {/* Filter buttons */}
-        {query.length >= 2 && totalCount > 0 && !isLocationMode && (
+        {/* Filter buttons - shown in both text and location search */}
+        {query.length >= 2 && totalCount > 0 && (
           <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-2 overflow-x-auto">
             <FilterButton
               active={filter === "all"}
@@ -341,7 +341,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 TMA ({counts.tma})
               </FilterButton>
             )}
-            {counts.emails > 0 && (
+            {/* Email and Chat only in text search mode */}
+            {!isLocationMode && counts.emails > 0 && (
               <FilterButton
                 active={filter === "emails"}
                 onClick={() => { setFilter("emails"); setSelectedIndex(0); }}
@@ -350,7 +351,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 E-Mails ({counts.emails})
               </FilterButton>
             )}
-            {counts.chat > 0 && (
+            {!isLocationMode && counts.chat > 0 && (
               <FilterButton
                 active={filter === "chat"}
                 onClick={() => { setFilter("chat"); setSelectedIndex(0); }}
