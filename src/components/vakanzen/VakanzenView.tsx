@@ -128,11 +128,14 @@ export function VakanzenView({ initialVacancies, contacts, roles, teams }: Props
   // Load candidates when vacancy is selected
   const loadCandidates = useCallback(async (vacancyId: string) => {
     setCandidatesLoading(true);
+    setCandidates(null); // Clear old data first to ensure fresh render
     try {
       const res = await fetch(`/api/vacancies/${vacancyId}/candidates`);
       if (res.ok) {
         const data = await res.json();
         setCandidates(data);
+      } else {
+        console.error("Failed to load candidates:", res.status);
       }
     } catch (error) {
       console.error("Error loading candidates:", error);

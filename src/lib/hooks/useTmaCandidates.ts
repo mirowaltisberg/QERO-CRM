@@ -126,7 +126,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
             }
             
             // Use payload.new directly merged with existing data to preserve claimer info
-            setCandidates((prev) =>
+                  setCandidates((prev) =>
               prev.map((c) => {
                 if (c.id === candidateId) {
                   // Merge: keep existing claimer info, update everything else from realtime
@@ -134,7 +134,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
                 }
                 return c;
               })
-            );
+              );
           } else if (payload.eventType === "DELETE") {
             setCandidates((prev) => prev.filter((c) => c.id !== payload.old.id));
           }

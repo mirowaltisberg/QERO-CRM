@@ -32,9 +32,11 @@ interface Props {
   isMobile?: boolean;
 }
 
-const QualityBadge = ({ tags }: { tags: string[] | null }) => {
-  if (!tags || tags.length === 0) return null;
-  const best = tags.includes("A") ? "A" : tags.includes("B") ? "B" : "C";
+const QualityBadge = ({ tags, status }: { tags: string[] | null; status?: string | null }) => {
+  // Use status_tags if populated, otherwise fallback to legacy status field
+  const qualities = (tags && tags.length > 0) ? tags : (status ? [status] : []);
+  if (qualities.length === 0) return null;
+  const best = qualities.includes("A") ? "A" : qualities.includes("B") ? "B" : "C";
   return (
     <span className={cn(
       "rounded px-1.5 py-0.5 text-[10px] font-bold",
@@ -114,7 +116,7 @@ const CandidateCard = memo(function CandidateCard({
             <p className="truncate text-sm font-medium text-gray-900">
               {tma.first_name} {tma.last_name}
             </p>
-            <QualityBadge tags={tma.status_tags} />
+            <QualityBadge tags={tma.status_tags} status={tma.status} />
           </div>
           {tma.position_title && (
             <p className="mt-0.5 truncate text-xs text-gray-500">{tma.position_title}</p>

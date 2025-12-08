@@ -102,8 +102,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         withinRadius = !vacancy.radius_km || distance_km <= vacancy.radius_km;
       }
 
-      // Check quality
-      const candidateQualities: string[] = candidate.status_tags || (candidate.status ? [candidate.status] : []);
+      // Check quality - use status_tags if populated, otherwise fallback to legacy status field
+      const candidateQualities: string[] = 
+        (candidate.status_tags && candidate.status_tags.length > 0) 
+          ? candidate.status_tags 
+          : (candidate.status ? [candidate.status] : []);
       const minQualityRank = vacancy.min_quality ? QUALITY_RANK[vacancy.min_quality] : 0;
       const candidateBestQuality = Math.max(...candidateQualities.map((q: string) => QUALITY_RANK[q] || 0), 0);
       const meetsQuality = minQualityRank === 0 || candidateBestQuality >= minQualityRank;
