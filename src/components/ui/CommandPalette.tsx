@@ -72,6 +72,8 @@ interface CommandPaletteProps {
   onClose: () => void;
 }
 
+type FilterType = "all" | "contacts" | "tma" | "emails" | "chat";
+
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -85,14 +87,30 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [isLocationMode, setIsLocationMode] = useState(false);
   const [radius, setRadius] = useState(25);
   const [location, setLocation] = useState<LocationInfo | null>(null);
+  const [filter, setFilter] = useState<FilterType>("all");
+
+  // Filter results based on selected filter
+  const filteredContacts = filter === "all" || filter === "contacts" ? contacts : [];
+  const filteredTma = filter === "all" || filter === "tma" ? tma : [];
+  const filteredEmails = filter === "all" || filter === "emails" ? emails : [];
+  const filteredChat = filter === "all" || filter === "chat" ? chat : [];
 
   // Combined results for keyboard navigation
   const allResults: SearchResult[] = [
-    ...contacts.map((c) => ({ ...c, type: "contact" as const })),
-    ...tma.map((t) => ({ ...t, type: "tma" as const })),
-    ...emails.map((e) => ({ ...e, type: "email" as const })),
-    ...chat.map((c) => ({ ...c, type: "chat" as const })),
+    ...filteredContacts.map((c) => ({ ...c, type: "contact" as const })),
+    ...filteredTma.map((t) => ({ ...t, type: "tma" as const })),
+    ...filteredEmails.map((e) => ({ ...e, type: "email" as const })),
+    ...filteredChat.map((c) => ({ ...c, type: "chat" as const })),
   ];
+
+  // Count results per type (for filter badges)
+  const counts = {
+    contacts: contacts.length,
+    tma: tma.length,
+    emails: emails.length,
+    chat: chat.length,
+  };
+  const totalCount = counts.contacts + counts.tma + counts.emails + counts.chat;
 
   // Focus input when opened
   useEffect(() => {
@@ -105,6 +123,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       setSelectedIndex(0);
       setIsLocationMode(false);
       setLocation(null);
+      setFilter("all");
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
@@ -217,11 +236,11 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   if (!isOpen) return null;
 
-  // Calculate global indices for each section
+  // Calculate global indices for each section (using filtered arrays)
   const contactStartIndex = 0;
-  const tmaStartIndex = contacts.length;
-  const emailStartIndex = tmaStartIndex + tma.length;
-  const chatStartIndex = emailStartIndex + emails.length;
+  const tmaStartIndex = filteredContacts.length;
+  const emailStartIndex = tmaStartIndex + filteredTma.length;
+  const chatStartIndex = emailStartIndex + filteredEmails.length;
 
   return (
     <div
@@ -252,6 +271,55 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             ESC
           </kbd>
         </div>
+
+        {/* Filter buttons */}
+        {query.length >= 2 && totalCount > 0 && !isLocationMode && (
+          <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-2 overflow-x-auto">
+            <FilterButton
+              active={filter === "all"}
+              onClick={() => { setFilter("all"); setSelectedIndex(0); }}
+              color="gray"
+            >
+              Alle ({totalCount})
+            </FilterButton>
+            {counts.contacts > 0 && (
+              <FilterButton
+                active={filter === "contacts"}
+                onClick={() => { setFilter("contacts"); setSelectedIndex(0); }}
+                color="blue"
+              >
+                Firmen ({counts.contacts})
+              </FilterButton>
+            )}
+            {counts.tma > 0 && (
+              <FilterButton
+                active={filter === "tma"}
+                onClick={() => { setFilter("tma"); setSelectedIndex(0); }}
+                color="purple"
+              >
+                TMA ({counts.tma})
+              </FilterButton>
+            )}
+            {counts.emails > 0 && (
+              <FilterButton
+                active={filter === "emails"}
+                onClick={() => { setFilter("emails"); setSelectedIndex(0); }}
+                color="green"
+              >
+                E-Mails ({counts.emails})
+              </FilterButton>
+            )}
+            {counts.chat > 0 && (
+              <FilterButton
+                active={filter === "chat"}
+                onClick={() => { setFilter("chat"); setSelectedIndex(0); }}
+                color="orange"
+              >
+                Chat ({counts.chat})
+              </FilterButton>
+            )}
+          </div>
+        )}
 
         {/* Location mode indicator + radius slider */}
         {isLocationMode && query.length >= 2 && (
@@ -300,12 +368,12 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           ) : (
             <>
               {/* Contacts section */}
-              {contacts.length > 0 && (
+              {filteredContacts.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
                     {isLocationMode ? "Firmen in der Nähe" : "Firmen"}
                   </div>
-                  {contacts.map((contact, idx) => {
+                  {filteredContacts.map((contact, idx) => {
                     const globalIndex = contactStartIndex + idx;
                     return (
                       <ResultItem
@@ -347,12 +415,12 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               )}
 
               {/* TMA section */}
-              {tma.length > 0 && (
+              {filteredTma.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
                     {isLocationMode ? "TMA Kandidaten in der Nähe" : "TMA Kandidaten"}
                   </div>
-                  {tma.map((candidate, idx) => {
+                  {filteredTma.map((candidate, idx) => {
                     const globalIndex = tmaStartIndex + idx;
                     return (
                       <ResultItem
@@ -394,12 +462,12 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               )}
 
               {/* Emails section */}
-              {emails.length > 0 && (
+              {filteredEmails.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
                     E-Mails
                   </div>
-                  {emails.map((email, idx) => {
+                  {filteredEmails.map((email, idx) => {
                     const globalIndex = emailStartIndex + idx;
                     return (
                       <ResultItem
@@ -434,12 +502,12 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               )}
 
               {/* Chat section */}
-              {chat.length > 0 && (
+              {filteredChat.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
                     Chat
                   </div>
-                  {chat.map((message, idx) => {
+                  {filteredChat.map((message, idx) => {
                     const globalIndex = chatStartIndex + idx;
                     return (
                       <ResultItem
@@ -515,6 +583,55 @@ function ResultItem({
       className={cn(
         "w-full px-4 py-2.5 text-left transition-colors",
         isSelected ? "bg-blue-50" : "hover:bg-gray-50"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Filter button component
+function FilterButton({
+  children,
+  active,
+  onClick,
+  color,
+}: {
+  children: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+  color: "gray" | "blue" | "purple" | "green" | "orange";
+}) {
+  const colors = {
+    gray: {
+      active: "bg-gray-900 text-white",
+      inactive: "bg-gray-100 text-gray-600 hover:bg-gray-200",
+    },
+    blue: {
+      active: "bg-blue-500 text-white",
+      inactive: "bg-blue-50 text-blue-600 hover:bg-blue-100",
+    },
+    purple: {
+      active: "bg-purple-500 text-white",
+      inactive: "bg-purple-50 text-purple-600 hover:bg-purple-100",
+    },
+    green: {
+      active: "bg-green-500 text-white",
+      inactive: "bg-green-50 text-green-600 hover:bg-green-100",
+    },
+    orange: {
+      active: "bg-orange-500 text-white",
+      inactive: "bg-orange-50 text-orange-600 hover:bg-orange-100",
+    },
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap",
+        active ? colors[color].active : colors[color].inactive
       )}
     >
       {children}
