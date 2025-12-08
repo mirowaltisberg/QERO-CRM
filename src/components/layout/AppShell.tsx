@@ -85,7 +85,7 @@ export function AppShell({ user, profile, children }: AppShellProps) {
         <main 
           className="flex-1 overflow-hidden"
           style={{ 
-            paddingBottom: "calc(49px + env(safe-area-inset-bottom, 0px))" 
+            paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" 
           }}
         >
           {children}

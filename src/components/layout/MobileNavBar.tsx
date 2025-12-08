@@ -30,10 +30,16 @@ export function MobileNavBar({ chatUnreadCount = 0 }: MobileNavBarProps) {
 
   return (
     <nav 
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-gray-200"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-gray-200/80"
     >
-      <div className="flex items-center justify-around h-[49px]">
+      {/* Tab bar content - sits above the home indicator */}
+      <div 
+        className="flex items-center justify-around"
+        style={{ 
+          height: "56px",
+          paddingBottom: "2px"
+        }}
+      >
         {navigation.map((item) => {
           const isActive = pathname === item.href || 
             (item.href !== "/" && pathname?.startsWith(item.href));
@@ -44,27 +50,27 @@ export function MobileNavBar({ chatUnreadCount = 0 }: MobileNavBarProps) {
               href={item.href}
               prefetch={true}
               className={cn(
-                "flex flex-col items-center justify-center flex-1 h-full pt-1 transition-colors",
-                isActive ? "text-blue-600" : "text-gray-500 active:text-gray-900"
+                "flex flex-col items-center justify-center flex-1 h-full transition-colors",
+                isActive ? "text-blue-600" : "text-gray-400 active:text-gray-600"
               )}
             >
               <div className="relative">
                 <item.icon 
                   className={cn(
-                    "w-6 h-6 transition-transform",
+                    "w-7 h-7 transition-transform",
                     isActive && "scale-105"
                   )} 
                   filled={isActive}
                 />
                 {item.name === "Chat" && chatUnreadCount > 0 && (
-                  <span className="absolute -top-1 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  <span className="absolute -top-1 -right-2.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
                     {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
                   </span>
                 )}
               </div>
               <span className={cn(
-                "text-[10px] mt-0.5 font-medium",
-                isActive ? "text-blue-600" : "text-gray-500"
+                "text-[11px] mt-1 font-medium",
+                isActive ? "text-blue-600" : "text-gray-400"
               )}>
                 {item.name}
               </span>
@@ -72,6 +78,8 @@ export function MobileNavBar({ chatUnreadCount = 0 }: MobileNavBarProps) {
           );
         })}
       </div>
+      {/* Home indicator safe area spacer */}
+      <div style={{ height: "env(safe-area-inset-bottom, 0px)" }} />
     </nav>
   );
 }
