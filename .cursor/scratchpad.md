@@ -117,7 +117,7 @@ user_tma_settings (
 - [x] **Task 19: Personal follow-ups & status** ✅ COMPLETE
 - [x] **Task 20: Fix call-log 400s & realtime flapping** ✅ COMPLETE
 - [x] **Task 21: Diagnose and fix non-working status/follow-up buttons** ✅ COMPLETE
-- [ ] **Task 23: Fix personal status SSR/auth merge** (planning)
+- [x] **Task 23: Fix personal status SSR/auth merge** ✅ DEPLOYED (commit: 95cd4ea)
 
 # Current Status / Progress Tracking
 - **Task 20 COMPLETE** ✅
@@ -159,14 +159,16 @@ Root cause identified: API routes were using browser Supabase client (`createBro
    - `/api/contacts/personal-settings/route.ts` → `serverPersonalSettingsService`
 4. ✅ Build passes with no errors
 
-**Pending:** Deploy and test in production
+**✅ DEPLOYED (commit: 95cd4ea)**
 
 # Executor's Feedback or Assistance Requests
-- Ready to deploy - all code changes complete and build passes
-- Need manual verification after deployment:
-  1. Click "Working" or "Hot" button on a contact
-  2. Refresh the page (hard reload)
-  3. Status should persist (not show "Not set")
+- **Task 23 deployed - needs manual verification**
+- Please test in production:
+  1. Go to Calling page
+  2. Click "Working" or "Hot" button on a contact
+  3. Hard refresh the page (Cmd+Shift+R or Ctrl+Shift+R)
+  4. **Expected:** Status should persist (not show "Not set")
+  5. Check that the status tag shows correctly in both the contact list sidebar and the detail header
 
 # Lessons
 - VAPID keys are free to generate
@@ -177,3 +179,4 @@ Root cause identified: API routes were using browser Supabase client (`createBro
 - Use object destructuring instead of `delete` operator for TypeScript compatibility
 - Client-side batching prevents 400 errors when dataset exceeds API limits (batch size <50% of server limit for safety margin)
 - **CRITICAL: NEVER use Cursor worktree for code changes, OR if used, ALWAYS sync to main repo immediately** - changes in worktree don't deploy to production!
+- **API routes MUST use server Supabase client** - `createClient` from `@/lib/supabase/server`, NOT from `@/lib/supabase/client`. Browser client has no auth context in server context, so `auth.getUser()` returns null.
