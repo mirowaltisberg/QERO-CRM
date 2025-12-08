@@ -121,23 +121,34 @@ const CandidateCard = memo(function CandidateCard({
           {tma.position_title && (
             <p className="mt-0.5 truncate text-xs text-gray-500">{tma.position_title}</p>
           )}
-          <div className="mt-1 flex items-center gap-2 text-xs text-gray-400">
-            {tma.city && <span>{tma.city}</span>}
-            {typeof distance === "number" && distance > 0 && (
-              <span className="flex items-center gap-0.5">
+          <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+            {/* Distance - prominent */}
+            {typeof distance === "number" && (
+              <span className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                distance <= 10 ? "bg-green-100 text-green-700" :
+                distance <= 25 ? "bg-blue-100 text-blue-700" :
+                distance <= 50 ? "bg-amber-100 text-amber-700" :
+                "bg-gray-100 text-gray-600"
+              )}>
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 </svg>
                 {distance} km
               </span>
             )}
+            {/* City */}
+            {tma.city && (
+              <span className="text-xs text-gray-400">{tma.city}</span>
+            )}
+            {/* Match Score */}
             {typeof matchScore === "number" && (
               <div className="relative">
                 <button
                   onClick={() => scoreBreakdown && setShowScoreBreakdown(!showScoreBreakdown)}
                   className={cn(
-                    "text-blue-500 hover:text-blue-700 transition-colors",
-                    scoreBreakdown && "underline decoration-dotted cursor-pointer"
+                    "px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors",
+                    scoreBreakdown && "cursor-pointer"
                   )}
                 >
                   {matchScore}% Match
