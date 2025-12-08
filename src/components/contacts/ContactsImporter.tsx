@@ -172,6 +172,11 @@ function mapRowToContact(row: CsvRow): ContactCreateInput | null {
   const cantonRaw = (row["Region geschäftlich"] || row["Bundesland/Kanton privat"] || "").trim();
   const canton = formatCanton(cantonRaw);
 
+  // Extract address fields for location search
+  const street = coalesce(row["Straße geschäftlich"], row["Straße privat"]) ?? null;
+  const city = coalesce(row["Ort geschäftlich"], row["Ort privat"]) ?? null;
+  const postalCode = coalesce(row["Postleitzahl geschäftlich"], row["Postleitzahl privat"]) ?? null;
+
   const phone =
     coalesce(
       row["Telefon Firma"],
@@ -190,6 +195,9 @@ function mapRowToContact(row: CsvRow): ContactCreateInput | null {
     phone,
     email,
     canton,
+    street,
+    city,
+    postal_code: postalCode,
     notes,
     status: null,
   };

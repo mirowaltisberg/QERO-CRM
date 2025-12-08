@@ -3,6 +3,7 @@ import { serverContactService } from "@/lib/data/server-data-service";
 import { respondError, respondSuccess } from "@/lib/utils/api-response";
 import { ContactCreateSchema } from "@/lib/validation/schemas";
 import { sanitizeContactPayload } from "@/lib/utils/sanitize-contact";
+import { geocodeByPostalOrCity } from "@/lib/geo";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,8 +21,19 @@ export async function POST(request: NextRequest) {
         errors.push(`Row ${index + 1}: ${parsed.error.issues[0]?.message ?? "invalid data"}`);
         continue;
       }
+      
+      // Geocode address if postal_code or city is provided
+      const payload = sanitizeContactPayload(parsed.data);
+      if ((payload.postal_code || payload.city) && !payload.latitude) {
+        const coords = geocodeByPostalOrCity(payload.postal_code, payload.city);
+        if (coords) {
+          payload.latitude = coords.lat;
+          payload.longitude = coords.lng;
+        }
+      }
+      
       // Use server contact service (uses server-side auth)
-      const contact = await serverContactService.create(sanitizeContactPayload(parsed.data));
+      const contact = await serverContactService.create(payload);
       created.push(contact.id);
     }
 
