@@ -196,6 +196,10 @@ export const serverContactService = {
   async getById(id: string): Promise<Contact | null> {
     const supabase = await createClient();
     
+    // First check auth
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log("[Server Data] getById - auth check:", { hasUser: !!user, userId: user?.id });
+    
     const { data, error } = await supabase
       .from("contacts")
       .select("*")
@@ -209,13 +213,24 @@ export const serverContactService = {
 
     // Merge with personal settings
     const personalSetting = await serverPersonalSettingsService.getContactSetting(id);
+    console.log("[Server Data] getById - personal setting found:", {
+      contactId: id,
+      personalSetting,
+      hasPersonalSetting: !!personalSetting,
+    });
+    
     if (personalSetting) {
-      return {
+      const merged = {
         ...data,
         status: personalSetting.status ?? data.status,
         follow_up_at: personalSetting.follow_up_at ?? data.follow_up_at,
         follow_up_note: personalSetting.follow_up_note ?? data.follow_up_note,
       };
+      console.log("[Server Data] getById - merged result:", {
+        status: merged.status,
+        follow_up_at: merged.follow_up_at,
+      });
+      return merged;
     }
     
     return data;
@@ -256,17 +271,29 @@ export const serverContactService = {
     // Update personal fields (if any) using server personal settings service
     if (Object.keys(personalFields).length > 0) {
       console.log("[Server Data Service] Calling serverPersonalSettingsService with:", { id, personalFields });
-      await serverPersonalSettingsService.updateContactSettings(id, personalFields as {
+      const result = await serverPersonalSettingsService.updateContactSettings(id, personalFields as {
         status?: "hot" | "working" | "follow_up" | null;
         follow_up_at?: string | null;
         follow_up_note?: string | null;
       });
+      
+      if (!result) {
+        console.error("[Server Data Service] ❌ FAILED to save personal settings! This is critical.");
+      } else {
+        console.log("[Server Data Service] ✅ Personal settings saved successfully:", result);
+      }
     } else {
       console.log("[Server Data Service] No personal fields to update");
     }
 
     // Fetch and return the updated contact with merged personal settings
-    return this.getById(id);
+    const updated = await this.getById(id);
+    console.log("[Server Data Service] Returning updated contact:", { 
+      id, 
+      status: updated?.status,
+      follow_up_at: updated?.follow_up_at 
+    });
+    return updated;
   },
 
   /**

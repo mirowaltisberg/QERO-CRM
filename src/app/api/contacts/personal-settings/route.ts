@@ -10,8 +10,23 @@ export async function POST(request: NextRequest) {
     }
 
     const { contact_ids } = body;
+    console.log("[API Personal Settings] Fetching for", contact_ids.length, "contacts");
+    
     // Use server personal settings service (has proper auth context)
     const settings = await serverPersonalSettingsService.getContactSettings(contact_ids);
+    
+    const settingsCount = Object.keys(settings).length;
+    console.log("[API Personal Settings] Returning", settingsCount, "settings");
+    
+    if (settingsCount > 0) {
+      // Log a sample for debugging
+      const sampleKey = Object.keys(settings)[0];
+      console.log("[API Personal Settings] Sample setting:", {
+        contactId: sampleKey,
+        status: settings[sampleKey]?.status,
+        follow_up_at: settings[sampleKey]?.follow_up_at,
+      });
+    }
 
     return respondSuccess(settings);
   } catch (error) {

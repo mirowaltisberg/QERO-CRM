@@ -27,6 +27,7 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
   const [personalSettingsLoaded, setPersonalSettingsLoaded] = useState(false);
   
   // Fetch and merge personal settings on client side
+  // This is a CRITICAL fallback if server-side merge fails
   useEffect(() => {
     if (personalSettingsLoaded || initialContacts.length === 0) return;
     console.log("[useContacts] Starting personal settings fetch...");
@@ -40,29 +41,44 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contact_ids: contactIds }),
+          credentials: "include", // Ensure cookies are sent
         });
         
         if (response.ok) {
           const { data } = await response.json();
           const settingsMap = data || {};
-          console.log("[Personal Settings] Received settings for", Object.keys(settingsMap).length, "contacts");
-          console.log("[Personal Settings] Settings map:", settingsMap);
+          const settingsCount = Object.keys(settingsMap).length;
+          console.log("[Personal Settings] Received settings for", settingsCount, "contacts");
           
-          // Merge personal settings with contacts
-          setContacts(prev => prev.map(contact => {
-            const merged = {
-              ...contact,
-              status: settingsMap[contact.id]?.status ?? contact.status,
-              follow_up_at: settingsMap[contact.id]?.follow_up_at ?? contact.follow_up_at,
-              follow_up_note: settingsMap[contact.id]?.follow_up_note ?? contact.follow_up_note,
-            };
-            if (settingsMap[contact.id]) {
-              console.log("[Personal Settings] Merged contact", contact.company_name, "- status:", merged.status);
-            }
-            return merged;
-          }));
+          if (settingsCount > 0) {
+            console.log("[Personal Settings] Settings found - merging into contacts");
+            // Log first few settings for debugging
+            const sampleSettings = Object.entries(settingsMap).slice(0, 3);
+            sampleSettings.forEach(([id, settings]) => {
+              console.log(`[Personal Settings] Sample - ${id}:`, settings);
+            });
+            
+            // Merge personal settings with contacts
+            setContacts(prev => prev.map(contact => {
+              const personalSetting = settingsMap[contact.id];
+              if (personalSetting) {
+                const merged = {
+                  ...contact,
+                  status: personalSetting.status ?? contact.status,
+                  follow_up_at: personalSetting.follow_up_at ?? contact.follow_up_at,
+                  follow_up_note: personalSetting.follow_up_note ?? contact.follow_up_note,
+                };
+                console.log("[Personal Settings] Merged:", contact.company_name, "- status:", merged.status);
+                return merged;
+              }
+              return contact;
+            }));
+          } else {
+            console.log("[Personal Settings] No settings found for any contacts");
+          }
         } else {
-          console.error("[Personal Settings] API error:", response.status, await response.text());
+          const errorText = await response.text();
+          console.error("[Personal Settings] API error:", response.status, errorText);
         }
       } catch (err) {
         console.error("[Personal Settings] Failed to load:", err);
@@ -301,6 +317,9 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
       if (!activeContact || activeContact.status === status) return;
       setActionState({ type: "saving", message: "Updating status..." });
       setError(null);
+      
+      console.log("[useContacts] updateStatus called:", { contactId: activeContact.id, status });
+      
       try {
         const response = await fetch(`/api/contacts/${activeContact.id}`, {
           method: "PATCH",
@@ -308,11 +327,28 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
           body: JSON.stringify({ status }),
         });
         const json = await response.json();
+        
+        console.log("[useContacts] updateStatus response:", { 
+          ok: response.ok, 
+          status: json.data?.status,
+          contactId: json.data?.id,
+        });
+        
         if (!response.ok) {
           throw new Error(json.error || "Failed to update status");
         }
+        
+        // Verify the response has the updated status
+        if (json.data?.status !== status) {
+          console.error("[useContacts] ⚠️ WARNING: Response status doesn't match request!", {
+            requested: status,
+            received: json.data?.status,
+          });
+        }
+        
         updateContactLocally(json.data);
       } catch (err) {
+        console.error("[useContacts] updateStatus error:", err);
         setError(err instanceof Error ? err.message : "Failed to update status");
       } finally {
         setActionState({ type: null });

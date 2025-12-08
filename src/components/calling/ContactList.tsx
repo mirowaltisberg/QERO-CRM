@@ -40,7 +40,7 @@ function getItemStyles(status: string | null, hasVacancy: boolean, isActive: boo
   if (hasFollowUp) {
     return isActive
       ? "bg-sky-50 border-sky-200 shadow-sm"
-      : "bg-sky-50/60 border-sky-100 hover:bg-sky-50";
+      : "bg-sky-50/40 border-sky-100 hover:bg-sky-50/70";
   }
   if (status === "working") {
     return isActive

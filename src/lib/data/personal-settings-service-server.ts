@@ -54,9 +54,14 @@ export const serverPersonalSettingsService = {
     
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      console.error("[Server Personal Settings] No user authenticated:", authError?.message);
+      console.error("[Server Personal Settings] getContactSetting - No user authenticated:", authError?.message);
       return null;
     }
+    
+    console.log("[Server Personal Settings] getContactSetting - fetching for:", {
+      userId: user.id,
+      contactId,
+    });
     
     const { data, error } = await supabase
       .from("user_contact_settings")
@@ -69,6 +74,13 @@ export const serverPersonalSettingsService = {
       console.error("[Server Personal Settings] Error fetching contact setting:", error);
       return null;
     }
+    
+    console.log("[Server Personal Settings] getContactSetting - result:", {
+      found: !!data,
+      status: data?.status,
+      follow_up_at: data?.follow_up_at,
+    });
+    
     return data;
   },
 
