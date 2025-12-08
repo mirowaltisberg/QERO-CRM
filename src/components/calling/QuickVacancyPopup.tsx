@@ -119,10 +119,10 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
       setSuccess(true);
       onCreated?.(data.data);
       
-      // Close after success animation
+      // Close after success animation completes
       setTimeout(() => {
         onClose();
-      }, 800);
+      }, 1200);
     } catch (error) {
       console.error("Failed to create vacancy:", error);
       alert("Fehler beim Erstellen der Vakanz");
@@ -153,31 +153,76 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
     >
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-black/25"
+        style={{
+          animation: "vacancy-backdrop-enter 300ms ease-out forwards",
+        }}
       />
       
       {/* Popup Card */}
       <div
         ref={popupRef}
         className={cn(
-          "relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100",
-          "animate-in zoom-in-95 fade-in slide-in-from-bottom-4 duration-300",
-          success && "scale-[0.98] opacity-90"
+          "relative w-full max-w-md bg-white rounded-2xl border border-gray-100",
+          success && "pointer-events-none"
         )}
         style={{
+          animation: success 
+            ? "vacancy-success-glow 600ms ease-out forwards"
+            : "vacancy-popup-enter 400ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
           boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)",
         }}
       >
-        {/* Success Overlay */}
+        {/* Success Overlay with Confetti */}
         {success && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/90 rounded-2xl z-10 animate-in fade-in duration-200">
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center animate-in zoom-in duration-300">
-                <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <div className="absolute inset-0 flex items-center justify-center bg-white/95 rounded-2xl z-10">
+            {/* Confetti Particles */}
+            <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-2xl">
+              <span 
+                className="absolute w-3 h-3 rounded-full bg-green-400"
+                style={{ animation: "vacancy-confetti-1 600ms ease-out forwards" }}
+              />
+              <span 
+                className="absolute w-2 h-2 rounded-full bg-emerald-500"
+                style={{ animation: "vacancy-confetti-2 600ms ease-out 50ms forwards" }}
+              />
+              <span 
+                className="absolute w-2.5 h-2.5 rounded-full bg-green-300"
+                style={{ animation: "vacancy-confetti-3 600ms ease-out 100ms forwards" }}
+              />
+              <span 
+                className="absolute w-2 h-2 rounded-full bg-teal-400"
+                style={{ animation: "vacancy-confetti-4 600ms ease-out 75ms forwards" }}
+              />
+              <span 
+                className="absolute w-1.5 h-1.5 rounded-sm bg-green-500 rotate-45"
+                style={{ animation: "vacancy-confetti-1 500ms ease-out 25ms forwards" }}
+              />
+              <span 
+                className="absolute w-1.5 h-1.5 rounded-sm bg-emerald-400 rotate-12"
+                style={{ animation: "vacancy-confetti-2 550ms ease-out forwards" }}
+              />
+            </div>
+            
+            {/* Success Icon */}
+            <div className="flex flex-col items-center gap-3 relative z-10">
+              <div 
+                className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center"
+                style={{ animation: "vacancy-success-ring 600ms ease-out forwards" }}
+              >
+                <svg 
+                  className="w-8 h-8 text-green-600" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor" 
+                  strokeWidth={2.5}
+                  style={{ animation: "vacancy-success-check 500ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards" }}
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-sm font-medium text-gray-900">Vakanz erstellt!</p>
+              <p className="text-base font-semibold text-gray-900">Vakanz erstellt!</p>
+              <p className="text-sm text-gray-500">Sichtbar in Vakanzen</p>
             </div>
           </div>
         )}

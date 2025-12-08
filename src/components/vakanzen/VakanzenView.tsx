@@ -73,6 +73,25 @@ export function VakanzenView({ initialVacancies, contacts, roles, teams }: Props
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // Refresh vacancies on mount (for client-side navigation)
+  // This ensures newly created vacancies show up when navigating to the page
+  useEffect(() => {
+    const refreshVacancies = async () => {
+      try {
+        const res = await fetch("/api/vacancies");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.data) {
+            setVacancies(data.data);
+          }
+        }
+      } catch (e) {
+        console.error("[VakanzenView] Failed to refresh vacancies:", e);
+      }
+    };
+    refreshVacancies();
+  }, []);
+
   // Filter and sort vacancies
   const filteredVacancies = useMemo(() => {
     let filtered = vacancies;
