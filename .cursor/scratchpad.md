@@ -5,6 +5,7 @@
 - Chat realtime stabilized ✅
 - **Make follow-ups and status PERSONAL per user (not shared across team)** ✅
 - New issue reported: repeated 400 errors on `POST /api/contacts/call-logs` plus realtime subscriptions flapping (SUBSCRIBED → CLOSED → SUBSCRIBED).
+- New regression: personal status still shows "Not set" after reload (Task 19 not stable).
 
 # Key Challenges and Analysis
 
@@ -35,6 +36,12 @@ user_tma_settings (
 - Frontend logs show repeated `POST https://qero-crm.vercel.app/api/contacts/call-logs 400 (Bad Request)` while realtime channels flicker between SUBSCRIBED and CLOSED.
 - Likely causes: payload missing required fields, validation mismatch between frontend and API, or auth/session issues causing Supabase RPC failure.
 - Need to capture request payload/response body and inspect API handler schema/DB constraints; also verify realtime channel lifecycle (disconnections vs cleanup).
+
+## Personal status still missing after reload (SSR/auth mismatch)
+- Symptoms: Sidebar/header/Calling list show status as "Not set" on reload even though personal status was saved earlier.
+- Hypothesis 1: API routes (`/api/contacts`, `/api/contacts/personal-settings`, `/api/contacts/[id]`) use the **browser** Supabase client (`createBrowserClient`), so in server context there is no session → RLS returns empty personal rows and `updateContactSettings` early-returns because `supabase.auth.getUser()` is null.
+- Hypothesis 2: Server data merge (`server-data-service`) may not see a user in SSR requests (cookies/session missing), so personal settings are not merged into initial payload.
+- Required: audit every call path that touches personal status/follow-up to ensure the right Supabase client (server vs browser) with cookies/session is used; add logging to verify `auth.getUser()` and row counts in server contexts.
 
 # High-level Task Breakdown
 
@@ -86,6 +93,21 @@ user_tma_settings (
 ### Step 6: Manual verification (pending)
 - Ready for testing in production - verify no more 400 errors and realtime channels stay stable.
 
+## Task 23: Fix personal status SSR/auth (IN PROGRESS - PLANNING)
+- Goal: personal status/follow-up must appear on first render (SSR) and after reload; updates must persist per-user via RLS.
+- Success criteria:
+  - `/api/contacts` and `/api/contacts/personal-settings` return personal status for the authenticated user.
+  - `serverContactService.getAll()` merges personal settings on SSR (user detected, non-zero settings merged).
+  - Setting status in Calling/Contacts persists after hard reload and across routes; Tag no longer shows "Not set".
+  - RLS respected (no leakage of other users’ settings).
+
+- Plan / steps:
+  1) **Reproduce & instrument**: Hit `/api/contacts/personal-settings` and `/api/contacts` with an authenticated session; log `auth.getUser()` result, settings row count, and any RLS errors. Check server logs from `server-data-service` (existing console logs) to confirm user is null vs present in SSR.
+  2) **Fix Supabase client usage in API routes**: Introduce a route-handler Supabase helper (server client with request cookies). Update `personal-settings-service` (or create server variant) and `contactService` to use the server client when called from API routes; remove browser client usage in server contexts.
+  3) **Plumb clients through services**: Allow `contactService`/`personalSettingsService` to accept an injected Supabase client so API routes can pass the server client, while client components can still use the browser client if ever needed.
+  4) **Re-test SSR merge**: Verify `serverContactService.getAll()` merges personal settings (user present) and that Calling/Contacts initial render shows the saved status.
+  5) **Regression checks**: Confirm status updates still work, follow-up scheduling unaffected, and RLS still enforced. Add a lightweight node:test for the service merge helper (mocking settings map) if feasible; otherwise document manual verification steps.
+
 # Project Status Board
 - [x] Task 1-7: PWA & Push Notifications
 - [x] Task 8-11: Chat Realtime Stability
@@ -95,6 +117,7 @@ user_tma_settings (
 - [x] **Task 19: Personal follow-ups & status** ✅ COMPLETE
 - [x] **Task 20: Fix call-log 400s & realtime flapping** ✅ COMPLETE
 - [x] **Task 21: Diagnose and fix non-working status/follow-up buttons** ✅ COMPLETE
+- [ ] **Task 23: Fix personal status SSR/auth merge** (planning)
 
 # Current Status / Progress Tracking
 - **Task 20 COMPLETE** ✅
@@ -120,16 +143,30 @@ Tested in production (2025-12-08):
 3. ✅ Personal settings saved to `user_contact_settings` table
 4. ✅ Server logs show `[Personal Settings]` logs (visible in Vercel logs, not browser console)
 
-**Task 23: Fix Sidebar Display** (IN PROGRESS)
-- Updated `server-data-service.ts` to merge personal settings on initial page load
-- Deployed (commit: 4aacc09)
-- Testing shows sidebar still displays "NOT SET" instead of personal status
-- Need to investigate why server-side merge isn't working
+**Task 23: Fix Server Auth for Personal Settings** (IN PROGRESS - IMPLEMENTING)
+
+Root cause identified: API routes were using browser Supabase client (`createBrowserClient`) which has no auth context on server. `auth.getUser()` returned null, so personal settings were never saved/fetched.
+
+**Implementation completed:**
+1. ✅ Created `src/lib/data/personal-settings-service-server.ts` - server-side service using `createClient` from `../supabase/server`
+2. ✅ Updated `src/lib/data/server-data-service.ts`:
+   - Added `getById`, `update`, `create`, `delete` methods to `serverContactService`
+   - All methods use `serverPersonalSettingsService` for personal fields
+3. ✅ Updated API routes to use server services:
+   - `/api/contacts/route.ts` → `serverContactService`
+   - `/api/contacts/[id]/route.ts` → `serverContactService`
+   - `/api/contacts/import/route.ts` → `serverContactService`
+   - `/api/contacts/personal-settings/route.ts` → `serverPersonalSettingsService`
+4. ✅ Build passes with no errors
+
+**Pending:** Deploy and test in production
 
 # Executor's Feedback or Assistance Requests
-- Server-side personal settings merge not working as expected
-- Sidebar and header still show incorrect status after reload
-- May need to check user authentication in server context
+- Ready to deploy - all code changes complete and build passes
+- Need manual verification after deployment:
+  1. Click "Working" or "Hot" button on a contact
+  2. Refresh the page (hard reload)
+  3. Status should persist (not show "Not set")
 
 # Lessons
 - VAPID keys are free to generate

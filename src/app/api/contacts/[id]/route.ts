@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { contactService } from '@/lib/data/data-service';
+import { serverContactService } from '@/lib/data/server-data-service';
 import { respondError, respondSuccess, formatZodError } from '@/lib/utils/api-response';
 import { ContactUpdateSchema } from '@/lib/validation/schemas';
 
@@ -16,7 +16,8 @@ function removeUndefined<T extends Record<string, unknown>>(payload: T) {
 export async function GET(_request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   try {
-    const contact = await contactService.getById(id);
+    // Use server contact service to get contact with personal settings merged
+    const contact = await serverContactService.getById(id);
     if (!contact) {
       return respondError('Contact not found', 404);
     }
@@ -52,7 +53,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       cleaned.status = "follow_up";
     }
     
-    const updated = await contactService.update(id, cleaned);
+    // Use server contact service to update (uses server-side auth)
+    const updated = await serverContactService.update(id, cleaned);
 
     if (!updated) {
       return respondError('Contact not found', 404);
@@ -68,7 +70,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 export async function DELETE(_request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   try {
-    const deleted = await contactService.delete(id);
+    // Use server contact service to delete
+    const deleted = await serverContactService.delete(id);
     if (!deleted) {
       return respondError('Contact not found', 404);
     }

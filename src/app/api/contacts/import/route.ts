@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { contactService } from "@/lib/data/data-service";
+import { serverContactService } from "@/lib/data/server-data-service";
 import { respondError, respondSuccess } from "@/lib/utils/api-response";
 import { ContactCreateSchema } from "@/lib/validation/schemas";
 import { sanitizeContactPayload } from "@/lib/utils/sanitize-contact";
@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
         errors.push(`Row ${index + 1}: ${parsed.error.issues[0]?.message ?? "invalid data"}`);
         continue;
       }
-      const contact = await contactService.create(sanitizeContactPayload(parsed.data));
+      // Use server contact service (uses server-side auth)
+      const contact = await serverContactService.create(sanitizeContactPayload(parsed.data));
       created.push(contact.id);
     }
 

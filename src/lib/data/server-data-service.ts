@@ -1,10 +1,14 @@
 /**
  * Server-side Data Service Layer
- * Uses Supabase Server Client for server components
+ * Uses Supabase Server Client for server components and API routes
  */
 
 import type { Contact, ContactFilters, TmaCandidate, TmaFilters } from "../types";
 import { createClient } from "../supabase/server";
+import { serverPersonalSettingsService } from "./personal-settings-service-server";
+
+// Fields that are personal (stored in user_contact_settings, not on contacts table)
+const PERSONAL_CONTACT_FIELDS = ["status", "follow_up_at", "follow_up_note"];
 
 // Supabase has a default max_rows of 1000, so we fetch in batches
 const BATCH_SIZE = 1000;
@@ -184,6 +188,150 @@ export const serverContactService = {
     }
 
     return count ?? 0;
+  },
+
+  /**
+   * Get a single contact by ID (with personal settings merged)
+   */
+  async getById(id: string): Promise<Contact | null> {
+    const supabase = await createClient();
+    
+    const { data, error } = await supabase
+      .from("contacts")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      console.error("[Server Data] Error fetching contact:", error);
+      return null;
+    }
+
+    // Merge with personal settings
+    const personalSetting = await serverPersonalSettingsService.getContactSetting(id);
+    if (personalSetting) {
+      return {
+        ...data,
+        status: personalSetting.status ?? data.status,
+        follow_up_at: personalSetting.follow_up_at ?? data.follow_up_at,
+        follow_up_note: personalSetting.follow_up_note ?? data.follow_up_note,
+      };
+    }
+    
+    return data;
+  },
+
+  /**
+   * Update a contact (server-side - for API routes)
+   */
+  async update(id: string, data: Partial<Contact>): Promise<Contact | null> {
+    const supabase = await createClient();
+    console.log("[Server Data Service] Update called with:", { id, data });
+    
+    // Separate personal fields from shared fields
+    const personalFields: Record<string, unknown> = {};
+    const sharedFields: Record<string, unknown> = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      if (PERSONAL_CONTACT_FIELDS.includes(key)) {
+        personalFields[key] = value;
+      } else {
+        sharedFields[key] = value;
+      }
+    }
+    
+    // Update shared fields on contacts table (if any)
+    if (Object.keys(sharedFields).length > 0) {
+      const { error } = await supabase
+        .from("contacts")
+        .update(sharedFields)
+        .eq("id", id);
+
+      if (error) {
+        console.error("[Server Data Service] Error updating contact:", error);
+        return null;
+      }
+    }
+    
+    // Update personal fields (if any) using server personal settings service
+    if (Object.keys(personalFields).length > 0) {
+      console.log("[Server Data Service] Calling serverPersonalSettingsService with:", { id, personalFields });
+      await serverPersonalSettingsService.updateContactSettings(id, personalFields as {
+        status?: "hot" | "working" | "follow_up" | null;
+        follow_up_at?: string | null;
+        follow_up_note?: string | null;
+      });
+    } else {
+      console.log("[Server Data Service] No personal fields to update");
+    }
+
+    // Fetch and return the updated contact with merged personal settings
+    return this.getById(id);
+  },
+
+  /**
+   * Create a new contact (server-side - for API routes)
+   */
+  async create(data: Omit<Contact, "id" | "created_at">): Promise<Contact> {
+    const supabase = await createClient();
+    
+    // Separate personal fields from shared fields
+    const personalFields = {
+      status: data.status,
+      follow_up_at: data.follow_up_at,
+      follow_up_note: data.follow_up_note,
+    };
+    
+    // Remove personal fields from contact data using destructuring
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status: _s, follow_up_at: _fa, follow_up_note: _fn, ...contactData } = data;
+    
+    const { data: newContact, error } = await supabase
+      .from("contacts")
+      .insert(contactData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[Server Data Service] Error creating contact:", error);
+      throw new Error(error.message);
+    }
+
+    // Save personal settings if any were provided (using server service)
+    if (personalFields.status || personalFields.follow_up_at) {
+      await serverPersonalSettingsService.updateContactSettings(newContact.id, personalFields);
+    }
+
+    // Return with merged personal settings
+    const personalSetting = await serverPersonalSettingsService.getContactSetting(newContact.id);
+    if (personalSetting) {
+      return {
+        ...newContact,
+        status: personalSetting.status ?? newContact.status,
+        follow_up_at: personalSetting.follow_up_at ?? newContact.follow_up_at,
+        follow_up_note: personalSetting.follow_up_note ?? newContact.follow_up_note,
+      };
+    }
+    return newContact;
+  },
+
+  /**
+   * Delete a contact
+   */
+  async delete(id: string): Promise<boolean> {
+    const supabase = await createClient();
+    
+    const { error } = await supabase
+      .from("contacts")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("[Server Data Service] Error deleting contact:", error);
+      return false;
+    }
+
+    return true;
   },
 };
 

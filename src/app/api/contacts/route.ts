@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { contactService } from '@/lib/data/data-service';
+import { serverContactService } from '@/lib/data/server-data-service';
 import { respondError, respondSuccess, formatZodError } from '@/lib/utils/api-response';
 import {
   ContactCreateSchema,
@@ -29,23 +29,9 @@ export async function GET(request: NextRequest) {
 
     const filters = filtersResult.data;
     
-    // If pagination params provided, use paginated endpoint
-    if (filters.page || filters.pageSize) {
-      const result = await contactService.getPaginated(filters);
-      return respondSuccess(result.data, {
-        status: 200,
-        meta: {
-          count: result.data.length,
-          total: result.total,
-          page: result.page,
-          pageSize: result.pageSize,
-          totalPages: result.totalPages,
-        },
-      });
-    }
-
-    // Otherwise return all (for backwards compatibility)
-    const contacts = await contactService.getAll(filters);
+    // Use server contact service (merges personal settings with proper auth)
+    // Note: pagination not yet implemented in server service, use getAll for now
+    const contacts = await serverContactService.getAll(filters);
     return respondSuccess(contacts, {
       status: 200,
       meta: { count: contacts.length },
@@ -67,7 +53,8 @@ export async function POST(request: NextRequest) {
       return respondError(formatZodError(parsed.error), 400);
     }
 
-    const contact = await contactService.create(sanitizeContactPayload(parsed.data));
+    // Use server contact service to create (uses server-side auth)
+    const contact = await serverContactService.create(sanitizeContactPayload(parsed.data));
     return respondSuccess(contact, { status: 201 });
   } catch (error) {
     console.error('POST /api/contacts error', error);

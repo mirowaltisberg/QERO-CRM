@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { personalSettingsService } from "@/lib/data/personal-settings-service";
+import { serverPersonalSettingsService } from "@/lib/data/personal-settings-service-server";
 import { respondError, respondSuccess } from "@/lib/utils/api-response";
 
 export async function POST(request: NextRequest) {
@@ -10,7 +10,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { contact_ids } = body;
-    const settings = await personalSettingsService.getContactSettings(contact_ids);
+    // Use server personal settings service (has proper auth context)
+    const settings = await serverPersonalSettingsService.getContactSettings(contact_ids);
 
     return respondSuccess(settings);
   } catch (error) {
