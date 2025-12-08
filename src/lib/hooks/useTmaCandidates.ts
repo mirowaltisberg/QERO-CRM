@@ -137,10 +137,11 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   // Helper to mark a candidate as recently updated locally
   const markLocalUpdate = useCallback((id: string) => {
     recentLocalUpdates.current.add(id);
-    // Clear after 2 seconds to allow future realtime updates
+    // Clear after 5 seconds to allow future realtime updates
+    // Using longer timeout to ensure realtime doesn't overwrite during slow network
     setTimeout(() => {
       recentLocalUpdates.current.delete(id);
-    }, 2000);
+    }, 5000);
   }, []);
 
   const fetchRoles = useCallback(async () => {
@@ -388,14 +389,14 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
       if (!activeCandidate) return;
       setActionState({ type: "saving", message: "Scheduling follow-up..." });
       try {
+        // Only send follow_up fields - DON'T overwrite status/status_tags!
+        // Follow-up is a reminder, quality assessment is separate
         const response = await fetch(`/api/tma/${activeCandidate.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             follow_up_at: date.toISOString(),
             follow_up_note: note ?? null,
-            status: "C",
-            status_tags: ["C"],
           }),
         });
         const json = await response.json();

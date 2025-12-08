@@ -45,13 +45,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const payload = clean(parsed.data);
 
+    // Note: We no longer auto-set status when scheduling follow-ups
+    // Status/quality (A, B, C) is managed independently from follow-ups
+    // If user explicitly sets status to something other than "C", clear follow-up
     if (payload.status && payload.status !== "C") {
       payload.follow_up_at = null;
       payload.follow_up_note = null;
-    }
-
-    if (payload.follow_up_at && !payload.status) {
-      payload.status = "C";
     }
 
     const supabase = await createClient();
