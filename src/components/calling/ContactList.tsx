@@ -3,9 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { CantonTag } from "@/components/ui/CantonTag";
-import type { Contact, ContactCallLog } from "@/lib/types";
+import type { Contact, ContactCallLog, Vacancy } from "@/lib/types";
 import { memo, useCallback, useRef, useState, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { cn } from "@/lib/utils/cn";
 
 interface ContactListProps {
   contacts: Contact[];
@@ -18,6 +19,7 @@ interface ContactListProps {
   activeCantonFilter?: string | null;
   availableCantons?: string[];
   callLogs?: Record<string, ContactCallLog>;
+  contactVacancies?: Record<string, Vacancy[]>;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   isMobile?: boolean;
@@ -32,6 +34,7 @@ const ContactListItem = memo(function ContactListItem({
   onClearCantonFilter,
   activeCantonFilter,
   callLog,
+  hasVacancy,
 }: {
   contact: Contact;
   isActive: boolean;
@@ -40,6 +43,7 @@ const ContactListItem = memo(function ContactListItem({
   onClearCantonFilter?: () => void;
   activeCantonFilter?: string | null;
   callLog?: ContactCallLog | null;
+  hasVacancy?: boolean;
 }) {
   const handleClick = useCallback(() => {
     onSelect(contact.id);
@@ -59,17 +63,32 @@ const ContactListItem = memo(function ContactListItem({
   return (
     <button
       onClick={handleClick}
-      className={[
+      className={cn(
         "w-full rounded-xl border px-3 py-2 text-left transition-colors duration-100",
         isActive
-          ? "bg-white border-gray-200 shadow-sm"
-          : "border-transparent hover:bg-white/60",
-      ].join(" ")}
+          ? hasVacancy 
+            ? "bg-purple-50 border-purple-200 shadow-sm" 
+            : "bg-white border-gray-200 shadow-sm"
+          : hasVacancy
+            ? "bg-purple-50/60 border-purple-100 hover:bg-purple-50"
+            : "border-transparent hover:bg-white/60"
+      )}
     >
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-900 truncate">
-          {contact.company_name}
-        </p>
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <p className="text-sm font-medium text-gray-900 truncate">
+            {contact.company_name}
+          </p>
+          {hasVacancy && (
+            <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-100 text-purple-700">
+              <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" />
+              </svg>
+              Vakanz
+            </span>
+          )}
+        </div>
         <Tag status={contact.status} className="text-[10px] px-2 py-0.5 flex-shrink-0" />
       </div>
       <div className="mt-1 flex items-center justify-between">
@@ -146,6 +165,7 @@ export const ContactList = memo(function ContactList({
   activeCantonFilter,
   availableCantons = [],
   callLogs = {},
+  contactVacancies = {},
   searchQuery = "",
   onSearchChange,
   isMobile = false,
@@ -291,6 +311,7 @@ export const ContactList = memo(function ContactList({
                     onClearCantonFilter={onClearCantonFilter}
                     activeCantonFilter={activeCantonFilter}
                     callLog={callLogs[contact.id]}
+                    hasVacancy={!!contactVacancies[contact.id]?.length}
                   />
                 </div>
               );

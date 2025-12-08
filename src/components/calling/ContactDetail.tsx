@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { NotesPanel } from "./NotesPanel";
 import { ContactPersonsPanel } from "./ContactPersonsPanel";
-import type { Contact } from "@/lib/types";
+import { VacancyQuickView } from "./VacancyQuickView";
+import type { Contact, Vacancy } from "@/lib/types";
 import type { ContactStatus } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
 
@@ -25,6 +26,7 @@ interface ContactDetailProps {
   onClearFollowUp: () => Promise<void> | void;
   onClearStatus: () => Promise<void> | void;
   onNoteAdded?: () => void;
+  vacancies?: Vacancy[];
   isMobile?: boolean;
 }
 
@@ -39,6 +41,7 @@ export const ContactDetail = memo(function ContactDetail({
   onClearFollowUp,
   onClearStatus,
   onNoteAdded,
+  vacancies,
   isMobile = false,
 }: ContactDetailProps) {
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
@@ -47,6 +50,7 @@ export const ContactDetail = memo(function ContactDetail({
   const [customNote, setCustomNote] = useState(contact?.follow_up_note ?? "");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState<{ success: boolean; message: string } | null>(null);
+  const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null);
   const [emailPreview, setEmailPreview] = useState<{
     recipients: string[];
     subject: string;
@@ -223,6 +227,16 @@ export const ContactDetail = memo(function ContactDetail({
         <div className="flex-shrink-0 mb-4">
           <ContactPersonsPanel contactId={contact.id} />
         </div>
+
+        {/* Vacancy Indicator */}
+        {vacancies && vacancies.length > 0 && (
+          <div className="flex-shrink-0 mb-4">
+            <VacancyIndicator 
+              vacancies={vacancies} 
+              onViewDetails={(vacancy) => setSelectedVacancy(vacancy)} 
+            />
+          </div>
+        )}
 
         {/* Compact status + follow-up toolbar - fixed */}
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 flex-shrink-0 mb-4">
@@ -409,7 +423,64 @@ export const ContactDetail = memo(function ContactDetail({
           )}
         </div>
       </Modal>
+
+      {/* Vacancy Quick View Popup */}
+      <VacancyQuickView
+        vacancy={selectedVacancy}
+        isOpen={!!selectedVacancy}
+        onClose={() => setSelectedVacancy(null)}
+      />
     </>
+  );
+});
+
+// Vacancy Indicator component
+const VacancyIndicator = memo(function VacancyIndicator({
+  vacancies,
+  onViewDetails,
+}: {
+  vacancies: Vacancy[];
+  onViewDetails: (vacancy: Vacancy) => void;
+}) {
+  // Sort by urgency (highest first)
+  const sortedVacancies = [...vacancies].sort((a, b) => (b.urgency || 1) - (a.urgency || 1));
+  const mostUrgent = sortedVacancies[0];
+
+  return (
+    <button
+      onClick={() => onViewDetails(mostUrgent)}
+      className="w-full rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-left transition-colors hover:bg-purple-100 hover:border-purple-300 group"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 text-purple-600 group-hover:bg-purple-200">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+              <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-purple-900">
+              {vacancies.length === 1 ? "Offene Vakanz" : `${vacancies.length} Offene Vakanzen`}
+            </p>
+            <p className="text-xs text-purple-600">{mostUrgent.title}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Urgency flames */}
+          <div className="flex gap-0.5">
+            {Array.from({ length: mostUrgent.urgency || 1 }).map((_, i) => (
+              <svg key={i} className="w-3.5 h-3.5 text-orange-500" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 23c-4.97 0-9-3.58-9-8 0-2.52 1.17-4.83 3.15-6.42.9-.73 1.85-1.27 2.85-1.58.39-.12.8.16.8.57v.44c0 1.08.22 2.14.65 3.12.15.36.55.48.87.27.17-.11.32-.24.45-.39.72-.8 1.14-1.82 1.23-2.9.09-1.08-.12-2.17-.63-3.14-.25-.47.18-1.02.7-.89 1.76.45 3.38 1.38 4.72 2.73C19.32 8.92 21 11.87 21 15c0 4.42-4.03 8-9 8z"/>
+              </svg>
+            ))}
+          </div>
+          <svg className="w-4 h-4 text-purple-400 group-hover:text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </button>
   );
 });
 

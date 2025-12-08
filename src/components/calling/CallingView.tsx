@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { ContactList } from "./ContactList";
 import { ContactDetail } from "./ContactDetail";
-import type { Contact, ContactCallLog } from "@/lib/types";
+import type { Contact, ContactCallLog, Vacancy } from "@/lib/types";
 import { useContacts } from "@/lib/hooks/useContacts";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { KEYBOARD_SHORTCUTS } from "@/lib/utils/constants";
@@ -96,6 +96,9 @@ export function CallingView({ initialContacts }: CallingViewProps) {
   // Track if a call was initiated for the current contact (waiting for note)
   const [callInitiatedForContact, setCallInitiatedForContact] = useState<string | null>(null);
 
+  // Track vacancies by contact ID
+  const [contactVacancies, setContactVacancies] = useState<Record<string, Vacancy[]>>({});
+
   // Fetch call logs for all contacts in a SINGLE batched request
   useEffect(() => {
     if (!contacts.length) return;
@@ -141,6 +144,29 @@ export function CallingView({ initialContacts }: CallingViewProps) {
 
     fetchCallLogs();
   }, [contacts]);
+
+  // Fetch vacancies and group by contact_id
+  useEffect(() => {
+    async function fetchVacancies() {
+      try {
+        const res = await fetch("/api/vacancies?status=open");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const grouped: Record<string, Vacancy[]> = {};
+            data.forEach((v: Vacancy) => {
+              if (!grouped[v.contact_id]) grouped[v.contact_id] = [];
+              grouped[v.contact_id].push(v);
+            });
+            setContactVacancies(grouped);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching vacancies:", err);
+      }
+    }
+    fetchVacancies();
+  }, []);
 
   // Real-time subscription for call logs
   useEffect(() => {
@@ -343,6 +369,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
             activeCantonFilter={cantonFilter}
             availableCantons={uniqueCantons}
             callLogs={callLogs}
+            contactVacancies={contactVacancies}
             isMobile={true}
           />
         </div>
@@ -403,6 +430,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
               onClearFollowUp={clearFollowUp}
               onClearStatus={clearStatus}
               onNoteAdded={handleNoteAdded}
+              vacancies={activeContact ? contactVacancies[activeContact.id] : undefined}
               isMobile={true}
             />
           </div>
@@ -425,6 +453,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         activeCantonFilter={cantonFilter}
         availableCantons={uniqueCantons}
         callLogs={callLogs}
+        contactVacancies={contactVacancies}
       />
       <ContactDetail
         key={activeContact?.id ?? "empty"}
@@ -438,6 +467,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         onClearFollowUp={clearFollowUp}
         onClearStatus={clearStatus}
         onNoteAdded={handleNoteAdded}
+        vacancies={activeContact ? contactVacancies[activeContact.id] : undefined}
       />
     </div>
   );
