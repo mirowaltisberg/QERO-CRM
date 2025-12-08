@@ -158,6 +158,35 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
   const handleBulkDelete = useCallback(() => runBulkAction({ type: "delete" }), [runBulkAction]);
   const handleCloseBulkModal = useCallback(() => setBulkModal(null), []);
 
+  // Fix encoding state and handler
+  const [fixingEncoding, setFixingEncoding] = useState(false);
+  const handleFixEncoding = useCallback(async () => {
+    if (fixingEncoding) return;
+    
+    const confirmed = window.confirm(
+      "This will fix ä, ö, ü encoding issues in all company names, contact names, streets, and cities.\n\nContinue?"
+    );
+    if (!confirmed) return;
+
+    setFixingEncoding(true);
+    try {
+      const res = await fetch("/api/contacts/fix-encoding", { method: "POST" });
+      const data = await res.json();
+      
+      if (res.ok) {
+        alert(`✅ Fixed encoding in ${data.fixed} of ${data.total} contacts.`);
+        router.refresh();
+      } else {
+        alert(`❌ Error: ${data.error}`);
+      }
+    } catch (err) {
+      alert("❌ Failed to fix encoding. Please try again.");
+      console.error(err);
+    } finally {
+      setFixingEncoding(false);
+    }
+  }, [fixingEncoding, router]);
+
   return (
     <section className="flex h-full flex-col">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -169,6 +198,8 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
           onOpenBulkStatus={handleOpenBulkStatus}
           onOpenBulkList={handleOpenBulkList}
           onBulkDelete={handleBulkDelete}
+          onFixEncoding={handleFixEncoding}
+          fixingEncoding={fixingEncoding}
           groupByCanton={groupByCanton}
           onToggleGroupByCanton={toggleGroupByCanton}
           availableCantons={availableCantons}

@@ -16,6 +16,8 @@ interface TableToolbarProps {
   onOpenBulkStatus: () => void;
   onOpenBulkList: () => void;
   onBulkDelete: () => void;
+  onFixEncoding: () => void;
+  fixingEncoding?: boolean;
   groupByCanton: boolean;
   onToggleGroupByCanton: () => void;
   availableCantons?: string[];
@@ -29,6 +31,8 @@ export function TableToolbar({
   onOpenBulkStatus,
   onOpenBulkList,
   onBulkDelete,
+  onFixEncoding,
+  fixingEncoding = false,
   groupByCanton,
   onToggleGroupByCanton,
   availableCantons = [],
@@ -103,6 +107,15 @@ export function TableToolbar({
       )}
 
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onFixEncoding}
+          disabled={fixingEncoding}
+          title="Fix ä, ö, ü encoding issues"
+        >
+          {fixingEncoding ? "Fixing..." : "🔧 Fix Encoding"}
+        </Button>
         <Button
           variant="secondary"
           size="sm"
