@@ -87,6 +87,17 @@ type FilterType = "all" | "contacts" | "tma" | "emails" | "chat";
 type TmaQualityFilter = "all" | "A" | "B" | "C";
 type TmaActivityFilter = "all" | "active" | "not_active";
 
+// Quick navigation items
+const NAV_ITEMS = [
+  { id: "nav-calling", name: "Calling", href: "/calling", icon: "📞", aliases: ["cal", "call", "anrufen", "phone"] },
+  { id: "nav-companies", name: "Companies", href: "/contacts", icon: "🏢", aliases: ["comp", "firmen", "firma", "kontakte", "contacts"] },
+  { id: "nav-tma", name: "TMA", href: "/tma", icon: "👥", aliases: ["kandidaten", "candidates"] },
+  { id: "nav-email", name: "Email", href: "/email", icon: "✉️", aliases: ["mail", "emails", "nachrichten"] },
+  { id: "nav-chat", name: "Chat", href: "/chat", icon: "💬", aliases: ["messages", "dm", "direct"] },
+  { id: "nav-dashboard", name: "Dashboard", href: "/dashboard", icon: "📊", aliases: ["dash", "stats", "übersicht"] },
+  { id: "nav-settings", name: "Settings", href: "/settings", icon: "⚙️", aliases: ["einstellungen", "config", "profil", "profile"] },
+];
+
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -104,6 +115,17 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [filter, setFilter] = useState<FilterType>("all");
   const [tmaQualityFilter, setTmaQualityFilter] = useState<TmaQualityFilter>("all");
   const [tmaActivityFilter, setTmaActivityFilter] = useState<TmaActivityFilter>("all");
+
+  // Filter navigation items based on query
+  const filteredNavItems = query.length >= 1 
+    ? NAV_ITEMS.filter((item) => {
+        const q = query.toLowerCase();
+        return (
+          item.name.toLowerCase().includes(q) ||
+          item.aliases.some((alias) => alias.includes(q))
+        );
+      })
+    : [];
 
   // Filter results based on selected filter
   const filteredContacts = filter === "all" || filter === "contacts" ? contacts : [];
@@ -127,7 +149,9 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const filteredChatRooms = filter === "all" || filter === "chat" ? chatRooms : [];
   const filteredChat = filter === "all" || filter === "chat" ? chat : [];
 
-  // Combined results for keyboard navigation (chat rooms come before chat messages)
+  // Combined results for keyboard navigation (nav items first, then chat rooms before chat messages)
+  const allResultsCount = filteredNavItems.length + filteredContacts.length + filteredTma.length + filteredEmails.length + filteredChatRooms.length + filteredChat.length;
+  
   const allResults: SearchResult[] = [
     ...filteredContacts.map((c) => ({ ...c, type: "contact" as const })),
     ...filteredTma.map((t) => ({ ...t, type: "tma" as const })),
@@ -135,6 +159,9 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     ...filteredChatRooms.map((r) => ({ ...r, type: "chat_room" as const })),
     ...filteredChat.map((c) => ({ ...c, type: "chat" as const })),
   ];
+  
+  // Total selectable items (nav items + search results)
+  const totalSelectableItems = filteredNavItems.length + allResults.length;
 
   // Count results per type (for filter badges)
   const counts = {
@@ -223,6 +250,15 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     };
   }, [query, isLocationMode, radius]);
 
+  // Handle navigation item selection
+  const handleNavSelect = useCallback(
+    (item: typeof NAV_ITEMS[0]) => {
+      router.push(item.href);
+      onClose();
+    },
+    [router, onClose]
+  );
+
   // Handle result selection
   const handleSelect = useCallback(
     (result: SearchResult) => {
@@ -242,7 +278,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     [router, onClose]
   );
 
-  // Keyboard navigation
+  // Keyboard navigation (nav items first, then search results)
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -250,18 +286,25 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         onClose();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((prev) => Math.min(prev + 1, allResults.length - 1));
+        setSelectedIndex((prev) => Math.min(prev + 1, totalSelectableItems - 1));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setSelectedIndex((prev) => Math.max(prev - 1, 0));
       } else if (e.key === "Enter") {
         e.preventDefault();
-        if (allResults[selectedIndex]) {
-          handleSelect(allResults[selectedIndex]);
+        // Check if a nav item is selected
+        if (selectedIndex < filteredNavItems.length) {
+          handleNavSelect(filteredNavItems[selectedIndex]);
+        } else {
+          // Adjust index for search results
+          const resultIndex = selectedIndex - filteredNavItems.length;
+          if (allResults[resultIndex]) {
+            handleSelect(allResults[resultIndex]);
+          }
         }
       }
     },
-    [allResults, selectedIndex, handleSelect, onClose]
+    [allResults, filteredNavItems, selectedIndex, handleSelect, handleNavSelect, onClose, totalSelectableItems]
   );
 
   // Close on backdrop click
@@ -276,9 +319,10 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   if (!isOpen) return null;
 
-  // Calculate global indices for each section (using filtered arrays)
-  const contactStartIndex = 0;
-  const tmaStartIndex = filteredContacts.length;
+  // Calculate global indices for each section (nav items first, then filtered arrays)
+  const navItemsCount = filteredNavItems.length;
+  const contactStartIndex = navItemsCount;
+  const tmaStartIndex = contactStartIndex + filteredContacts.length;
   const emailStartIndex = tmaStartIndex + filteredTma.length;
   const chatRoomStartIndex = emailStartIndex + filteredEmails.length;
   const chatStartIndex = chatRoomStartIndex + filteredChatRooms.length;
@@ -447,14 +491,43 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
         {/* Results */}
         <div className="max-h-[60vh] overflow-y-auto">
-          {query.length < 2 ? (
+          {/* Navigation shortcuts - always show when matching, even with short query */}
+          {filteredNavItems.length > 0 && (
+            <div>
+              <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
+                Navigation
+              </div>
+              {filteredNavItems.map((item, idx) => (
+                <ResultItem
+                  key={item.id}
+                  isSelected={selectedIndex === idx}
+                  onClick={() => handleNavSelect(item)}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-xl">
+                      {item.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-gray-900">{item.name}</span>
+                    </div>
+                    <kbd className="hidden sm:inline-flex items-center rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-xs text-gray-400">
+                      Enter
+                    </kbd>
+                  </div>
+                </ResultItem>
+              ))}
+            </div>
+          )}
+
+          {query.length < 2 && filteredNavItems.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-gray-500">
-              <p>Mindestens 2 Zeichen eingeben...</p>
+              <p>Tippe zum Navigieren oder suchen...</p>
               <p className="mt-2 text-xs text-gray-400">
-                Suche nach Firmen, TMA, E-Mails oder Chat-Nachrichten
+                z.B. &quot;cal&quot; für Calling, &quot;tma&quot; für TMA
               </p>
             </div>
-          ) : allResults.length === 0 && !loading ? (
+          ) : query.length >= 2 && allResults.length === 0 && filteredNavItems.length === 0 && !loading ? (
             <div className="px-4 py-8 text-center text-sm text-gray-500">
               {isLocationMode ? (
                 <>
