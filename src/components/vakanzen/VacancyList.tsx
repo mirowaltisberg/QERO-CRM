@@ -5,6 +5,7 @@ import type { Vacancy } from "@/lib/types";
 import type { VacancyStatus } from "@/lib/utils/constants";
 import { VACANCY_STATUS_LIST, VACANCY_STATUS_LABELS, VACANCY_STATUS_COLORS } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
+import { UrgencyBadge } from "./UrgencyBadge";
 
 interface Props {
   vacancies: Vacancy[];
@@ -133,9 +134,14 @@ export const VacancyList = memo(function VacancyList({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-gray-900">
-                        {vacancy.title}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium text-gray-900">
+                          {vacancy.title}
+                        </p>
+                        {vacancy.urgency > 1 && (
+                          <UrgencyBadge urgency={vacancy.urgency} showLabel={false} size="sm" />
+                        )}
+                      </div>
                       <p className="mt-0.5 truncate text-xs text-gray-500">
                         {vacancy.contact?.company_name || "Unbekannt"}
                       </p>

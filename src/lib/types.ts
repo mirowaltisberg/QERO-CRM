@@ -427,6 +427,7 @@ export interface ChatMember {
 
 export type VacancyStatus = "open" | "interviewing" | "filled";
 export type VacancyCandidateStatus = "suggested" | "contacted" | "interviewing" | "rejected" | "hired";
+export type VacancyUrgency = 1 | 2 | 3;
 
 /**
  * Vacancy - A job opening posted by a company
@@ -444,6 +445,7 @@ export interface Vacancy {
   longitude: number | null;
   radius_km: number;
   min_quality: "A" | "B" | "C" | null;
+  urgency: VacancyUrgency; // 1 = Kann warten, 2 = Bald, 3 = Sofort
   status: VacancyStatus;
   created_by: string;
   creator?: {

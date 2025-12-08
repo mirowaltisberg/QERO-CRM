@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
       longitude,
       radius_km,
       min_quality,
+      urgency,
       status,
     } = body;
 
@@ -134,6 +135,7 @@ export async function POST(request: NextRequest) {
         longitude: longitude || null,
         radius_km: radius_km || 25,
         min_quality: min_quality || null,
+        urgency: urgency || 1,
         status: status || "open",
         created_by: user.id,
       })

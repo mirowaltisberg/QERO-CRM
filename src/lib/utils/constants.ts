@@ -218,3 +218,32 @@ export const VACANCY_CANDIDATE_STATUS_COLORS: Record<VacancyCandidateStatus, str
   hired: "bg-green-100 text-green-700 border-green-200",
 };
 
+/**
+ * Vacancy Urgency Levels
+ */
+export const VACANCY_URGENCY = {
+  LOW: 1,
+  MEDIUM: 2,
+  HIGH: 3,
+} as const;
+
+export type VacancyUrgency = (typeof VACANCY_URGENCY)[keyof typeof VACANCY_URGENCY];
+
+export const VACANCY_URGENCY_LIST = [
+  VACANCY_URGENCY.LOW,
+  VACANCY_URGENCY.MEDIUM,
+  VACANCY_URGENCY.HIGH,
+] as const;
+
+export const VACANCY_URGENCY_LABELS: Record<VacancyUrgency, string> = {
+  1: "Kann warten",
+  2: "Bald",
+  3: "Sofort",
+};
+
+export const VACANCY_URGENCY_COLORS: Record<VacancyUrgency, { text: string; bg: string }> = {
+  1: { text: "text-gray-500", bg: "bg-gray-100" },
+  2: { text: "text-orange-600", bg: "bg-orange-100" },
+  3: { text: "text-red-600", bg: "bg-red-100" },
+};
+

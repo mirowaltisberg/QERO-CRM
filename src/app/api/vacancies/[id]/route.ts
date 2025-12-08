@@ -75,6 +75,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       "longitude",
       "radius_km",
       "min_quality",
+      "urgency",
       "status",
       "contact_id",
     ];

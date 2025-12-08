@@ -6,6 +6,7 @@ import type { VacancyStatus } from "@/lib/utils/constants";
 import { VACANCY_STATUS_LIST, VACANCY_STATUS_LABELS, VACANCY_STATUS_COLORS } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
 import { HoldToConfirmButton } from "@/components/ui/HoldToConfirmButton";
+import { UrgencyBadge } from "./UrgencyBadge";
 
 interface Props {
   vacancy: Vacancy;
@@ -60,7 +61,10 @@ export const VacancyDetail = memo(function VacancyDetail({
             </button>
           )}
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">{vacancy.title}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold text-gray-900">{vacancy.title}</h1>
+              <UrgencyBadge urgency={vacancy.urgency} size="md" />
+            </div>
             <p className="text-sm text-gray-500">{vacancy.contact?.company_name}</p>
           </div>
         </div>

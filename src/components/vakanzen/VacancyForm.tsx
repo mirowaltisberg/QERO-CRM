@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import type { Vacancy } from "@/lib/types";
+import type { Vacancy, VacancyUrgency } from "@/lib/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { TMA_STATUS_LIST } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
+import { UrgencySelector } from "./UrgencyBadge";
 
 // Simplified contact type for vacancy form
 interface ContactForVacancy {
@@ -41,6 +42,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy }: Pr
   const [postalCode, setPostalCode] = useState("");
   const [radiusKm, setRadiusKm] = useState(25);
   const [minQuality, setMinQuality] = useState<"A" | "B" | "C" | "">("");
+  const [urgency, setUrgency] = useState<VacancyUrgency>(1);
   const [contactSearch, setContactSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -55,6 +57,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy }: Pr
       setPostalCode(vacancy.postal_code || "");
       setRadiusKm(vacancy.radius_km || 25);
       setMinQuality(vacancy.min_quality || "");
+      setUrgency(vacancy.urgency || 1);
     } else {
       setContactId("");
       setTitle("");
@@ -64,6 +67,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy }: Pr
       setPostalCode("");
       setRadiusKm(25);
       setMinQuality("");
+      setUrgency(1);
     }
     setContactSearch("");
   }, [vacancy, isOpen]);
@@ -93,7 +97,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy }: Pr
 
   const handleSubmit = async () => {
     if (!contactId || !title.trim()) return;
-    
+
     setSubmitting(true);
     try {
       await onSubmit({
@@ -107,6 +111,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy }: Pr
         longitude: selectedContact?.longitude || null,
         radius_km: radiusKm,
         min_quality: minQuality || null,
+        urgency,
       });
     } finally {
       setSubmitting(false);
@@ -306,6 +311,14 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy }: Pr
           <p className="mt-1 text-xs text-gray-400">
             Nur Kandidaten mit dieser Qualität oder besser werden vorgeschlagen
           </p>
+        </div>
+
+        {/* Urgency */}
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">
+            Dringlichkeit
+          </label>
+          <UrgencySelector value={urgency} onChange={setUrgency} />
         </div>
 
         {/* Description */}
