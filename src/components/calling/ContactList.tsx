@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Tag } from "@/components/ui/tag";
 import { CantonTag } from "@/components/ui/CantonTag";
 import type { Contact, ContactCallLog, Vacancy } from "@/lib/types";
 import { memo, useCallback, useRef, useState, useEffect } from "react";
@@ -24,6 +23,70 @@ interface ContactListProps {
   onSearchChange?: (query: string) => void;
   isMobile?: boolean;
 }
+
+// Get background styles based on status, vacancy, and active state
+function getItemStyles(status: string | null, hasVacancy: boolean, isActive: boolean, hasFollowUp: boolean): string {
+  // Priority: vacancy > hot > follow_up > working > default
+  if (hasVacancy) {
+    return isActive 
+      ? "bg-purple-50 border-purple-200 shadow-sm"
+      : "bg-purple-50/60 border-purple-100 hover:bg-purple-50";
+  }
+  if (status === "hot") {
+    return isActive
+      ? "bg-orange-50 border-orange-200 shadow-sm"
+      : "bg-orange-50/60 border-orange-100 hover:bg-orange-50";
+  }
+  if (hasFollowUp) {
+    return isActive
+      ? "bg-amber-50 border-amber-200 shadow-sm"
+      : "bg-amber-50/60 border-amber-100 hover:bg-amber-50";
+  }
+  if (status === "working") {
+    return isActive
+      ? "bg-slate-50 border-slate-200 shadow-sm"
+      : "bg-slate-50/60 border-slate-100 hover:bg-slate-50";
+  }
+  return isActive
+    ? "bg-white border-gray-200 shadow-sm"
+    : "border-transparent hover:bg-white/60";
+}
+
+// Status badge component
+const StatusBadge = memo(function StatusBadge({ status, hasFollowUp }: { status: string | null; hasFollowUp: boolean }) {
+  if (status === "hot") {
+    return (
+      <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-orange-100 text-orange-700">
+        <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
+        </svg>
+        Hot
+      </span>
+    );
+  }
+  if (hasFollowUp) {
+    return (
+      <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-amber-100 text-amber-700">
+        <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+        </svg>
+        Follow-up
+      </span>
+    );
+  }
+  if (status === "working") {
+    return (
+      <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 text-slate-600">
+        <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+          <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+        </svg>
+        Working
+      </span>
+    );
+  }
+  return null;
+});
 
 // Memoized list item to prevent re-renders
 const ContactListItem = memo(function ContactListItem({
@@ -60,18 +123,15 @@ const ContactListItem = memo(function ContactListItem({
     [activeCantonFilter, onClearCantonFilter, onFilterByCanton]
   );
 
+  const hasFollowUp = !!contact.follow_up_at;
+  const itemStyles = getItemStyles(contact.status, !!hasVacancy, isActive, hasFollowUp);
+
   return (
     <button
       onClick={handleClick}
       className={cn(
         "w-full rounded-xl border px-3 py-2 text-left transition-colors duration-100",
-        isActive
-          ? hasVacancy 
-            ? "bg-purple-50 border-purple-200 shadow-sm" 
-            : "bg-white border-gray-200 shadow-sm"
-          : hasVacancy
-            ? "bg-purple-50/60 border-purple-100 hover:bg-purple-50"
-            : "border-transparent hover:bg-white/60"
+        itemStyles
       )}
     >
       <div className="flex items-center justify-between">
@@ -79,8 +139,10 @@ const ContactListItem = memo(function ContactListItem({
           <p className="text-sm font-medium text-gray-900 truncate">
             {contact.company_name}
           </p>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
           {hasVacancy && (
-            <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-100 text-purple-700">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-100 text-purple-700">
               <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
                 <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" />
@@ -88,8 +150,8 @@ const ContactListItem = memo(function ContactListItem({
               Vakanz
             </span>
           )}
+          <StatusBadge status={contact.status} hasFollowUp={hasFollowUp} />
         </div>
-        <Tag status={contact.status} className="text-[10px] px-2 py-0.5 flex-shrink-0" />
       </div>
       <div className="mt-1 flex items-center justify-between">
         <p className="text-xs text-gray-500 truncate">
