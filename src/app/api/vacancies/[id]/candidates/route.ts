@@ -108,9 +108,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const candidateBestQuality = Math.max(...candidateQualities.map((q: string) => QUALITY_RANK[q] || 0), 0);
       const meetsQuality = minQualityRank === 0 || candidateBestQuality >= minQualityRank;
 
-      // Check role match
+      // Check role match - REQUIRED if vacancy has role specified
       const roleMatches = !vacancy.role || 
         candidate.position_title?.toLowerCase().includes(vacancy.role.toLowerCase());
+      
+      // Skip candidates that don't match required role
+      if (vacancy.role && !roleMatches) continue;
 
       // Check if active
       const isActive = candidate.activity === "active";
