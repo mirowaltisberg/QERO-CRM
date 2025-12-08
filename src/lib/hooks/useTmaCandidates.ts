@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TmaCandidate, TmaRole } from "@/lib/types";
 import type { TmaStatus, TmaActivity } from "@/lib/utils/constants";
 import { createClient } from "@/lib/supabase/client";
@@ -66,6 +66,9 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   const [rolesLoading, setRolesLoading] = useState(false);
 
   // Real-time subscription for TMA candidates
+  // Track recent local updates to avoid realtime overwriting them
+  const recentLocalUpdates = useRef<Set<string>>(new Set());
+  
   useEffect(() => {
     if (locationSearch.active) return; // Skip realtime when doing location search
 
@@ -98,23 +101,25 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
               setCandidates((prev) => [payload.new as TmaCandidate, ...prev]);
             }
           } else if (payload.eventType === "UPDATE") {
-            // Fetch the updated candidate with claimer info
-            try {
-              const res = await fetch(`/api/tma/${payload.new.id}`);
-              if (res.ok) {
-                const json = await res.json();
-                if (json.data) {
-                  setCandidates((prev) =>
-                    prev.map((c) => (c.id === json.data.id ? json.data : c))
-                  );
-                }
-              }
-            } catch {
-              // Fallback: update with partial data
-              setCandidates((prev) =>
-                prev.map((c) => (c.id === payload.new.id ? { ...c, ...payload.new } as TmaCandidate : c))
-              );
+            const candidateId = payload.new.id as string;
+            
+            // Skip if we just did a local update for this candidate (avoid overwriting)
+            if (recentLocalUpdates.current.has(candidateId)) {
+              console.log("[TMA Realtime] Skipping UPDATE - recent local update for:", candidateId);
+              recentLocalUpdates.current.delete(candidateId);
+              return;
             }
+            
+            // Use payload.new directly merged with existing data to preserve claimer info
+            setCandidates((prev) =>
+              prev.map((c) => {
+                if (c.id === candidateId) {
+                  // Merge: keep existing claimer info, update everything else from realtime
+                  return { ...c, ...payload.new, claimer: c.claimer } as TmaCandidate;
+                }
+                return c;
+              })
+            );
           } else if (payload.eventType === "DELETE") {
             setCandidates((prev) => prev.filter((c) => c.id !== payload.old.id));
           }
@@ -128,6 +133,15 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
       supabase.removeChannel(channel);
     };
   }, [locationSearch.active]);
+  
+  // Helper to mark a candidate as recently updated locally
+  const markLocalUpdate = useCallback((id: string) => {
+    recentLocalUpdates.current.add(id);
+    // Clear after 2 seconds to allow future realtime updates
+    setTimeout(() => {
+      recentLocalUpdates.current.delete(id);
+    }, 2000);
+  }, []);
 
   const fetchRoles = useCallback(async () => {
     setRolesLoading(true);
@@ -319,8 +333,10 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   );
 
   const updateCandidateLocally = useCallback((updated: TmaCandidate) => {
+    // Mark this as a local update to prevent realtime from overwriting
+    markLocalUpdate(updated.id);
     setCandidates((prev) => prev.map((candidate) => (candidate.id === updated.id ? updated : candidate)));
-  }, []);
+  }, [markLocalUpdate]);
 
   const setStatusTags = useCallback(
     async (statusTags: TmaStatus[]) => {
