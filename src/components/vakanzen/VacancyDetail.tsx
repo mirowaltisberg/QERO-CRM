@@ -7,6 +7,7 @@ import { VACANCY_STATUS_LIST, VACANCY_STATUS_LABELS, VACANCY_STATUS_COLORS } fro
 import { cn } from "@/lib/utils/cn";
 import { HoldToConfirmButton } from "@/components/ui/HoldToConfirmButton";
 import { UrgencyBadge } from "./UrgencyBadge";
+import { DrivingLicenseBadge } from "@/components/ui/DrivingLicenseBadge";
 
 interface Props {
   vacancy: Vacancy;
@@ -199,6 +200,14 @@ export const VacancyDetail = memo(function VacancyDetail({
               <div>
                 <p className="text-xs text-gray-400">Suchradius</p>
                 <p className="text-sm font-medium text-gray-900">{vacancy.radius_km} km</p>
+              </div>
+            )}
+            {vacancy.driving_license && (
+              <div>
+                <p className="text-xs text-gray-400">Führerschein</p>
+                <div className="mt-1">
+                  <DrivingLicenseBadge license={vacancy.driving_license} size="md" />
+                </div>
               </div>
             )}
           </div>

@@ -4,6 +4,7 @@ import { memo, useState } from "react";
 import type { Vacancy, VacancyCandidate, TmaCandidate } from "@/lib/types";
 import { VACANCY_CANDIDATE_STATUS_LIST, VACANCY_CANDIDATE_STATUS_LABELS, VACANCY_CANDIDATE_STATUS_COLORS } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
+import { DrivingLicenseBadge } from "@/components/ui/DrivingLicenseBadge";
 
 interface ScoreBreakdown {
   base: number;
@@ -112,11 +113,14 @@ const CandidateCard = memo(function CandidateCard({
     <div className="rounded-lg border border-gray-200 p-3 hover:border-gray-300 transition-colors">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <p className="truncate text-sm font-medium text-gray-900">
               {tma.first_name} {tma.last_name}
             </p>
             <QualityBadge tags={tma.status_tags} status={tma.status} />
+            {tma.driving_license && (
+              <DrivingLicenseBadge license={tma.driving_license} size="sm" showLabel={false} />
+            )}
           </div>
           {tma.position_title && (
             <p className="mt-0.5 truncate text-xs text-gray-500">{tma.position_title}</p>

@@ -4,7 +4,8 @@ import { memo, useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Vacancy, VacancyUrgency, TmaRole } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
-import { TMA_STATUS_LIST, DRIVING_LICENSE_LIST, DRIVING_LICENSE_LABELS, type DrivingLicense } from "@/lib/utils/constants";
+import { TMA_STATUS_LIST, type DrivingLicense } from "@/lib/utils/constants";
+import { DrivingLicenseSelector } from "@/components/ui/DrivingLicenseBadge";
 
 interface QuickVacancyPopupProps {
   isOpen: boolean;
@@ -425,35 +426,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
             <label className="block text-xs font-medium text-gray-500 mb-1.5">
               Führerschein
             </label>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => setDrivingLicense("")}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all",
-                  drivingLicense === ""
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                )}
-              >
-                Egal
-              </button>
-              {DRIVING_LICENSE_LIST.map((license) => (
-                <button
-                  key={license}
-                  type="button"
-                  onClick={() => setDrivingLicense(license)}
-                  className={cn(
-                    "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all",
-                    drivingLicense === license
-                      ? "bg-blue-500 text-white border-blue-500"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                  )}
-                >
-                  {DRIVING_LICENSE_LABELS[license]}
-                </button>
-              ))}
-            </div>
+            <DrivingLicenseSelector value={drivingLicense} onChange={setDrivingLicense} size="sm" />
           </div>
 
           {/* Description */}

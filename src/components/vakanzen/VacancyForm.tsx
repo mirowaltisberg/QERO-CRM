@@ -4,10 +4,11 @@ import { useState, useEffect, useMemo } from "react";
 import type { Vacancy, VacancyUrgency, TmaRole, Team } from "@/lib/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { TMA_STATUS_LIST, DRIVING_LICENSE_LIST, DRIVING_LICENSE_LABELS, type DrivingLicense } from "@/lib/utils/constants";
+import { TMA_STATUS_LIST, type DrivingLicense } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
 import { UrgencySelector } from "./UrgencyBadge";
 import { VacancyRoleDropdown } from "./VacancyRoleDropdown";
+import { DrivingLicenseSelector } from "@/components/ui/DrivingLicenseBadge";
 
 // Simplified contact type for vacancy form
 interface ContactForVacancy {
@@ -331,33 +332,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
             Führerschein benötigt
           </label>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setDrivingLicense("")}
-              className={cn(
-                "rounded-lg px-3 py-2 text-sm font-medium border transition-colors",
-                drivingLicense === ""
-                  ? "bg-gray-900 text-white border-gray-900"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-              )}
-            >
-              Egal
-            </button>
-            {DRIVING_LICENSE_LIST.map((license) => (
-              <button
-                key={license}
-                onClick={() => setDrivingLicense(license)}
-                className={cn(
-                  "rounded-lg px-3 py-2 text-sm font-medium border transition-colors",
-                  drivingLicense === license
-                    ? "bg-blue-500 text-white border-blue-500"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                )}
-              >
-                {DRIVING_LICENSE_LABELS[license]}
-              </button>
-            ))}
-          </div>
+          <DrivingLicenseSelector value={drivingLicense} onChange={setDrivingLicense} />
         </div>
 
         {/* Urgency */}

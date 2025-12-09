@@ -19,12 +19,11 @@ import {
   TMA_STATUS_STYLES, 
   TMA_ACTIVITY_LABELS,
   TMA_ACTIVITY_STYLES,
-  DRIVING_LICENSE_LIST,
-  DRIVING_LICENSE_LABELS,
   type TmaStatus,
   type TmaActivity,
   type DrivingLicense,
 } from "@/lib/utils/constants";
+import { DrivingLicenseSelector, DrivingLicenseBadge } from "@/components/ui/DrivingLicenseBadge";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils/cn";
 
@@ -313,6 +312,9 @@ export function TmaDetail({
                 {roleLabel}
               </span>
             )}
+            {candidate.driving_license && (
+              <DrivingLicenseBadge license={candidate.driving_license} size="md" />
+            )}
           </div>
           {(candidate.city || candidate.postal_code || candidate.street) && (
             <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
@@ -534,30 +536,10 @@ export function TmaDetail({
           </Panel>
 
           <Panel title="Führerschein" description="Fahrerlaubnis des Kandidaten">
-            <div className="flex flex-wrap gap-2">
-              {DRIVING_LICENSE_LIST.map((license) => (
-                <button
-                  key={license}
-                  onClick={() => onUpdateDrivingLicense(license)}
-                  className={cn(
-                    "rounded-xl border px-3 py-2 text-sm font-medium transition",
-                    candidate.driving_license === license
-                      ? "border-blue-500 bg-blue-500 text-white"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
-                  )}
-                >
-                  {DRIVING_LICENSE_LABELS[license]}
-                </button>
-              ))}
-              {candidate.driving_license && (
-                <button
-                  onClick={() => onUpdateDrivingLicense(null)}
-                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+            <DrivingLicenseSelector 
+              value={candidate.driving_license || ""} 
+              onChange={(val) => onUpdateDrivingLicense(val || null)} 
+            />
           </Panel>
 
           <Panel title="Documents" description="Upload CV and Zeugnisse">
