@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import type { Vacancy, VacancyUrgency, TmaRole, Team } from "@/lib/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { TMA_STATUS_LIST } from "@/lib/utils/constants";
+import { TMA_STATUS_LIST, DRIVING_LICENSE_LIST, DRIVING_LICENSE_LABELS, type DrivingLicense } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
 import { UrgencySelector } from "./UrgencyBadge";
 import { VacancyRoleDropdown } from "./VacancyRoleDropdown";
@@ -50,6 +50,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
   const [radiusKm, setRadiusKm] = useState(25);
   const [minQuality, setMinQuality] = useState<"A" | "B" | "C" | "">("");
   const [urgency, setUrgency] = useState<VacancyUrgency>(1);
+  const [drivingLicense, setDrivingLicense] = useState<DrivingLicense | "">("");
   const [contactSearch, setContactSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -65,6 +66,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
       setRadiusKm(vacancy.radius_km || 25);
       setMinQuality(vacancy.min_quality || "");
       setUrgency(vacancy.urgency || 1);
+      setDrivingLicense(vacancy.driving_license || "");
     } else {
       setContactId("");
       setTitle("");
@@ -75,6 +77,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
       setRadiusKm(25);
       setMinQuality("");
       setUrgency(1);
+      setDrivingLicense("");
     }
     setContactSearch("");
   }, [vacancy, isOpen]);
@@ -119,6 +122,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
         radius_km: radiusKm,
         min_quality: minQuality || null,
         urgency,
+        driving_license: drivingLicense || null,
       });
     } finally {
       setSubmitting(false);
@@ -320,6 +324,40 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
           <p className="mt-1 text-xs text-gray-400">
             Nur Kandidaten mit dieser Qualität oder besser werden vorgeschlagen
           </p>
+        </div>
+
+        {/* Driving License */}
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">
+            Führerschein benötigt
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setDrivingLicense("")}
+              className={cn(
+                "rounded-lg px-3 py-2 text-sm font-medium border transition-colors",
+                drivingLicense === ""
+                  ? "bg-gray-900 text-white border-gray-900"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+              )}
+            >
+              Egal
+            </button>
+            {DRIVING_LICENSE_LIST.map((license) => (
+              <button
+                key={license}
+                onClick={() => setDrivingLicense(license)}
+                className={cn(
+                  "rounded-lg px-3 py-2 text-sm font-medium border transition-colors",
+                  drivingLicense === license
+                    ? "bg-blue-500 text-white border-blue-500"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                )}
+              >
+                {DRIVING_LICENSE_LABELS[license]}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Urgency */}

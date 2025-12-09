@@ -76,6 +76,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       "radius_km",
       "min_quality",
       "urgency",
+      "driving_license",
       "status",
       "contact_id",
     ];

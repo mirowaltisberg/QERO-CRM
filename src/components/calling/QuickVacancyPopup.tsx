@@ -4,7 +4,7 @@ import { memo, useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Vacancy, VacancyUrgency, TmaRole } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
-import { TMA_STATUS_LIST } from "@/lib/utils/constants";
+import { TMA_STATUS_LIST, DRIVING_LICENSE_LIST, DRIVING_LICENSE_LABELS, type DrivingLicense } from "@/lib/utils/constants";
 
 interface QuickVacancyPopupProps {
   isOpen: boolean;
@@ -33,6 +33,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
   const [minQuality, setMinQuality] = useState<"A" | "B" | "C" | "">("");
   const [urgency, setUrgency] = useState<VacancyUrgency>(2);
   const [radiusKm, setRadiusKm] = useState(25);
+  const [drivingLicense, setDrivingLicense] = useState<DrivingLicense | "">("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [roles, setRoles] = useState<TmaRole[]>([]);
@@ -62,6 +63,8 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
       setDescription("");
       setMinQuality("");
       setUrgency(2);
+      setRadiusKm(25);
+      setDrivingLicense("");
       setSuccess(false);
       // Focus title input after animation
       setTimeout(() => titleInputRef.current?.focus(), 100);
@@ -110,6 +113,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
           radius_km: radiusKm,
           min_quality: minQuality || null,
           urgency,
+          driving_license: drivingLicense || null,
         }),
       });
 
@@ -129,7 +133,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
     } finally {
       setSubmitting(false);
     }
-  }, [title, role, description, minQuality, urgency, radiusKm, contact, onCreated, onClose, submitting]);
+  }, [title, role, description, minQuality, urgency, radiusKm, drivingLicense, contact, onCreated, onClose, submitting]);
 
   // Handle Enter to submit
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -411,6 +415,42 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
                   )}
                 >
                   {preset} km
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Driving License */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+              Führerschein
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setDrivingLicense("")}
+                className={cn(
+                  "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all",
+                  drivingLicense === ""
+                    ? "bg-gray-900 text-white border-gray-900"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                )}
+              >
+                Egal
+              </button>
+              {DRIVING_LICENSE_LIST.map((license) => (
+                <button
+                  key={license}
+                  type="button"
+                  onClick={() => setDrivingLicense(license)}
+                  className={cn(
+                    "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all",
+                    drivingLicense === license
+                      ? "bg-blue-500 text-white border-blue-500"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                  )}
+                >
+                  {DRIVING_LICENSE_LABELS[license]}
                 </button>
               ))}
             </div>

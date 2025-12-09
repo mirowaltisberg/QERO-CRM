@@ -3,7 +3,7 @@
  * Matches the Supabase schema for future integration
  */
 
-import type { ContactStatus, CallOutcome, TmaStatus, TmaActivity } from "./utils/constants";
+import type { ContactStatus, CallOutcome, TmaStatus, TmaActivity, DrivingLicense } from "./utils/constants";
 
 /**
  * Organization - Top-level entity
@@ -103,6 +103,8 @@ export interface TmaCandidate {
   // Coordinates for location search
   latitude: number | null;
   longitude: number | null;
+  // Driving license
+  driving_license: DrivingLicense | null;
   // Computed distance (only present in radius search results)
   distance_km?: number;
   // Joined from profiles when fetched
@@ -458,6 +460,7 @@ export interface Vacancy {
   radius_km: number;
   min_quality: "A" | "B" | "C" | null;
   urgency: VacancyUrgency; // 1 = Kann warten, 2 = Bald, 3 = Sofort
+  driving_license: DrivingLicense | null; // Required driving license
   status: VacancyStatus;
   created_by: string;
   creator?: {

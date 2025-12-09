@@ -247,3 +247,40 @@ export const VACANCY_URGENCY_COLORS: Record<VacancyUrgency, { text: string; bg: 
   3: { text: "text-red-600", bg: "bg-red-100" },
 };
 
+/**
+ * Driving License Options
+ */
+export const DRIVING_LICENSE = {
+  NONE: "none",
+  B: "B",
+  BE: "BE",
+  B_CAR: "B_car",
+  BE_CAR: "BE_car",
+} as const;
+
+export type DrivingLicense = (typeof DRIVING_LICENSE)[keyof typeof DRIVING_LICENSE];
+
+export const DRIVING_LICENSE_LIST = [
+  DRIVING_LICENSE.NONE,
+  DRIVING_LICENSE.B,
+  DRIVING_LICENSE.BE,
+  DRIVING_LICENSE.B_CAR,
+  DRIVING_LICENSE.BE_CAR,
+] as const;
+
+export const DRIVING_LICENSE_LABELS: Record<DrivingLicense, string> = {
+  none: "Keine Autoprüfung",
+  B: "Kat. B",
+  BE: "Kat. BE",
+  B_car: "Kat. B + Auto",
+  BE_car: "Kat. BE + Auto",
+};
+
+export const DRIVING_LICENSE_SHORT: Record<DrivingLicense, string> = {
+  none: "Keine",
+  B: "B",
+  BE: "BE",
+  B_car: "B+🚗",
+  BE_car: "BE+🚗",
+};
+
