@@ -19,8 +19,11 @@ import {
   TMA_STATUS_STYLES, 
   TMA_ACTIVITY_LABELS,
   TMA_ACTIVITY_STYLES,
+  DRIVING_LICENSE_LIST,
+  DRIVING_LICENSE_LABELS,
   type TmaStatus,
   type TmaActivity,
+  type DrivingLicense,
 } from "@/lib/utils/constants";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils/cn";
@@ -45,6 +48,7 @@ interface Props {
   onUpdatePosition: (value: string | null) => Promise<void> | void;
   onUpdateAddress: (payload: { city: string | null; street: string | null; postal_code: string | null }) => Promise<void> | void;
   onUpdatePhone: (value: string | null) => Promise<void> | void;
+  onUpdateDrivingLicense: (value: DrivingLicense | null) => Promise<void> | void;
   onClaim: () => Promise<void> | void;
   onUnclaim: () => Promise<void> | void;
   isMobile?: boolean;
@@ -80,6 +84,7 @@ export function TmaDetail({
   onUpdatePosition,
   onUpdateAddress,
   onUpdatePhone,
+  onUpdateDrivingLicense,
   onClaim,
   onUnclaim,
   isMobile = false,
@@ -520,6 +525,33 @@ export function TmaDetail({
               {candidate.activity && (
                 <button
                   onClick={onClearActivity}
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </Panel>
+
+          <Panel title="Führerschein" description="Fahrerlaubnis des Kandidaten">
+            <div className="flex flex-wrap gap-2">
+              {DRIVING_LICENSE_LIST.map((license) => (
+                <button
+                  key={license}
+                  onClick={() => onUpdateDrivingLicense(license)}
+                  className={cn(
+                    "rounded-xl border px-3 py-2 text-sm font-medium transition",
+                    candidate.driving_license === license
+                      ? "border-blue-500 bg-blue-500 text-white"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
+                  )}
+                >
+                  {DRIVING_LICENSE_LABELS[license]}
+                </button>
+              ))}
+              {candidate.driving_license && (
+                <button
+                  onClick={() => onUpdateDrivingLicense(null)}
                   className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600"
                 >
                   Clear

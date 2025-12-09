@@ -39,6 +39,7 @@ export function TmaView({ initialCandidates }: Props) {
     updatePosition,
     updateAddress,
     updatePhone,
+    updateDrivingLicense,
     clearStatusTags,
     clearActivity,
     setStatusFilter,
@@ -325,6 +326,7 @@ export function TmaView({ initialCandidates }: Props) {
                 onUpdatePosition={updatePosition}
                 onUpdateAddress={updateAddress}
                 onUpdatePhone={updatePhone}
+                onUpdateDrivingLicense={updateDrivingLicense}
                 onClaim={claimCandidate}
                 onUnclaim={unclaimCandidate}
                 isMobile={true}
@@ -586,6 +588,7 @@ export function TmaView({ initialCandidates }: Props) {
             onUpdatePosition={updatePosition}
             onUpdateAddress={updateAddress}
             onUpdatePhone={updatePhone}
+            onUpdateDrivingLicense={updateDrivingLicense}
             onClaim={claimCandidate}
             onUnclaim={unclaimCandidate}
           />

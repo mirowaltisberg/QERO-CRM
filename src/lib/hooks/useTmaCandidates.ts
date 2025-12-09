@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TmaCandidate, TmaRole } from "@/lib/types";
-import type { TmaStatus, TmaActivity } from "@/lib/utils/constants";
+import type { TmaStatus, TmaActivity, DrivingLicense } from "@/lib/utils/constants";
 import { createClient } from "@/lib/supabase/client";
 import { useTmaCacheOptional } from "@/lib/cache/TmaCacheContext";
 
@@ -547,6 +547,28 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     [activeCandidate, updateCandidateLocally]
   );
 
+  const updateDrivingLicense = useCallback(
+    async (drivingLicense: DrivingLicense | null) => {
+      if (!activeCandidate) return;
+      setActionState({ type: "saving", message: "Updating driving license..." });
+      try {
+        const response = await fetch(`/api/tma/${activeCandidate.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ driving_license: drivingLicense }),
+        });
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || "Failed to update driving license");
+        updateCandidateLocally(json.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update driving license");
+      } finally {
+        setActionState({ type: null });
+      }
+    },
+    [activeCandidate, updateCandidateLocally]
+  );
+
   const updateActivity = useCallback(
     async (activity: TmaActivity) => {
       if (!activeCandidate || activeCandidate.activity === activity) return;
@@ -721,6 +743,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     updatePosition,
     updateAddress,
     updatePhone,
+    updateDrivingLicense,
     clearActivity,
     claimCandidate,
     unclaimCandidate,
