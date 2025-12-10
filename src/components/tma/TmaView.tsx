@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import type { TmaCandidate } from "@/lib/types";
+import type { TmaCandidate, Team } from "@/lib/types";
 import { useTmaCandidates } from "@/lib/hooks/useTmaCandidates";
 import { TmaList } from "./TmaList";
 import { TmaDetail } from "./TmaDetail";
@@ -13,9 +13,11 @@ import { Modal } from "@/components/ui/modal";
 
 interface Props {
   initialCandidates: TmaCandidate[];
+  teams: Team[];
+  userTeamId: string | null;
 }
 
-export function TmaView({ initialCandidates }: Props) {
+export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
   const searchParams = useSearchParams();
   const selectFromUrl = searchParams.get("select");
   
@@ -37,6 +39,8 @@ export function TmaView({ initialCandidates }: Props) {
     updateNotes,
     updateQualityNote,
     updateDocuments,
+    teamFilter,
+    setTeamFilter,
     updatePosition,
     updateAddress,
     updatePhone,
@@ -68,7 +72,7 @@ export function TmaView({ initialCandidates }: Props) {
     updateLocationRadius,
     claimCandidate,
     unclaimCandidate,
-  } = useTmaCandidates({ initialCandidates });
+  } = useTmaCandidates({ initialCandidates, defaultTeamFilter: userTeamId });
   const [importOpen, setImportOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -248,6 +252,19 @@ export function TmaView({ initialCandidates }: Props) {
                 >
                   Inaktiv
                 </button>
+                <div className="shrink-0 w-px bg-gray-200 mx-1" />
+                <select
+                  className="shrink-0 rounded-full border-0 bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600"
+                  value={teamFilter ?? ""}
+                  onChange={(e) => setTeamFilter(e.target.value || null)}
+                >
+                  <option value="">Alle Teams</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </header>
             
@@ -514,10 +531,29 @@ export function TmaView({ initialCandidates }: Props) {
               </select>
             </label>
             {cantonFilter && (
-              <Button variant="ghost" size="sm" onClick={clearCantonFilter}>
+              <Button variant="ghost" size="sm" onClick={() => setCantonFilter(null)}>
                 Clear
               </Button>
             )}
+            <div className="mx-1 h-4 w-px bg-gray-200" />
+            <label className="flex items-center gap-2">
+              <span className="text-gray-500">Team</span>
+              <select
+                className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
+                value={teamFilter ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setTeamFilter(value || null);
+                }}
+              >
+                <option value="">Alle Teams</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="flex items-center gap-2">
               <span className="text-gray-500">Sort</span>
               <select

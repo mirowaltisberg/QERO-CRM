@@ -8,6 +8,7 @@ import { useTmaCacheOptional } from "@/lib/cache/TmaCacheContext";
 
 interface UseTmaCandidatesOptions {
   initialCandidates?: TmaCandidate[];
+  defaultTeamFilter?: string | null;
 }
 
 interface ActionState {
@@ -46,7 +47,7 @@ function getCandidateStatusTags(candidate: TmaCandidate | null) {
   return normalizeStatusTags(candidate.status_tags, candidate.status ?? null);
 }
 
-export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOptions) {
+export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = null }: UseTmaCandidatesOptions) {
   // Get global cache if available
   const cache = useTmaCacheOptional();
   
@@ -60,6 +61,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
   const [cantonFilter, setCantonFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TmaStatus | "all">("all");
   const [activityFilter, setActivityFilter] = useState<TmaActivity | "all">("all");
+  const [teamFilter, setTeamFilter] = useState<string | null>(defaultTeamFilter);
   const [sortOption, setSortOption] = useState<"recent" | "oldest" | "name" | "activity" | "distance">("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const [locationSearch, setLocationSearch] = useState<LocationSearchState>({
@@ -187,6 +189,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
       }
       if (activityFilter !== "all" && candidate.activity !== activityFilter) return false;
       if (cantonFilter && candidate.canton !== cantonFilter) return false;
+      if (teamFilter && candidate.team_id !== teamFilter) return false;
       
       // Search filter
       if (searchQuery.trim()) {
@@ -205,7 +208,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
       
       return true;
     });
-  }, [candidates, cantonFilter, statusFilter, activityFilter, searchQuery]);
+  }, [candidates, cantonFilter, statusFilter, activityFilter, teamFilter, searchQuery]);
 
   const availableCantons = useMemo(() => {
     return Array.from(
@@ -750,6 +753,8 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     cantonFilter,
     statusFilter,
     activityFilter,
+    teamFilter,
+    setTeamFilter,
     searchQuery,
     selectCandidate,
     refreshCandidates,
