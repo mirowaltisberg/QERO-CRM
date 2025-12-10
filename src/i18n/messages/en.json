@@ -251,7 +251,9 @@
     "notes": "Notes",
     "noContactSelected": "No contact selected",
     "selectContactToStart": "Select a contact to start",
-    "readyToCall": "Ready to call"
+    "readyToCall": "Ready to call",
+    "noContactsAvailable": "No contacts available",
+    "addContactsToStart": "Import contacts to get started"
   },
   "email": {
     "title": "Email",
