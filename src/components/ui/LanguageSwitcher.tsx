@@ -11,6 +11,12 @@ interface LanguageSwitcherProps {
   size?: "sm" | "md";
 }
 
+// Flag emojis for each locale
+const flagEmojis: Record<Locale, string> = {
+  de: "🇨🇭", // Swiss flag for German
+  en: "🇺🇸", // American flag for English
+};
+
 export const LanguageSwitcher = memo(function LanguageSwitcher({
   currentLocale,
   variant = "dropdown",
@@ -46,13 +52,14 @@ export const LanguageSwitcher = memo(function LanguageSwitcher({
             key={locale}
             onClick={() => handleLocaleChange(locale)}
             className={cn(
-              "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+              "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors flex items-center justify-center",
               currentLocale === locale
                 ? "bg-gray-900 text-white border-gray-900"
                 : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
             )}
+            title={localeNames[locale]}
           >
-            {locale.toUpperCase()}
+            <span className="text-lg">{flagEmojis[locale]}</span>
           </button>
         ))}
       </div>
@@ -89,7 +96,8 @@ export const LanguageSwitcher = memo(function LanguageSwitcher({
               {currentLocale === locale && (
                 <CheckIcon className="h-4 w-4 text-blue-600" />
               )}
-              <span className={currentLocale !== locale ? "ml-6" : ""}>
+              <span className="text-lg">{flagEmojis[locale]}</span>
+              <span className={currentLocale !== locale ? "" : ""}>
                 {localeNames[locale]}
               </span>
             </button>

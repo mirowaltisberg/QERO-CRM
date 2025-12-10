@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { EmailFoldersRail } from "./EmailFoldersRail";
 import { EmailList } from "./EmailList";
 import { EmailDetail } from "./EmailDetail";
@@ -17,6 +18,8 @@ const PAGE_SIZE = 500;
 
 export function EmailView({ account }: Props) {
   const router = useRouter();
+  const t = useTranslations("email");
+  const tCommon = useTranslations("common");
   const searchParams = useSearchParams();
   const threadIdFromUrl = searchParams.get("thread");
   const [folder, setFolder] = useState<EmailFolder>("inbox");
@@ -350,13 +353,13 @@ export function EmailView({ account }: Props) {
           <EmailIcon className="h-8 w-8 text-gray-400" />
         </div>
         <div className="text-center">
-          <h2 className="text-lg font-semibold text-gray-900">Connect your email</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t("connectEmail")}</h2>
           <p className="mt-1 text-sm text-gray-500">
             Connect your Outlook account to send and receive emails directly from QERO.
           </p>
         </div>
         <Button onClick={() => router.push("/settings")}>
-          Go to Settings
+          {tCommon("settings")}
         </Button>
       </div>
     );

@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils/cn";
 import type { EmailThread, EmailFolder } from "@/lib/types";
 
@@ -30,14 +31,6 @@ interface Props {
   onLoadMore: () => void;
 }
 
-const FOLDER_LABELS: Record<EmailFolder, string> = {
-  inbox: "Inbox",
-  sent: "Sent",
-  drafts: "Drafts",
-  archive: "Archive",
-  trash: "Trash",
-};
-
 export const EmailList = memo(function EmailList({
   threads,
   selectedId,
@@ -58,6 +51,17 @@ export const EmailList = memo(function EmailList({
   onToggleStar,
   onLoadMore,
 }: Props) {
+  const t = useTranslations("email");
+  const tCommon = useTranslations("common");
+  
+  const FOLDER_LABELS: Record<EmailFolder, string> = {
+    inbox: t("inbox"),
+    sent: t("sent"),
+    drafts: t("drafts"),
+    archive: t("archive"),
+    trash: t("trash"),
+  };
+  
   // Use client-side only rendering for relative times to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -71,7 +75,7 @@ export const EmailList = memo(function EmailList({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-400">{FOLDER_LABELS[folder]}</p>
-            <p className="text-sm font-semibold text-gray-900">{threads.length} emails</p>
+            <p className="text-sm font-semibold text-gray-900">{threads.length} {t("emails")}</p>
           </div>
           <button
             onClick={onSync}
@@ -98,7 +102,7 @@ export const EmailList = memo(function EmailList({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search emails..."
+            placeholder={t("searchEmails")}
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0"
           />
         </div>
@@ -127,7 +131,7 @@ export const EmailList = memo(function EmailList({
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100">
             <EmptyIcon className="h-6 w-6 text-gray-400" />
           </div>
-          <p className="text-sm text-gray-500">No emails in {FOLDER_LABELS[folder].toLowerCase()}</p>
+          <p className="text-sm text-gray-500">{t("noEmailsIn", { folder: FOLDER_LABELS[folder] })}</p>
           <button
             onClick={onSync}
             className="mt-2 text-xs font-medium text-gray-600 hover:text-gray-900"

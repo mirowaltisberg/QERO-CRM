@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,6 +77,8 @@ const EMAIL_SIGNATURE_HTML = `
 `;
 
 export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
+  const t = useTranslations("email");
+  const tCommon = useTranslations("common");
   const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
   const [subject, setSubject] = useState("");
@@ -270,10 +273,10 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
       <div className="space-y-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">
-            {replyTo ? "Reply" : "New Email"}
+            {replyTo ? t("reply") : t("newEmail")}
           </h3>
           <p className="text-sm text-gray-500">
-            {replyTo ? "Reply to this conversation" : "Compose a new email"}
+            {replyTo ? t("replyToConversation") : t("composeNewEmail")}
           </p>
         </div>
 
@@ -286,7 +289,7 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
         <div className="space-y-3">
           <div>
             <div className="flex items-center justify-between">
-              <label className="text-xs uppercase text-gray-400">To</label>
+              <label className="text-xs uppercase text-gray-400">{t("to")}</label>
               {!showCc && (
                 <button
                   type="button"
@@ -307,7 +310,7 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
 
           {showCc && (
             <div>
-              <label className="text-xs uppercase text-gray-400">Cc</label>
+              <label className="text-xs uppercase text-gray-400">{t("cc")}</label>
               <Input
                 value={cc}
                 onChange={(e) => setCc(e.target.value)}
@@ -318,21 +321,21 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
           )}
 
           <div>
-            <label className="text-xs uppercase text-gray-400">Subject</label>
+            <label className="text-xs uppercase text-gray-400">{t("subject")}</label>
             <Input
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Subject"
+              placeholder={t("subject")}
               className="mt-1"
             />
           </div>
 
           <div>
-            <label className="text-xs uppercase text-gray-400">Message</label>
+            <label className="text-xs uppercase text-gray-400">{t("body")}</label>
             <Textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder="Write your message..."
+              placeholder={t("writeMessage")}
               rows={8}
               className="mt-1"
             />
@@ -341,7 +344,7 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
           {/* Attachments section */}
           <div>
             <div className="flex items-center justify-between">
-              <label className="text-xs uppercase text-gray-400">Attachments</label>
+              <label className="text-xs uppercase text-gray-400">{t("attachments")}</label>
               <span className="text-xs text-gray-400">
                 {formatBytes(totalSize)} / 25 MB
               </span>
@@ -363,7 +366,7 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
             >
               <span className="flex items-center justify-center gap-2">
                 <AttachmentIcon className="h-4 w-4" />
-                Click to attach files (PDF, Word, Excel, images)
+                {t("clickToAttach")}
               </span>
             </button>
 

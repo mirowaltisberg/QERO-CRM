@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
 import type { EmailThread, EmailMessage } from "@/lib/types";
@@ -15,6 +16,9 @@ interface Props {
 }
 
 export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onToggleStar }: Props) {
+  const t = useTranslations("email");
+  const tCommon = useTranslations("common");
+  
   const messages = useMemo(() => {
     if (!thread?.messages) return [];
     return [...thread.messages].sort((a, b) => {
@@ -42,7 +46,7 @@ export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onT
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100">
             <EmailIcon className="h-6 w-6 text-gray-400" />
           </div>
-          <p className="text-sm text-gray-500">Select an email to read</p>
+          <p className="text-sm text-gray-500">{t("selectEmail")}</p>
         </div>
       </section>
     );
@@ -56,31 +60,31 @@ export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onT
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg font-semibold text-gray-900">
-            {thread.subject || "(no subject)"}
+            {thread.subject || t("noSubject")}
           </h1>
           <p className="mt-0.5 text-xs text-gray-500">
-            {messages.length} message{messages.length !== 1 ? "s" : ""} in this thread
+            {t("messagesInThread", { count: messages.length })}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => onToggleStar(thread.id, !thread.is_starred)}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-100"
-            title={thread.is_starred ? "Unstar" : "Star"}
+            title={thread.is_starred ? t("unstar") : t("star")}
           >
             <StarIcon filled={thread.is_starred} />
           </button>
           <button
             onClick={() => onArchive(thread.id)}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-100"
-            title="Archive"
+            title={t("archive")}
           >
             <ArchiveIcon />
           </button>
           <button
             onClick={() => onDelete(thread.id)}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-100 hover:text-red-500"
-            title="Delete"
+            title={tCommon("delete")}
           >
             <TrashIcon />
           </button>
@@ -94,6 +98,7 @@ export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onT
             key={message.id}
             message={message}
             isLast={index === messages.length - 1}
+            t={t}
           />
         ))}
       </div>
@@ -106,7 +111,7 @@ export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onT
             className="w-full"
           >
             <ReplyIcon className="mr-2 h-4 w-4" />
-            Reply
+            {t("reply")}
           </Button>
         </footer>
       )}
@@ -119,7 +124,7 @@ interface MessageBubbleProps {
   isLast: boolean;
 }
 
-function MessageBubble({ message, isLast }: MessageBubbleProps) {
+function MessageBubble({ message, isLast, t }: MessageBubbleProps & { t: (key: string, values?: Record<string, string>) => string }) {
   const senderInitials = (message.sender_name || message.sender_email)
     .split(" ")
     .map((n) => n[0])
@@ -164,14 +169,14 @@ function MessageBubble({ message, isLast }: MessageBubbleProps) {
             {message.sender_name || message.sender_email}
           </p>
           <p className="truncate text-xs text-gray-500">
-            to {message.recipients?.join(", ") || "unknown"}
+            {t("to")} {message.recipients?.join(", ") || t("unknown")}
             {message.cc && message.cc.length > 0 && (
-              <span className="text-gray-400"> · cc: {message.cc.join(", ")}</span>
+              <span className="text-gray-400"> · {t("cc")}: {message.cc.join(", ")}</span>
             )}
           </p>
         </div>
         <time className="text-xs text-gray-400 whitespace-nowrap">
-          {formatDateTime(message.received_at || message.sent_at)}
+          {formatDateTime(message.received_at || message.sent_at, t)}
         </time>
       </div>
 
@@ -194,7 +199,7 @@ function MessageBubble({ message, isLast }: MessageBubbleProps) {
         <div className="mt-4 pt-3 border-t border-gray-100">
           <p className="flex items-center gap-2 text-xs font-medium text-gray-600 mb-2">
             <AttachmentIcon className="h-4 w-4" />
-            Attachments
+            {t("attachments")}
           </p>
           <AttachmentsList messageId={message.graph_message_id} />
         </div>
@@ -205,6 +210,7 @@ function MessageBubble({ message, isLast }: MessageBubbleProps) {
 
 // Component to fetch and display attachments
 function AttachmentsList({ messageId }: { messageId: string }) {
+  const t = useTranslations("email");
   const [attachments, setAttachments] = useState<Array<{
     id: string;
     name: string;
@@ -234,7 +240,7 @@ function AttachmentsList({ messageId }: { messageId: string }) {
 
   if (loading) {
     return (
-      <div className="text-xs text-gray-400">Loading attachments...</div>
+      <div className="text-xs text-gray-400">{t("loadingAttachments")}</div>
     );
   }
 
@@ -246,7 +252,7 @@ function AttachmentsList({ messageId }: { messageId: string }) {
 
   if (attachments.length === 0) {
     return (
-      <div className="text-xs text-gray-400">No downloadable attachments</div>
+      <div className="text-xs text-gray-400">{t("noAttachments")}</div>
     );
   }
 
@@ -307,17 +313,17 @@ function sanitizeHtml(html: string): string {
     .replace(/javascript:/gi, "");
 }
 
-function formatDateTime(isoDate: string | null): string {
+function formatDateTime(isoDate: string | null, t: (key: string, values?: Record<string, string>) => string): string {
   if (!isoDate) return "";
   const date = new Date(isoDate);
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
 
   if (diffDays === 0) {
-    return `Today at ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    return t("todayAt", { time: date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) });
   }
   if (diffDays === 1) {
-    return `Yesterday at ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    return t("yesterdayAt", { time: date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) });
   }
   return date.toLocaleDateString([], {
     month: "short",
