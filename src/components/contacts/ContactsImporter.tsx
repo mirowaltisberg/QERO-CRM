@@ -197,28 +197,78 @@ function mapRowToContact(row: CsvRow): ContactCreateInput | null {
     normalizedRow[cleanKey] = value;
   }
 
-  const company = (normalizedRow["Firma"] || normalizedRow["Firma "] || "").trim();
+  // Support multiple CSV formats:
+  // 1. Outlook German format: "Firma" column
+  // 2. Simple format: "Nachname" column (used for company names)
+  // 3. English format: "Company" or "Company Name" column
+  const company = (
+    normalizedRow["Firma"] || 
+    normalizedRow["Firma "] || 
+    normalizedRow["Nachname"] ||
+    normalizedRow["Company"] ||
+    normalizedRow["Company Name"] ||
+    ""
+  ).trim();
   if (!company) return null;
 
-  const cantonRaw = (normalizedRow["Region geschäftlich"] || normalizedRow["Bundesland/Kanton privat"] || "").trim();
+  // Support multiple CSV formats for canton
+  const cantonRaw = (
+    normalizedRow["Region geschäftlich"] || 
+    normalizedRow["Bundesland/Kanton privat"] || 
+    normalizedRow["Canton"] ||
+    normalizedRow["Kanton"] ||
+    ""
+  ).trim();
   const canton = formatCanton(cantonRaw);
 
-  // Extract address fields for location search
-  const street = coalesce(normalizedRow["Straße geschäftlich"], normalizedRow["Straße privat"]) ?? null;
-  const city = coalesce(normalizedRow["Ort geschäftlich"], normalizedRow["Ort privat"]) ?? null;
-  const postalCode = coalesce(normalizedRow["Postleitzahl geschäftlich"], normalizedRow["Postleitzahl privat"]) ?? null;
+  // Extract address fields - support multiple formats
+  const street = coalesce(
+    normalizedRow["Straße geschäftlich"], 
+    normalizedRow["Straße privat"],
+    normalizedRow["Street"],
+    normalizedRow["Strasse"]
+  ) ?? null;
+  
+  const city = coalesce(
+    normalizedRow["Ort geschäftlich"], 
+    normalizedRow["Ort privat"],
+    normalizedRow["City"],
+    normalizedRow["Stadt"]
+  ) ?? null;
+  
+  const postalCode = coalesce(
+    normalizedRow["Postleitzahl geschäftlich"], 
+    normalizedRow["Postleitzahl privat"],
+    normalizedRow["Postal Code"],
+    normalizedRow["PLZ"]
+  ) ?? null;
 
-  const phone =
-    coalesce(
-      normalizedRow["Telefon Firma"],
-      normalizedRow["Telefon geschäftlich"],
-      normalizedRow["Telefon geschäftlich 2"],
-      normalizedRow["Mobiltelefon"],
-      normalizedRow["Mobiltelefon 2"]
-    ) ?? null;
+  // Phone - support multiple formats
+  const phone = coalesce(
+    normalizedRow["Telefon Firma"],
+    normalizedRow["Telefon geschäftlich"],
+    normalizedRow["Telefon geschäftlich 2"],
+    normalizedRow["Mobiltelefon"],
+    normalizedRow["Mobiltelefon 2"],
+    normalizedRow["Phone"],
+    normalizedRow["Telefon"]
+  ) ?? null;
 
-  const email = coalesce(normalizedRow["E-Mail-Adresse"], normalizedRow["E-Mail 2: Adresse"], normalizedRow["E-Mail 3: Adresse"]) ?? null;
-  const notes = [normalizedRow["Rückmeldung"], normalizedRow["Notizen"]].filter(Boolean).join("\n").trim() || null;
+  // Email - support multiple formats
+  const email = coalesce(
+    normalizedRow["E-Mail-Adresse"], 
+    normalizedRow["E-Mail 2: Adresse"], 
+    normalizedRow["E-Mail 3: Adresse"],
+    normalizedRow["Email"],
+    normalizedRow["E-Mail"]
+  ) ?? null;
+  
+  // Notes - support multiple formats
+  const notes = [
+    normalizedRow["Rückmeldung"], 
+    normalizedRow["Notizen"],
+    normalizedRow["Notes"]
+  ].filter(Boolean).join("\n").trim() || null;
 
   return {
     company_name: company,

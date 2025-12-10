@@ -250,7 +250,8 @@
     "duration": "Dauer",
     "notes": "Notizen",
     "noContactSelected": "Kein Kontakt ausgewählt",
-    "selectContactToStart": "Kontakt auswählen zum Starten"
+    "selectContactToStart": "Kontakt auswählen zum Starten",
+    "readyToCall": "Bereit zum Anrufen"
   },
   "email": {
     "title": "E-Mail",

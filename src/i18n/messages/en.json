@@ -250,7 +250,8 @@
     "duration": "Duration",
     "notes": "Notes",
     "noContactSelected": "No contact selected",
-    "selectContactToStart": "Select a contact to start"
+    "selectContactToStart": "Select a contact to start",
+    "readyToCall": "Ready to call"
   },
   "email": {
     "title": "Email",
