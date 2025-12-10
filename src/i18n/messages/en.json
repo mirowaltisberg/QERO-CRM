@@ -152,7 +152,9 @@
   "tma": {
     "title": "TMA",
     "candidate": "Candidate",
+    "candidates": "candidates",
     "candidatePlural": "Candidates",
+    "searchCandidates": "Search candidates...",
     "selectCandidate": "Select a candidate to view details",
     "firstName": "First Name",
     "lastName": "Last Name",
