@@ -2,6 +2,7 @@
 
 import { memo, useState, useCallback, useRef, useMemo, useEffect } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils/cn";
 import type { ChatMember, ChatRoom } from "@/lib/types";
 
@@ -43,6 +44,7 @@ export const ChatInput = memo(function ChatInput({
   onSend,
   disabled,
 }: ChatInputProps) {
+  const t = useTranslations("chat");
   const [content, setContent] = useState("");
   const [showMentions, setShowMentions] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
@@ -397,7 +399,7 @@ export const ChatInput = memo(function ChatInput({
                     {isEveryone ? "@everyone" : member.full_name}
                   </p>
                   {isEveryone ? (
-                    <p className="truncate text-xs text-gray-500">Alle benachrichtigen</p>
+                    <p className="truncate text-xs text-gray-500">{t("notifyAll")}</p>
                   ) : member.team ? (
                     <p
                       className="truncate text-xs"
@@ -478,7 +480,7 @@ export const ChatInput = memo(function ChatInput({
             value={content}
             onChange={handleContentChange}
             onKeyDown={handleKeyDown}
-            placeholder="Nachricht schreiben..."
+            placeholder={t("writeMessage")}
             disabled={disabled}
             rows={1}
             className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-[16px] text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none disabled:opacity-50"

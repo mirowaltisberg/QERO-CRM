@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { Contact } from "@/lib/types";
 import { CantonTag } from "@/components/ui/CantonTag";
 
@@ -8,14 +9,15 @@ interface FollowUpsListProps {
 }
 
 export function FollowUpsList({ contacts }: FollowUpsListProps) {
+  const t = useTranslations("dashboard");
   return (
     <div className="card-surface border border-gray-100 p-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-wide text-gray-400">Follow-ups</p>
-          <p className="text-sm text-gray-500">Next actions</p>
+          <p className="text-xs uppercase tracking-wide text-gray-400">{t("followUps")}</p>
+          <p className="text-sm text-gray-500">{t("nextActions")}</p>
         </div>
-        <span className="text-xs text-gray-400">{contacts.length} scheduled</span>
+        <span className="text-xs text-gray-400">{contacts.length} {t("scheduled")}</span>
       </div>
       <ul className="mt-4 space-y-3 text-sm text-gray-700">
         {contacts.map((contact) => (
@@ -28,15 +30,15 @@ export function FollowUpsList({ contacts }: FollowUpsListProps) {
               </div>
             </div>
             <div className="text-right text-xs text-gray-500">
-              <p className="font-medium text-gray-900">{contact.follow_up_at ? formatFollowUp(contact.follow_up_at) : "Due now"}</p>
+              <p className="font-medium text-gray-900">{contact.follow_up_at ? formatFollowUp(contact.follow_up_at) : t("dueNow")}</p>
               <p className="text-xs text-gray-400">
-                {contact.follow_up_note ? truncate(contact.follow_up_note) : contact.notes ? truncate(contact.notes) : "No note"}
+                {contact.follow_up_note ? truncate(contact.follow_up_note) : contact.notes ? truncate(contact.notes) : t("noNote")}
               </p>
             </div>
           </li>
         ))}
         {contacts.length === 0 && (
-          <li className="text-sm text-gray-400">You&apos;re caught up</li>
+          <li className="text-sm text-gray-400">{t("caughtUp")}</li>
         )}
       </ul>
     </div>
