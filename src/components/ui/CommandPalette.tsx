@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils/cn";
 import { looksLikeSwissLocation } from "@/lib/geo/client";
 import { useTmaCacheOptional } from "@/lib/cache/TmaCacheContext";
@@ -102,6 +103,8 @@ const NAV_ITEMS = [
 
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const router = useRouter();
+  const t = useTranslations("commandPalette");
+  const tNav = useTranslations("nav");
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [contacts, setContacts] = useState<SearchResultContact[]>([]);
@@ -408,7 +411,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Suche Firmen, TMA, E-Mails, Chat..."
+            placeholder={t("placeholder")}
             className="flex-1 bg-transparent text-gray-900 placeholder-gray-400 outline-none text-base"
           />
           {loading && (
@@ -435,7 +438,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 onClick={() => { setFilter("contacts"); setSelectedIndex(0); }}
                 color="blue"
               >
-                Firmen ({counts.contacts})
+                {t("companies")} ({counts.contacts})
               </FilterButton>
             )}
             {counts.tma > 0 && (
@@ -454,7 +457,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 onClick={() => { setFilter("emails"); setSelectedIndex(0); }}
                 color="green"
               >
-                E-Mails ({counts.emails})
+                {t("emails")} ({counts.emails})
               </FilterButton>
             )}
             {!isLocationMode && counts.chat > 0 && (
@@ -557,7 +560,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           {filteredNavItems.length > 0 && (
             <div>
               <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
-                Navigation
+                {t("navigation")}
               </div>
               {filteredNavItems.map((item, idx) => (
                 <ResultItem
@@ -608,7 +611,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               {filteredContacts.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
-                    {isLocationMode ? "Firmen in der Nähe" : "Firmen"}
+                    {t("companies")}
                   </div>
                   {filteredContacts.map((contact, idx) => {
                     const globalIndex = contactStartIndex + idx;
@@ -655,7 +658,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               {filteredTma.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
-                    {isLocationMode ? "TMA Kandidaten in der Nähe" : "TMA Kandidaten"}
+                    {t("candidates")}
                   </div>
                   {filteredTma.map((candidate, idx) => {
                     const globalIndex = tmaStartIndex + idx;
@@ -710,7 +713,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               {filteredEmails.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
-                    E-Mails
+                    {t("emails")}
                   </div>
                   {filteredEmails.map((email, idx) => {
                     const globalIndex = emailStartIndex + idx;
@@ -750,7 +753,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               {filteredChatRooms.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-50">
-                    Chats
+                    {t("chats")}
                   </div>
                   {filteredChatRooms.map((room, idx) => {
                     const globalIndex = chatRoomStartIndex + idx;

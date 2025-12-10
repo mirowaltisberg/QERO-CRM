@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import type { Vacancy, VacancyUrgency, TmaRole, Team } from "@/lib/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,11 @@ interface Props {
 }
 
 export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, roles, teams, onCreateRole, onRefreshRoles }: Props) {
+  const t = useTranslations("vacancy");
+  const tQuality = useTranslations("quality");
+  const tUrgency = useTranslations("urgency");
+  const tDrivingLicense = useTranslations("drivingLicense");
+  const tCommon = useTranslations("common");
   const isEditing = !!vacancy;
   
   // Form state
@@ -134,19 +140,19 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
     <Modal
       open={isOpen}
       onClose={onClose}
-      title={isEditing ? "Vakanz bearbeiten" : "Neue Vakanz erstellen"}
+      title={isEditing ? t("edit") : t("new")}
       size="lg"
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>
-            Abbrechen
+            {tCommon("cancel")}
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={!contactId || !title.trim() || submitting}
             loading={submitting}
           >
-            {isEditing ? "Speichern" : "Erstellen"}
+            {isEditing ? tCommon("save") : tCommon("create")}
           </Button>
         </div>
       }
@@ -155,7 +161,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
         {/* Company Selection */}
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
-            Firma *
+            {t("company")} *
           </label>
           {selectedContact ? (
             <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -177,7 +183,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
             <div className="space-y-2">
               <input
                 type="text"
-                placeholder="Firma suchen..."
+                placeholder={t("searchCompany")}
                 value={contactSearch}
                 onChange={(e) => setContactSearch(e.target.value)}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-gray-300 focus:outline-none focus:ring-0"
@@ -210,7 +216,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
         {/* Title */}
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
-            Stellentitel *
+            {t("jobTitle")} *
           </label>
           <input
             type="text"
@@ -224,7 +230,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
         {/* Role (for matching) */}
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
-            Rolle (für TMA-Matching)
+            {t("roleForMatching")}
           </label>
           <VacancyRoleDropdown
             value={role || null}
@@ -233,7 +239,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
             onChange={(roleName) => setRole(roleName || "")}
             onCreateRole={onCreateRole}
             onRefreshRoles={onRefreshRoles}
-            placeholder="Rolle auswählen..."
+            placeholder={t("role") + "..."}
           />
           <p className="mt-1 text-xs text-gray-400">
             Wird verwendet um passende TMA-Kandidaten vorzuschlagen
@@ -244,7 +250,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">
-              Stadt
+              {t("city")}
             </label>
             <input
               type="text"
@@ -256,7 +262,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">
-              PLZ
+              {t("postalCode")}
             </label>
             <input
               type="text"
@@ -271,7 +277,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
         {/* Radius */}
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
-            Suchradius: {radiusKm} km
+            {t("searchRadius")}: {radiusKm} km
           </label>
           <input
             type="range"
@@ -291,7 +297,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
         {/* Min Quality */}
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
-            Mindest-Qualität
+            {tQuality("minQuality")}
           </label>
           <div className="flex gap-2">
             <button
@@ -330,7 +336,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
         {/* Driving License */}
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
-            Führerschein benötigt
+            {tDrivingLicense("required")}
           </label>
           <DrivingLicenseSelector value={drivingLicense} onChange={setDrivingLicense} />
         </div>
@@ -338,7 +344,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
         {/* Urgency */}
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
-            Dringlichkeit
+            {tUrgency("label")}
           </label>
           <UrgencySelector value={urgency} onChange={setUrgency} />
         </div>
@@ -346,7 +352,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
         {/* Description */}
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">
-            Beschreibung
+            {t("description")}
           </label>
           <textarea
             placeholder="Zusätzliche Informationen zur Stelle..."

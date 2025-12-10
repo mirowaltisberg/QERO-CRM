@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { Tag } from "@/components/ui/tag";
@@ -15,9 +16,8 @@ import { HoldToConfirmButton } from "@/components/ui/HoldToConfirmButton";
 import type { TmaCandidate, TmaRole } from "@/lib/types";
 import { 
   TMA_STATUS_LIST, 
-  TMA_STATUS_LABELS, 
+  TMA_STATUS_LABELS,
   TMA_STATUS_STYLES, 
-  TMA_ACTIVITY_LABELS,
   TMA_ACTIVITY_STYLES,
   type TmaStatus,
   type TmaActivity,
@@ -88,6 +88,12 @@ export function TmaDetail({
   onUnclaim,
   isMobile = false,
 }: Props) {
+  const t = useTranslations("tma");
+  const tQuality = useTranslations("quality");
+  const tActivity = useTranslations("activity");
+  const tCommon = useTranslations("common");
+  const tDrivingLicense = useTranslations("drivingLicense");
+  
   const initialFollowUpDate = candidate?.follow_up_at ? new Date(candidate.follow_up_at) : null;
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [followUpDate, setFollowUpDate] = useState(
@@ -197,7 +203,7 @@ export function TmaDetail({
   if (!candidate) {
     return (
       <section className="flex flex-1 items-center justify-center text-sm text-gray-500">
-        Select a candidate to view details.
+        {t("selectCandidate")}
       </section>
     );
   }
@@ -247,12 +253,12 @@ export function TmaDetail({
               </>
             ) : (
               <>
-                <span className="text-xs text-orange-600 font-medium">Unclaimed</span>
+                <span className="text-xs text-orange-600 font-medium">{t("unclaimed")}</span>
                 <button
                   onClick={onClaim}
                   className="rounded-full border border-blue-500 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-100 transition-colors"
                 >
-                  Claim
+                  {tCommon("claim")}
                 </button>
               </>
             )}
@@ -329,7 +335,7 @@ export function TmaDetail({
           )}
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-xs uppercase text-gray-400">Role / Position</label>
+              <label className="text-xs uppercase text-gray-400">{t("rolePosition")}</label>
               <div className="mt-1">
                 <RoleDropdown
                   value={candidate.position_title}
@@ -344,7 +350,7 @@ export function TmaDetail({
               </div>
             </div>
             <div>
-              <label className="text-xs uppercase text-gray-400">City</label>
+              <label className="text-xs uppercase text-gray-400">{t("city")}</label>
               <Input
                 value={city}
                 onChange={(event) => setCity(event.target.value)}
@@ -354,7 +360,7 @@ export function TmaDetail({
               />
             </div>
             <div>
-              <label className="text-xs uppercase text-gray-400">Postal Code</label>
+              <label className="text-xs uppercase text-gray-400">{t("postalCode")}</label>
               <Input
                 value={postalCode}
                 onChange={(event) => setPostalCode(event.target.value)}
@@ -364,7 +370,7 @@ export function TmaDetail({
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="text-xs uppercase text-gray-400">Street</label>
+              <label className="text-xs uppercase text-gray-400">{t("street")}</label>
               <Input
                 value={street}
                 onChange={(event) => setStreet(event.target.value)}
@@ -374,7 +380,7 @@ export function TmaDetail({
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="text-xs uppercase text-gray-400">Phone</label>
+              <label className="text-xs uppercase text-gray-400">{t("phone")}</label>
               <div className="mt-1 flex gap-2">
                 <Input
                   value={phone}
@@ -391,7 +397,7 @@ export function TmaDetail({
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                     </svg>
-                    Call
+                    {t("call")}
                   </a>
                 )}
               </div>
@@ -418,7 +424,7 @@ export function TmaDetail({
               ))}
             </div>
           ) : (
-            <span className="text-xs text-gray-400">Quality not set</span>
+            <span className="text-xs text-gray-400">{tQuality("notSet")}</span>
           )}
           {/* Activity Status (Active/Not Active) */}
           <Tag
@@ -434,7 +440,7 @@ export function TmaDetail({
                 : undefined
             }
           >
-            {candidate.activity ? TMA_ACTIVITY_LABELS[candidate.activity as TmaActivity] : "Activity"}
+            {candidate.activity ? tActivity(candidate.activity as TmaActivity) : tActivity("label")}
           </Tag>
         </div>
       </div>
@@ -453,27 +459,27 @@ export function TmaDetail({
 
           {/* Right column - Status, Activity, Documents */}
           <div className="flex flex-col gap-6">
-            <Panel title="Follow-up" description="Stay on top of next actions">
+            <Panel title={t("followUp")} description={t("followUpDescription")}>
             <div className="space-y-4 text-sm text-gray-600">
               <div>
-                <p className="text-xs uppercase text-gray-400">Next follow-up</p>
+                <p className="text-xs uppercase text-gray-400">{t("nextFollowUp")}</p>
                 <p className="text-sm text-gray-900">
-                  {candidate.follow_up_at ? formatFollowUp(candidate.follow_up_at) : "None scheduled"}
+                  {candidate.follow_up_at ? formatFollowUp(candidate.follow_up_at) : t("noneScheduled")}
                 </p>
                 {candidate.follow_up_note && <p className="text-xs text-gray-400 mt-1">{candidate.follow_up_note}</p>}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" size="sm" onClick={handleQuickFollowUp}>
-                  Tomorrow · 09:00
+                  {t("tomorrowAt")}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setIsFollowUpModalOpen(true)}>
-                  Custom…
+                  {t("custom")}
                 </Button>
               </div>
             </div>
           </Panel>
 
-          <Panel title="Quality" description="Assign one or multiple quality tags">
+          <Panel title={t("quality")} description={t("qualityDescription")}>
             <div className="flex flex-wrap gap-2">
               {TMA_STATUS_LIST.map((status) => (
                 <button
@@ -494,13 +500,13 @@ export function TmaDetail({
                   onClick={onClearStatusTags}
                   className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600"
                 >
-                  Clear
+                  {tCommon("clear")}
                 </button>
               )}
             </div>
           </Panel>
 
-          <Panel title="Activity" description="Is candidate actively looking?">
+          <Panel title={tActivity("label")} description={t("activityDescription")}>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => onUpdateActivity("active")}
@@ -511,7 +517,7 @@ export function TmaDetail({
                     : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
                 )}
               >
-                Active
+                {tActivity("active")}
               </button>
               <button
                 onClick={() => onUpdateActivity("inactive")}
@@ -522,27 +528,27 @@ export function TmaDetail({
                     : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"
                 )}
               >
-                Not Active
+                {tActivity("inactive")}
               </button>
               {candidate.activity && (
                 <button
                   onClick={onClearActivity}
                   className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600"
                 >
-                  Clear
+                  {tCommon("clear")}
                 </button>
               )}
             </div>
           </Panel>
 
-          <Panel title="Führerschein" description="Fahrerlaubnis des Kandidaten">
+          <Panel title={tDrivingLicense("label")} description={tDrivingLicense("candidateHas")}>
             <DrivingLicenseSelector 
               value={candidate.driving_license || ""} 
               onChange={(val) => onUpdateDrivingLicense(val || null)} 
             />
           </Panel>
 
-          <Panel title="Documents" description="Upload CV and Zeugnisse">
+          <Panel title={t("documents")} description={t("documentsDescription")}>
             <div className="space-y-4">
               <DocumentCard
                 title="CV"
@@ -571,28 +577,28 @@ export function TmaDetail({
       <Modal open={isFollowUpModalOpen} onClose={() => setIsFollowUpModalOpen(false)}>
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Schedule follow-up</h3>
-            <p className="text-sm text-gray-500">Choose a specific date and time to revisit this candidate.</p>
+            <h3 className="text-lg font-semibold text-gray-900">{t("scheduleFollowUp")}</h3>
+            <p className="text-sm text-gray-500">{t("reminderNote")}</p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <label className="text-xs uppercase text-gray-400">Date</label>
+              <label className="text-xs uppercase text-gray-400">{t("date")}</label>
               <Input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs uppercase text-gray-400">Time</label>
+              <label className="text-xs uppercase text-gray-400">{t("time")}</label>
               <Input type="time" value={followUpTime} onChange={(e) => setFollowUpTime(e.target.value)} />
             </div>
           </div>
           <div>
-            <label className="text-xs uppercase text-gray-400">Note</label>
-            <Textarea value={followUpNote} onChange={(e) => setFollowUpNote(e.target.value)} placeholder="Reminder for future you" />
+            <label className="text-xs uppercase text-gray-400">{t("note")}</label>
+            <Textarea value={followUpNote} onChange={(e) => setFollowUpNote(e.target.value)} placeholder={t("reminderNote")} />
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setIsFollowUpModalOpen(false)}>
-              Cancel
+              {tCommon("cancel")}
             </Button>
-            <Button onClick={handleCustomFollowUp}>Save follow-up</Button>
+            <Button onClick={handleCustomFollowUp}>{t("saveFollowUp")}</Button>
           </div>
         </div>
       </Modal>

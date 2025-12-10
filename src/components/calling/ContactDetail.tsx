@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { Tag } from "@/components/ui/tag";
@@ -44,6 +45,10 @@ export const ContactDetail = memo(function ContactDetail({
   vacancies,
   isMobile = false,
 }: ContactDetailProps) {
+  const t = useTranslations("contact");
+  const tStatus = useTranslations("status");
+  const tCommon = useTranslations("common");
+  const tTma = useTranslations("tma");
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [customDate, setCustomDate] = useState(() => getDefaultDateISO());
   const [customTime, setCustomTime] = useState("09:00");
@@ -129,7 +134,7 @@ export const ContactDetail = memo(function ContactDetail({
   if (!contact) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
-        Select a company to start calling.
+        {t("selectContact")}
       </div>
     );
   }
@@ -250,7 +255,7 @@ export const ContactDetail = memo(function ContactDetail({
             )}
             onClick={() => onUpdateStatus("working")}
           >
-            Working
+            {tStatus("working")}
           </Button>
           <Button
             size="sm"
@@ -261,7 +266,7 @@ export const ContactDetail = memo(function ContactDetail({
             )}
             onClick={() => onUpdateStatus("hot")}
           >
-            Hot
+            {tStatus("hot")}
           </Button>
           {contact.status && (
             <Button
@@ -327,7 +332,7 @@ export const ContactDetail = memo(function ContactDetail({
       <Modal open={isFollowUpModalOpen} onClose={() => setIsFollowUpModalOpen(false)}>
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Schedule follow-up</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{tTma("scheduleFollowUp")}</h3>
             <p className="text-sm text-gray-500">
               Pick when this company should reappear in your follow-up list.
             </p>
@@ -348,9 +353,9 @@ export const ContactDetail = memo(function ContactDetail({
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setIsFollowUpModalOpen(false)}>
-              Cancel
+              {tCommon("cancel")}
             </Button>
-            <Button onClick={handleCustomFollowUp}>Save follow-up</Button>
+            <Button onClick={handleCustomFollowUp}>{tTma("saveFollowUp")}</Button>
           </div>
         </div>
       </Modal>
