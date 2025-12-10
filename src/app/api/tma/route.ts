@@ -98,6 +98,9 @@ export async function GET(request: NextRequest) {
     console.log(`[TMA API] Fetched ${allCandidates.length} candidates in ${batches} batches`);
     
     // Fetch notes count for each candidate
+    // IMPORTANT: Exclude notes by Arbios Shtanaj (legacy notes importer) from count
+    // so that candidates with only migrated legacy notes still show as "NEW"
+    const ARBIOS_USER_ID = "4fd451d9-d018-4078-8ce7-490734724857";
     const candidateIds = allCandidates.map(c => c.id);
     const notesCountMap = new Map<string, number>();
     
@@ -108,8 +111,9 @@ export async function GET(request: NextRequest) {
         const batchIds = candidateIds.slice(i, i + notesBatchSize);
         const { data: notesCounts } = await supabase
           .from("tma_notes")
-          .select("tma_id")
-          .in("tma_id", batchIds);
+          .select("tma_id, author_id")
+          .in("tma_id", batchIds)
+          .neq("author_id", ARBIOS_USER_ID); // Exclude Arbios's migrated legacy notes
         
         if (notesCounts) {
           for (const note of notesCounts) {

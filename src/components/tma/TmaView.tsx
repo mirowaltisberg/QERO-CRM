@@ -39,6 +39,7 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
     updateNotes,
     updateQualityNote,
     updateDocuments,
+    incrementNotesCount,
     teamFilter,
     setTeamFilter,
     updatePosition,
@@ -341,6 +342,7 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
                 onClearActivity={clearActivity}
                 onScheduleFollowUp={scheduleFollowUp}
                 onUpdateNotes={updateNotes}
+                onNoteAdded={incrementNotesCount}
                 onUpdateDocuments={updateDocuments}
                 onUpdatePosition={updatePosition}
                 onUpdateAddress={updateAddress}
@@ -623,6 +625,7 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
             onClearActivity={clearActivity}
             onScheduleFollowUp={scheduleFollowUp}
             onUpdateNotes={updateNotes}
+            onNoteAdded={incrementNotesCount}
             onUpdateDocuments={updateDocuments}
             onUpdatePosition={updatePosition}
             onUpdateAddress={updateAddress}

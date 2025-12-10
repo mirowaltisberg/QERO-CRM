@@ -250,9 +250,14 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
         });
         break;
       default:
-        copy.sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
+        // Sort with NEW candidates first (no notes, no status), then by date
+        copy.sort((a, b) => {
+          const aIsNew = (a.notes_count ?? 0) === 0 && (!a.status_tags || a.status_tags.length === 0);
+          const bIsNew = (b.notes_count ?? 0) === 0 && (!b.status_tags || b.status_tags.length === 0);
+          if (aIsNew && !bIsNew) return -1;
+          if (!aIsNew && bIsNew) return 1;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
     }
     return copy;
   }, [filteredCandidates, sortOption]);
@@ -744,6 +749,15 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
     }
   }, [activeCandidate, updateCandidateLocally]);
 
+  // Increment notes_count for the active candidate (called when a note is added)
+  const incrementNotesCount = useCallback(() => {
+    if (!activeCandidate) return;
+    updateCandidateLocally({
+      ...activeCandidate,
+      notes_count: (activeCandidate.notes_count ?? 0) + 1,
+    });
+  }, [activeCandidate, updateCandidateLocally]);
+
   return {
     candidates: sortedCandidates,
     allCandidates: candidates,
@@ -765,6 +779,7 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
     updateNotes,
     updateQualityNote,
     updateDocuments,
+    incrementNotesCount,
     updatePosition,
     updateAddress,
     updatePhone,

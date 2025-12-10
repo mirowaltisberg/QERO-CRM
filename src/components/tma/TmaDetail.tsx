@@ -42,6 +42,7 @@ interface Props {
   onClearActivity: () => Promise<void> | void;
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
   onUpdateNotes: (value: string | null) => Promise<void>;
+  onNoteAdded?: () => void;
   onUpdateDocuments: (
     payload: { cv_url?: string | null; references_url?: string | null; short_profile_url?: string | null; ahv_url?: string | null; id_url?: string | null; bank_url?: string | null }
   ) => Promise<void>;
@@ -81,6 +82,7 @@ export function TmaDetail({
   onClearActivity,
   onScheduleFollowUp,
   onUpdateNotes,
+  onNoteAdded,
   onUpdateDocuments,
   onUpdatePosition,
   onUpdateAddress,
@@ -477,6 +479,7 @@ export function TmaDetail({
               entityType="tma"
               legacyNotes={candidate.notes}
               onSaveLegacyNotes={onUpdateNotes}
+              onNoteAdded={onNoteAdded}
             />
           </div>
 
