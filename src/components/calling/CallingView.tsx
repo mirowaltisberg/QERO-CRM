@@ -31,6 +31,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     actionState,
     cantonFilter,
     uniqueCantons,
+    searchQuery,
     selectContact,
     goToNextContact,
     goToPreviousContact,
@@ -43,6 +44,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     clearStatus,
     setCantonFilter,
     clearCantonFilter,
+    setSearchQuery,
   } = useContacts({ initialContacts });
 
   // Mobile detection
@@ -370,6 +372,8 @@ export function CallingView({ initialContacts }: CallingViewProps) {
             availableCantons={uniqueCantons}
             callLogs={callLogs}
             contactVacancies={contactVacancies}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
             isMobile={true}
           />
         </div>
@@ -454,6 +458,8 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         availableCantons={uniqueCantons}
         callLogs={callLogs}
         contactVacancies={contactVacancies}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
       <ContactDetail
         key={activeContact?.id ?? "empty"}
