@@ -3,6 +3,10 @@ import { tmaService } from "@/lib/data/data-service";
 import { respondError, respondSuccess, formatZodError } from "@/lib/utils/api-response";
 import { TmaCreateSchema, TmaFilterSchema } from "@/lib/validation/schemas";
 import { createClient } from "@/lib/supabase/server";
+import type { TmaCandidate } from "@/lib/types";
+
+// Supabase default limit is 1000 rows
+const BATCH_SIZE = 1000;
 
 function buildFilters(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -22,38 +26,80 @@ export async function GET(request: NextRequest) {
     }
     
     const supabase = await createClient();
-    let query = supabase
-      .from("tma_candidates")
-      .select(`
-        *,
-        claimer:profiles!claimed_by(id, full_name, avatar_url)
-      `)
-      .order("created_at", { ascending: false });
-
     const filters = filtersResult.data;
+
+    // First get the total count
+    let countQuery = supabase
+      .from("tma_candidates")
+      .select("*", { count: "exact", head: true });
+
     if (filters.status) {
-      query = query.contains("status_tags", [filters.status]);
+      countQuery = countQuery.contains("status_tags", [filters.status]);
     }
     if (filters.canton) {
-      query = query.eq("canton", filters.canton);
+      countQuery = countQuery.eq("canton", filters.canton);
     }
     if (filters.search) {
       const search = filters.search.toLowerCase();
-      query = query.or(
+      countQuery = countQuery.or(
         `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`
       );
     }
 
-    const { data: candidates, error } = await query;
-    
-    if (error) {
-      console.error("Error fetching TMA candidates:", error);
-      return respondError("Failed to fetch candidates", 500);
+    const { count } = await countQuery;
+    const totalCount = count ?? 0;
+
+    if (totalCount === 0) {
+      return respondSuccess([], { status: 200, meta: { count: 0 } });
     }
+
+    // Fetch in batches
+    const allCandidates: TmaCandidate[] = [];
+    const batches = Math.ceil(totalCount / BATCH_SIZE);
+
+    for (let i = 0; i < batches; i++) {
+      const from = i * BATCH_SIZE;
+      const to = from + BATCH_SIZE - 1;
+
+      let query = supabase
+        .from("tma_candidates")
+        .select(`
+          *,
+          claimer:profiles!claimed_by(id, full_name, avatar_url)
+        `)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (filters.status) {
+        query = query.contains("status_tags", [filters.status]);
+      }
+      if (filters.canton) {
+        query = query.eq("canton", filters.canton);
+      }
+      if (filters.search) {
+        const search = filters.search.toLowerCase();
+        query = query.or(
+          `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`
+        );
+      }
+
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error(`[TMA API] Error fetching batch ${i + 1}/${batches}:`, error);
+        continue;
+      }
+
+      if (data) {
+        allCandidates.push(...(data as TmaCandidate[]));
+      }
+    }
+
+    console.log(`[TMA API] Fetched ${allCandidates.length} candidates in ${batches} batches`);
     
-    return respondSuccess(candidates ?? [], {
+    return respondSuccess(allCandidates, {
       status: 200,
-      meta: { count: candidates?.length ?? 0 },
+      meta: { count: allCandidates.length },
     });
   } catch (error) {
     console.error("GET /api/tma error", error);

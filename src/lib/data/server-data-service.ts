@@ -363,32 +363,78 @@ export const serverContactService = {
 };
 
 export const serverTmaService = {
+  /**
+   * Get all TMA candidates (up to 100k) - for server components
+   * Fetches in batches to work around Supabase 1000 row limit
+   */
   async getAll(filters?: TmaFilters): Promise<TmaCandidate[]> {
     const supabase = await createClient();
 
-    let query = supabase
+    // First get the total count
+    let countQuery = supabase
       .from("tma_candidates")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select("*", { count: "exact", head: true });
 
     if (filters?.status) {
-      query = query.eq("status", filters.status);
+      countQuery = countQuery.eq("status", filters.status);
     }
     if (filters?.canton) {
-      query = query.eq("canton", filters.canton);
+      countQuery = countQuery.eq("canton", filters.canton);
     }
     if (filters?.search) {
       const search = filters.search.toLowerCase();
-      query = query.or(
+      countQuery = countQuery.or(
         `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`
       );
     }
 
-    const { data, error } = await query;
-    if (error) {
-      console.error("Error fetching TMA candidates:", error);
+    const { count } = await countQuery;
+    const totalCount = count ?? 0;
+    console.log(`[TMA Service] Total count: ${totalCount}`);
+
+    if (totalCount === 0) {
       return [];
     }
-    return data ?? [];
+
+    // Fetch in batches using range()
+    const allCandidates: TmaCandidate[] = [];
+    const batches = Math.ceil(totalCount / BATCH_SIZE);
+
+    for (let i = 0; i < batches; i++) {
+      const from = i * BATCH_SIZE;
+      const to = from + BATCH_SIZE - 1;
+
+      let query = supabase
+        .from("tma_candidates")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (filters?.status) {
+        query = query.eq("status", filters.status);
+      }
+      if (filters?.canton) {
+        query = query.eq("canton", filters.canton);
+      }
+      if (filters?.search) {
+        const search = filters.search.toLowerCase();
+        query = query.or(
+          `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`
+        );
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.error(`[TMA Service] Error fetching batch ${i + 1}/${batches}:`, error);
+        continue;
+      }
+
+      if (data) {
+        allCandidates.push(...data);
+      }
+    }
+
+    console.log(`[TMA Service] Fetched ${allCandidates.length} candidates in ${batches} batches`);
+    return allCandidates;
   },
 };
