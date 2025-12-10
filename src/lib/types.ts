@@ -112,6 +112,8 @@ export interface TmaCandidate {
   driving_license: DrivingLicense | null;
   // Computed distance (only present in radius search results)
   distance_km?: number;
+  // Computed notes count (for NEW badge display)
+  notes_count?: number;
   // Joined from profiles when fetched
   claimer?: {
     id: string;

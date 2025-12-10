@@ -97,9 +97,37 @@ export async function GET(request: NextRequest) {
 
     console.log(`[TMA API] Fetched ${allCandidates.length} candidates in ${batches} batches`);
     
-    return respondSuccess(allCandidates, {
+    // Fetch notes count for each candidate
+    const candidateIds = allCandidates.map(c => c.id);
+    const notesCountMap = new Map<string, number>();
+    
+    if (candidateIds.length > 0) {
+      // Fetch notes counts in batches of 500 to avoid URL length limits
+      const notesBatchSize = 500;
+      for (let i = 0; i < candidateIds.length; i += notesBatchSize) {
+        const batchIds = candidateIds.slice(i, i + notesBatchSize);
+        const { data: notesCounts } = await supabase
+          .from("tma_notes")
+          .select("tma_id")
+          .in("tma_id", batchIds);
+        
+        if (notesCounts) {
+          for (const note of notesCounts) {
+            notesCountMap.set(note.tma_id, (notesCountMap.get(note.tma_id) || 0) + 1);
+          }
+        }
+      }
+    }
+    
+    // Add notes_count to each candidate
+    const candidatesWithNotes = allCandidates.map(c => ({
+      ...c,
+      notes_count: notesCountMap.get(c.id) || 0,
+    }));
+    
+    return respondSuccess(candidatesWithNotes, {
       status: 200,
-      meta: { count: allCandidates.length },
+      meta: { count: candidatesWithNotes.length },
     });
   } catch (error) {
     console.error("GET /api/tma error", error);
