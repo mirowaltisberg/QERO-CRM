@@ -42,15 +42,33 @@ export function ContactsImporter({ onImportComplete }: ContactsImporterProps) {
         });
       });
 
+      // Debug: Log the first row's headers
+      if (results.data.length > 0) {
+        const firstRow = results.data[0];
+        const headers = Object.keys(firstRow);
+        console.log("[CSV Import] Headers found:", headers);
+        console.log("[CSV Import] First row sample:", firstRow);
+        
+        // Check for BOM in first header
+        const firstHeader = headers[0];
+        if (firstHeader && firstHeader.charCodeAt(0) === 0xFEFF) {
+          console.log("[CSV Import] BOM detected in first header");
+        }
+      }
+
       const mapped = results.data
         .map(mapRowToContact)
         .filter<ContactCreateInput>((contact): contact is ContactCreateInput => Boolean(contact));
 
       if (mapped.length === 0) {
+        // Debug: Log why no companies were found
+        console.log("[CSV Import] No valid companies found. Sample rows:", results.data.slice(0, 3));
         setStatus("error");
-        setMessage("Keine gültigen Firmen im CSV gefunden.");
+        setMessage("Keine gültigen Firmen im CSV gefunden. Prüfe ob 'Firma' Spalte existiert.");
         return;
       }
+      
+      console.log("[CSV Import] Found", mapped.length, "valid companies to import");
 
       // Split into batches to avoid timeout
       const batches = chunkArray(mapped, BATCH_SIZE);
@@ -171,28 +189,36 @@ export function ContactsImporter({ onImportComplete }: ContactsImporterProps) {
 }
 
 function mapRowToContact(row: CsvRow): ContactCreateInput | null {
-  const company = (row["Firma"] || row["Firma "] || "").trim();
+  // Normalize keys to handle BOM and whitespace issues
+  const normalizedRow: CsvRow = {};
+  for (const [key, value] of Object.entries(row)) {
+    // Remove BOM and trim whitespace from keys
+    const cleanKey = key.replace(/^\uFEFF/, "").trim();
+    normalizedRow[cleanKey] = value;
+  }
+
+  const company = (normalizedRow["Firma"] || normalizedRow["Firma "] || "").trim();
   if (!company) return null;
 
-  const cantonRaw = (row["Region geschäftlich"] || row["Bundesland/Kanton privat"] || "").trim();
+  const cantonRaw = (normalizedRow["Region geschäftlich"] || normalizedRow["Bundesland/Kanton privat"] || "").trim();
   const canton = formatCanton(cantonRaw);
 
   // Extract address fields for location search
-  const street = coalesce(row["Straße geschäftlich"], row["Straße privat"]) ?? null;
-  const city = coalesce(row["Ort geschäftlich"], row["Ort privat"]) ?? null;
-  const postalCode = coalesce(row["Postleitzahl geschäftlich"], row["Postleitzahl privat"]) ?? null;
+  const street = coalesce(normalizedRow["Straße geschäftlich"], normalizedRow["Straße privat"]) ?? null;
+  const city = coalesce(normalizedRow["Ort geschäftlich"], normalizedRow["Ort privat"]) ?? null;
+  const postalCode = coalesce(normalizedRow["Postleitzahl geschäftlich"], normalizedRow["Postleitzahl privat"]) ?? null;
 
   const phone =
     coalesce(
-      row["Telefon Firma"],
-      row["Telefon geschäftlich"],
-      row["Telefon geschäftlich 2"],
-      row["Mobiltelefon"],
-      row["Mobiltelefon 2"]
+      normalizedRow["Telefon Firma"],
+      normalizedRow["Telefon geschäftlich"],
+      normalizedRow["Telefon geschäftlich 2"],
+      normalizedRow["Mobiltelefon"],
+      normalizedRow["Mobiltelefon 2"]
     ) ?? null;
 
-  const email = coalesce(row["E-Mail-Adresse"], row["E-Mail 2: Adresse"], row["E-Mail 3: Adresse"]) ?? null;
-  const notes = [row["Rückmeldung"], row["Notizen"]].filter(Boolean).join("\n").trim() || null;
+  const email = coalesce(normalizedRow["E-Mail-Adresse"], normalizedRow["E-Mail 2: Adresse"], normalizedRow["E-Mail 3: Adresse"]) ?? null;
+  const notes = [normalizedRow["Rückmeldung"], normalizedRow["Notizen"]].filter(Boolean).join("\n").trim() || null;
 
   return {
     company_name: company,

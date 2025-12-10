@@ -214,6 +214,7 @@
   "contact": {
     "title": "Contact",
     "titlePlural": "Contacts",
+    "search": "Search companies...",
     "company": "Company",
     "companyName": "Company Name",
     "phone": "Phone",
