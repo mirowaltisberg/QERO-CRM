@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils/cn";
 
-const navigation = [
-  { name: "Calling", href: "/calling", icon: PhoneIcon },
-  { name: "Firmen", href: "/contacts", icon: BuildingIcon },
-  { name: "TMA", href: "/tma", icon: UsersIcon },
-  { name: "Email", href: "/email", icon: EmailIcon },
-  { name: "Chat", href: "/chat", icon: ChatIcon },
+const navigationKeys = [
+  { key: "calling", href: "/calling", icon: PhoneIcon },
+  { key: "companies", href: "/contacts", icon: BuildingIcon },
+  { key: "tma", href: "/tma", icon: UsersIcon },
+  { key: "email", href: "/email", icon: EmailIcon },
+  { key: "chat", href: "/chat", icon: ChatIcon },
 ];
 
 interface MobileNavBarProps {
@@ -19,6 +20,7 @@ interface MobileNavBarProps {
 
 export function MobileNavBar({ chatUnreadCount = 0 }: MobileNavBarProps) {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -40,13 +42,14 @@ export function MobileNavBar({ chatUnreadCount = 0 }: MobileNavBarProps) {
           paddingBottom: "2px"
         }}
       >
-        {navigation.map((item) => {
+        {navigationKeys.map((item) => {
           const isActive = pathname === item.href || 
             (item.href !== "/" && pathname?.startsWith(item.href));
+          const name = t(item.key);
           
           return (
             <Link
-              key={item.name}
+              key={item.key}
               href={item.href}
               prefetch={true}
               className={cn(
@@ -62,7 +65,7 @@ export function MobileNavBar({ chatUnreadCount = 0 }: MobileNavBarProps) {
                   )} 
                   filled={isActive}
                 />
-                {item.name === "Chat" && chatUnreadCount > 0 && (
+                {item.key === "chat" && chatUnreadCount > 0 && (
                   <span className="absolute -top-1 -right-2.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
                     {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
                   </span>
@@ -72,7 +75,7 @@ export function MobileNavBar({ chatUnreadCount = 0 }: MobileNavBarProps) {
                 "text-[11px] mt-1 font-medium",
                 isActive ? "text-blue-600" : "text-gray-400"
               )}>
-                {item.name}
+                {name}
               </span>
             </Link>
           );

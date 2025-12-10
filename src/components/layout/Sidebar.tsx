@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils/cn";
 
 interface SidebarProps {
@@ -19,53 +20,20 @@ interface SidebarProps {
   } | null;
 }
 
-const navigation = [
-  {
-    name: "Calling",
-    href: "/calling",
-    icon: PhoneIcon,
-    shortcut: "G then C",
-  },
-  {
-    name: "Companies",
-    href: "/contacts",
-    icon: UsersIcon,
-    shortcut: "G then T",
-  },
-  {
-    name: "TMA",
-    href: "/tma",
-    icon: UsersIcon,
-    shortcut: "G then M",
-  },
-  {
-    name: "Vakanzen",
-    href: "/vakanzen",
-    icon: BriefcaseIcon,
-    shortcut: "G then V",
-  },
-  {
-    name: "Email",
-    href: "/email",
-    icon: EmailIcon,
-    shortcut: "G then E",
-  },
-  {
-    name: "Chat",
-    href: "/chat",
-    icon: ChatIcon,
-    shortcut: "G then H",
-  },
-  {
-    name: "Dashboard",
-    href: "/dashboard",
-    icon: ChartIcon,
-    shortcut: "G then D",
-  },
+const navigationKeys = [
+  { key: "calling", href: "/calling", icon: PhoneIcon, shortcut: "G then C" },
+  { key: "companies", href: "/contacts", icon: UsersIcon, shortcut: "G then T" },
+  { key: "tma", href: "/tma", icon: UsersIcon, shortcut: "G then M" },
+  { key: "vakanzen", href: "/vakanzen", icon: BriefcaseIcon, shortcut: "G then V" },
+  { key: "email", href: "/email", icon: EmailIcon, shortcut: "G then E" },
+  { key: "chat", href: "/chat", icon: ChatIcon, shortcut: "G then H" },
+  { key: "dashboard", href: "/dashboard", icon: ChartIcon, shortcut: "G then D" },
 ];
 
 export function Sidebar({ user, profile }: SidebarProps) {
   const pathname = usePathname();
+  const t = useTranslations("nav");
+  const tCommon = useTranslations("common");
   // Start with false (server default), then read from localStorage after mount
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -180,12 +148,13 @@ export function Sidebar({ user, profile }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 p-2">
         <ul className="space-y-0.5">
-          {navigation.map((item) => {
+          {navigationKeys.map((item) => {
             const isActive = pathname === item.href || 
               (item.href !== "/" && pathname?.startsWith(item.href));
+            const name = t(item.key);
             
             return (
-              <li key={item.name}>
+              <li key={item.key}>
                 <Link
                   href={item.href}
                   prefetch={true}
@@ -196,23 +165,23 @@ export function Sidebar({ user, profile }: SidebarProps) {
                       ? "bg-white text-gray-900 shadow-sm border border-border"
                       : "text-gray-600 hover:bg-white hover:text-gray-900"
                   )}
-                  title={isCollapsed ? `${item.name} (${item.shortcut})` : undefined}
+                  title={isCollapsed ? `${name} (${item.shortcut})` : undefined}
                 >
                   <div className="relative">
                     <item.icon className="w-4 h-4 shrink-0" />
-                    {item.name === "Chat" && chatUnreadCount > 0 && isCollapsed && (
+                    {item.key === "chat" && chatUnreadCount > 0 && isCollapsed && (
                       <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-medium text-white">
                         {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
                       </span>
                     )}
                   </div>
-                  {!isCollapsed && <span className="flex-1 whitespace-nowrap">{item.name}</span>}
-                  {item.name === "Chat" && chatUnreadCount > 0 && !isCollapsed && (
+                  {!isCollapsed && <span className="flex-1 whitespace-nowrap">{name}</span>}
+                  {item.key === "chat" && chatUnreadCount > 0 && !isCollapsed && (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-medium text-white">
                       {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
                     </span>
                   )}
-                  {!isCollapsed && !isActive && item.name !== "Chat" && (
+                  {!isCollapsed && !isActive && item.key !== "chat" && (
                     <span className="text-xs text-gray-400 hidden group-hover:block">
                       {item.shortcut}
                     </span>
@@ -273,17 +242,17 @@ export function Sidebar({ user, profile }: SidebarProps) {
         {!isCollapsed ? (
           <div className="text-xs text-gray-400 space-y-1">
             <div className="flex items-center justify-between">
-              <span>Command palette</span>
+              <span>{tCommon("commandPalette")}</span>
               <kbd className="kbd">Q</kbd>
             </div>
             <div className="flex items-center justify-between pt-1">
-              <span className="text-gray-300">v1.12.2</span>
+              <span className="text-gray-300">v1.13.0</span>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1 text-xs text-gray-400">
             <kbd className="kbd">Q</kbd>
-            <span className="text-[10px] text-gray-300">v1.12.2</span>
+            <span className="text-[10px] text-gray-300">v1.13.0</span>
           </div>
         )}
       </div>

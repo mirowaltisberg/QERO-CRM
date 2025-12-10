@@ -1,9 +1,10 @@
 "use client";
 
 import { memo, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { Vacancy } from "@/lib/types";
 import type { VacancyStatus } from "@/lib/utils/constants";
-import { VACANCY_STATUS_LIST, VACANCY_STATUS_LABELS, VACANCY_STATUS_COLORS } from "@/lib/utils/constants";
+import { VACANCY_STATUS_LIST, VACANCY_STATUS_COLORS } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
 import { HoldToConfirmButton } from "@/components/ui/HoldToConfirmButton";
 import { UrgencyBadge } from "./UrgencyBadge";
@@ -30,6 +31,11 @@ export const VacancyDetail = memo(function VacancyDetail({
   candidateCount = 0,
   isMobile = false,
 }: Props) {
+  const t = useTranslations("vacancy");
+  const tStatus = useTranslations("vacancyStatus");
+  const tCommon = useTranslations("common");
+  const tQuality = useTranslations("quality");
+  const tDrivingLicense = useTranslations("drivingLicense");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const formatDate = (dateStr: string) => {
@@ -38,6 +44,12 @@ export const VacancyDetail = memo(function VacancyDetail({
       month: "2-digit",
       year: "numeric",
     });
+  };
+  
+  const statusLabels: Record<VacancyStatus, string> = {
+    open: tStatus("open"),
+    interviewing: tStatus("interviewing"),
+    filled: tStatus("filled"),
   };
 
   return (
@@ -108,7 +120,7 @@ export const VacancyDetail = memo(function VacancyDetail({
       >
         {/* Status Pipeline */}
         <div className="mb-6">
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Status</h2>
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">{tStatus("label")}</h2>
           <div className="flex gap-2">
             {VACANCY_STATUS_LIST.map((status, index) => {
               const isActive = vacancy.status === status;
@@ -131,7 +143,7 @@ export const VacancyDetail = memo(function VacancyDetail({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     )}
-                    {VACANCY_STATUS_LABELS[status]}
+                    {statusLabels[status]}
                   </div>
                 </button>
               );
@@ -141,7 +153,7 @@ export const VacancyDetail = memo(function VacancyDetail({
 
         {/* Company Info */}
         <div className="mb-6 rounded-xl border border-gray-200 p-4">
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Firma</h2>
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">{t("company")}</h2>
           <div className="space-y-2">
             <p className="text-sm font-medium text-gray-900">{vacancy.contact?.company_name}</p>
             {vacancy.contact?.city && (
@@ -166,17 +178,17 @@ export const VacancyDetail = memo(function VacancyDetail({
 
         {/* Requirements */}
         <div className="mb-6 rounded-xl border border-gray-200 p-4">
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Anforderungen</h2>
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">{t("requirements")}</h2>
           <div className="grid grid-cols-2 gap-4">
             {vacancy.role && (
               <div>
-                <p className="text-xs text-gray-400">Rolle</p>
+                <p className="text-xs text-gray-400">{t("role")}</p>
                 <p className="text-sm font-medium text-gray-900">{vacancy.role}</p>
               </div>
             )}
             {vacancy.min_quality && (
               <div>
-                <p className="text-xs text-gray-400">Min. Qualität</p>
+                <p className="text-xs text-gray-400">{tQuality("minQuality")}</p>
                 <span className={cn(
                   "inline-block mt-1 rounded px-2 py-0.5 text-xs font-medium",
                   vacancy.min_quality === "A" ? "bg-green-100 text-green-700" :
@@ -189,7 +201,7 @@ export const VacancyDetail = memo(function VacancyDetail({
             )}
             {vacancy.city && (
               <div>
-                <p className="text-xs text-gray-400">Standort</p>
+                <p className="text-xs text-gray-400">{t("location")}</p>
                 <p className="text-sm font-medium text-gray-900">
                   {vacancy.city}
                   {vacancy.postal_code && ` (${vacancy.postal_code})`}
@@ -198,13 +210,13 @@ export const VacancyDetail = memo(function VacancyDetail({
             )}
             {vacancy.radius_km && (
               <div>
-                <p className="text-xs text-gray-400">Suchradius</p>
+                <p className="text-xs text-gray-400">{t("searchRadius")}</p>
                 <p className="text-sm font-medium text-gray-900">{vacancy.radius_km} km</p>
               </div>
             )}
             {vacancy.driving_license && (
               <div>
-                <p className="text-xs text-gray-400">Führerschein</p>
+                <p className="text-xs text-gray-400">{tDrivingLicense("label")}</p>
                 <div className="mt-1">
                   <DrivingLicenseBadge license={vacancy.driving_license} size="md" />
                 </div>
@@ -216,21 +228,21 @@ export const VacancyDetail = memo(function VacancyDetail({
         {/* Description */}
         {vacancy.description && (
           <div className="mb-6 rounded-xl border border-gray-200 p-4">
-            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Beschreibung</h2>
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">{t("description")}</h2>
             <p className="text-sm text-gray-600 whitespace-pre-wrap">{vacancy.description}</p>
           </div>
         )}
 
         {/* Meta */}
         <div className="rounded-xl border border-gray-200 p-4">
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Info</h2>
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">{t("info")}</h2>
           <div className="space-y-2 text-sm text-gray-500">
-            <p>Erstellt am {formatDate(vacancy.created_at)}</p>
+            <p>{t("createdAt")} {formatDate(vacancy.created_at)}</p>
             {vacancy.creator && (
               <p>von {vacancy.creator.full_name}</p>
             )}
             {vacancy.updated_at !== vacancy.created_at && (
-              <p>Aktualisiert am {formatDate(vacancy.updated_at)}</p>
+              <p>{t("updatedAt")} {formatDate(vacancy.updated_at)}</p>
             )}
           </div>
         </div>
@@ -244,7 +256,7 @@ export const VacancyDetail = memo(function VacancyDetail({
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
-            Kandidaten anzeigen
+            {t("showCandidates")}
             {candidateCount > 0 && (
               <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">
                 {candidateCount}

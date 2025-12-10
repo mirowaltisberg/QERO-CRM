@@ -3,15 +3,18 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { signOut } from "@/lib/auth/actions";
 import { motion } from "framer-motion";
 import { Modal } from "@/components/ui/modal";
 import type { EmailAccount } from "@/lib/types";
+import type { Locale } from "@/i18n/config";
 
 interface Profile {
   id: string;
@@ -30,6 +33,9 @@ interface SettingsFormProps {
 export function SettingsForm({ user, profile }: SettingsFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
+  const locale = useLocale() as Locale;
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [fullName, setFullName] = useState(profile?.full_name || "");
@@ -616,11 +622,21 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
         </Panel>
       )}
 
+      {/* Language */}
+      <Panel title={t("language")} description={t("languageDescription")}>
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            {locale === "de" ? "Deutsch" : "English"}
+          </div>
+          <LanguageSwitcher currentLocale={locale} variant="buttons" />
+        </div>
+      </Panel>
+
       {/* Danger Zone */}
-      <Panel title="Sign Out" description="Sign out of your account">
+      <Panel title={tCommon("logout")} description="Sign out of your account">
         <form action={signOut}>
           <Button type="submit" variant="danger">
-            Sign Out
+            {tCommon("logout")}
           </Button>
         </form>
       </Panel>
