@@ -97,6 +97,10 @@ export interface TmaCandidate {
   cv_url: string | null;
   references_url: string | null;
   short_profile_url: string | null;
+  // Personal documents for contracts
+  ahv_url: string | null;
+  id_url: string | null;
+  bank_url: string | null;
   team_id: string | null; // Which industry vertical this candidate belongs to
   created_at: string;
   claimed_by: string | null;

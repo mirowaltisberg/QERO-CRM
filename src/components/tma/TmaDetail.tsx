@@ -42,7 +42,7 @@ interface Props {
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
   onUpdateNotes: (value: string | null) => Promise<void>;
   onUpdateDocuments: (
-    payload: { cv_url?: string | null; references_url?: string | null; short_profile_url?: string | null }
+    payload: { cv_url?: string | null; references_url?: string | null; short_profile_url?: string | null; ahv_url?: string | null; id_url?: string | null; bank_url?: string | null }
   ) => Promise<void>;
   onUpdatePosition: (value: string | null) => Promise<void> | void;
   onUpdateAddress: (payload: { city: string | null; street: string | null; postal_code: string | null }) => Promise<void> | void;
@@ -103,7 +103,7 @@ export function TmaDetail({
     initialFollowUpDate ? initialFollowUpDate.toISOString().slice(11, 16) : "09:00"
   );
   const [followUpNote, setFollowUpNote] = useState(candidate?.follow_up_note ?? "");
-  const [uploading, setUploading] = useState<"cv" | "references" | "short_profile" | null>(null);
+  const [uploading, setUploading] = useState<"cv" | "references" | "short_profile" | "ahv" | "id" | "bank" | null>(null);
   const [city, setCity] = useState(() => candidate?.city ?? "");
   const [street, setStreet] = useState(() => candidate?.street ?? "");
   const [postalCode, setPostalCode] = useState(() => candidate?.postal_code ?? "");
@@ -157,7 +157,7 @@ export function TmaDetail({
   };
 
   const handleUpload = useCallback(
-    async (file: File, type: "cv" | "references" | "short_profile") => {
+    async (file: File, type: "cv" | "references" | "short_profile" | "ahv" | "id" | "bank") => {
       if (!candidate) return;
       const supabase = createClient();
       const bucket = "tma-docs";
@@ -179,6 +179,9 @@ export function TmaDetail({
           cv_url: type === "cv" ? data.publicUrl : candidate.cv_url,
           references_url: type === "references" ? data.publicUrl : candidate.references_url,
           short_profile_url: type === "short_profile" ? data.publicUrl : candidate.short_profile_url,
+          ahv_url: type === "ahv" ? data.publicUrl : candidate.ahv_url,
+          id_url: type === "id" ? data.publicUrl : candidate.id_url,
+          bank_url: type === "bank" ? data.publicUrl : candidate.bank_url,
         });
       } catch (err) {
         console.error("Failed to save document URL:", err);
@@ -567,6 +570,29 @@ export function TmaDetail({
                 url={candidate.short_profile_url}
                 uploading={uploading === "short_profile"}
                 onUpload={(file) => handleUpload(file, "short_profile")}
+              />
+            </div>
+          </Panel>
+
+          <Panel title="Vertragsunterlagen" description="Dokumente für Verträge">
+            <div className="space-y-4">
+              <DocumentCard
+                title="AHV-Ausweis"
+                url={candidate.ahv_url}
+                uploading={uploading === "ahv"}
+                onUpload={(file) => handleUpload(file, "ahv")}
+              />
+              <DocumentCard
+                title="ID / Pass"
+                url={candidate.id_url}
+                uploading={uploading === "id"}
+                onUpload={(file) => handleUpload(file, "id")}
+              />
+              <DocumentCard
+                title="Bankkarte"
+                url={candidate.bank_url}
+                uploading={uploading === "bank"}
+                onUpload={(file) => handleUpload(file, "bank")}
               />
             </div>
           </Panel>

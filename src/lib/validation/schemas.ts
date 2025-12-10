@@ -106,6 +106,9 @@ const tmaBaseSchema = z.object({
   cv_url: z.string().url().optional().nullable(),
   references_url: z.string().url().optional().nullable(),
   short_profile_url: z.string().url().optional().nullable(),
+  ahv_url: z.string().url().optional().nullable(),
+  id_url: z.string().url().optional().nullable(),
+  bank_url: z.string().url().optional().nullable(),
   team_id: z.string().uuid().optional().nullable(),
   driving_license: z.enum(DRIVING_LICENSE_VALUES).optional().nullable(),
   status_tags: z
