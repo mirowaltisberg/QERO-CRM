@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { CantonTag } from "@/components/ui/CantonTag";
 import type { Contact, ContactCallLog, Vacancy } from "@/lib/types";
@@ -232,6 +233,8 @@ export const ContactList = memo(function ContactList({
   onSearchChange,
   isMobile = false,
 }: ContactListProps) {
+  const t = useTranslations("calling");
+  const tCommon = useTranslations("common");
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery ?? "");
   
@@ -270,7 +273,7 @@ export const ContactList = memo(function ContactList({
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-400">Companies</p>
           <p className="text-sm font-semibold text-gray-900">
-            {contacts.length} ready to call
+            {contacts.length} {t("readyToCall")}
           </p>
           {activeCantonFilter && (
             <button
@@ -339,8 +342,8 @@ export const ContactList = memo(function ContactList({
       <div ref={parentRef} className="flex-1 overflow-y-auto">
         {contacts.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center px-4 text-center text-sm text-gray-500">
-            <p>No contacts available.</p>
-            <p className="text-xs text-gray-400">Add contacts to start calling.</p>
+            <p>{t("noContactsAvailable")}</p>
+            <p className="text-xs text-gray-400">{t("addContactsToStart")}</p>
           </div>
         ) : (
           <div

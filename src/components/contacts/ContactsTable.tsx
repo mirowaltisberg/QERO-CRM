@@ -2,6 +2,7 @@
 
 import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Contact } from "@/lib/types";
 import type { ContactStatus } from "@/lib/utils/constants";
@@ -86,6 +87,8 @@ const ContactTableRow = memo(function ContactTableRow({
 
 export function ContactsTable({ initialContacts }: ContactsTableProps) {
   const router = useRouter();
+  const t = useTranslations("contact");
+  const tStatus = useTranslations("status");
   const [bulkModal, setBulkModal] = useState<"status" | "list" | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
   const clientContacts = initialContacts;
@@ -221,7 +224,7 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
                 <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
               </th>
               <SortableHeader
-                label="Company"
+                label={t("company")}
                 column="company_name"
                 sortBy={sortBy}
                 sortDirection={sortDirection}
@@ -235,7 +238,7 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
                 onSort={applySort}
               />
               <SortableHeader
-                label="Canton"
+                label={t("canton")}
                 column="canton"
                 sortBy={sortBy}
                 sortDirection={sortDirection}

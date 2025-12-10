@@ -2,11 +2,11 @@
 
 import { memo } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import type { TmaCandidate } from "@/lib/types";
 import { CantonTag } from "@/components/ui/CantonTag";
 import { 
   TMA_STATUS_STYLES, 
-  TMA_ACTIVITY_LABELS,
   TMA_ACTIVITY_STYLES,
   type TmaStatus,
   type TmaActivity
@@ -29,19 +29,21 @@ export const TmaList = memo(function TmaList({
   onSearchChange,
   isMobile = false,
 }: Props) {
+  const t = useTranslations("tma");
+  const tActivity = useTranslations("activity");
   return (
     <aside className={`flex h-full flex-col border-r border-gray-200 bg-gray-50 ${isMobile ? "w-full" : "w-80"}`}>
       {/* Header hidden on mobile (shown in TmaView) */}
       {!isMobile && (
         <header className="border-b border-gray-200 px-4 py-3">
           <p className="text-xs uppercase tracking-wide text-gray-400">TMA</p>
-          <p className="text-sm font-semibold text-gray-900">{candidates.length} candidates</p>
+          <p className="text-sm font-semibold text-gray-900">{candidates.length} {t("candidates")}</p>
           <div className="mt-2">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search candidates..."
+              placeholder={t("searchCandidates")}
               className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0"
             />
           </div>
@@ -153,7 +155,7 @@ export const TmaList = memo(function TmaList({
                           borderColor: `${TMA_ACTIVITY_STYLES[candidate.activity as TmaActivity].border}40`,
                         }}
                       >
-                        {TMA_ACTIVITY_LABELS[candidate.activity as TmaActivity]}
+                        {tActivity(candidate.activity as TmaActivity)}
                       </span>
                     )}
                   </div>

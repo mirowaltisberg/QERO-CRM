@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { Vacancy, VacancyCandidate, TmaCandidate } from "@/lib/types";
 import { VACANCY_CANDIDATE_STATUS_LIST, VACANCY_CANDIDATE_STATUS_LABELS, VACANCY_CANDIDATE_STATUS_COLORS } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
@@ -65,7 +66,7 @@ const ScoreBreakdownPopup = ({ breakdown, onClose }: { breakdown: ScoreBreakdown
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div className="absolute left-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
-        <div className="text-xs font-medium text-gray-700 mb-2">Score-Aufschlüsselung</div>
+        <div className="text-xs font-medium text-gray-700 mb-2">{useTranslations("tma")("scoreBreakdown")}</div>
         <div className="space-y-1">
           {items.map((item) => (
             <div key={item.label} className="flex justify-between text-xs">
@@ -266,6 +267,9 @@ export const CandidateMatches = memo(function CandidateMatches({
   onBack,
   isMobile = false,
 }: Props) {
+  const t = useTranslations("vacancy");
+  const tTma = useTranslations("tma");
+  const tCommon = useTranslations("common");
   const [activeTab, setActiveTab] = useState<"assigned" | "suggested">("assigned");
 
   const assignedCount = candidates?.assigned.length || 0;
@@ -310,7 +314,7 @@ export const CandidateMatches = memo(function CandidateMatches({
               : "text-gray-500 hover:text-gray-700"
           )}
         >
-          Zugewiesen ({assignedCount})
+          {t("assigned")} ({assignedCount})
         </button>
         <button
           onClick={() => setActiveTab("suggested")}
@@ -321,7 +325,7 @@ export const CandidateMatches = memo(function CandidateMatches({
               : "text-gray-500 hover:text-gray-700"
           )}
         >
-          Vorschläge ({suggestedCount})
+          {t("suggestions")} ({suggestedCount})
         </button>
       </div>
 
@@ -343,12 +347,12 @@ export const CandidateMatches = memo(function CandidateMatches({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                 </svg>
               </div>
-              <p className="mt-3 text-sm text-gray-500">Keine Kandidaten zugewiesen</p>
+              <p className="mt-3 text-sm text-gray-500">{tCommon("noResults")}</p>
               <button
                 onClick={() => setActiveTab("suggested")}
                 className="mt-3 text-sm font-medium text-blue-600 hover:text-blue-700"
               >
-                Vorschläge anzeigen
+                {t("suggestions")}
               </button>
             </div>
           ) : (
