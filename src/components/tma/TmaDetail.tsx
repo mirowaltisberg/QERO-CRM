@@ -543,8 +543,8 @@ export function TmaDetail({
 
           <Panel title={tDrivingLicense("label")} description={tDrivingLicense("candidateHas")}>
             <DrivingLicenseSelector 
-              value={candidate.driving_license || ""} 
-              onChange={(val) => onUpdateDrivingLicense(val || null)} 
+              value={candidate.driving_license} 
+              onChange={onUpdateDrivingLicense} 
             />
           </Panel>
 

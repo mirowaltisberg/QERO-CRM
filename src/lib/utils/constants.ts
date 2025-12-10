@@ -270,17 +270,17 @@ export const DRIVING_LICENSE_LIST = [
 
 export const DRIVING_LICENSE_LABELS: Record<DrivingLicense, string> = {
   none: "Keine Autoprüfung",
-  B: "Kat. B",
-  BE: "Kat. BE",
-  B_car: "Kat. B + Auto",
-  BE_car: "Kat. BE + Auto",
+  B: "Autoprüfung",
+  BE: "Autoprüfung (BE)",
+  B_car: "Autoprüfung + Auto",
+  BE_car: "Autoprüfung (BE) + Auto",
 };
 
 export const DRIVING_LICENSE_SHORT: Record<DrivingLicense, string> = {
-  none: "Keine",
-  B: "B",
+  none: "Nein",
+  B: "Ja",
   BE: "BE",
-  B_car: "B+🚗",
-  BE_car: "BE+🚗",
+  B_car: "Ja + Auto",
+  BE_car: "BE + Auto",
 };
 

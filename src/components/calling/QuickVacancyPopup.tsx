@@ -34,7 +34,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
   const [minQuality, setMinQuality] = useState<"A" | "B" | "C" | "">("");
   const [urgency, setUrgency] = useState<VacancyUrgency>(2);
   const [radiusKm, setRadiusKm] = useState(25);
-  const [drivingLicense, setDrivingLicense] = useState<DrivingLicense | "">("");
+  const [drivingLicense, setDrivingLicense] = useState<DrivingLicense | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [roles, setRoles] = useState<TmaRole[]>([]);
@@ -65,7 +65,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
       setMinQuality("");
       setUrgency(2);
       setRadiusKm(25);
-      setDrivingLicense("");
+      setDrivingLicense(null);
       setSuccess(false);
       // Focus title input after animation
       setTimeout(() => titleInputRef.current?.focus(), 100);

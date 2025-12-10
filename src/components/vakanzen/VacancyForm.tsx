@@ -57,7 +57,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
   const [radiusKm, setRadiusKm] = useState(25);
   const [minQuality, setMinQuality] = useState<"A" | "B" | "C" | "">("");
   const [urgency, setUrgency] = useState<VacancyUrgency>(1);
-  const [drivingLicense, setDrivingLicense] = useState<DrivingLicense | "">("");
+  const [drivingLicense, setDrivingLicense] = useState<DrivingLicense | null>(null);
   const [contactSearch, setContactSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -73,7 +73,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
       setRadiusKm(vacancy.radius_km || 25);
       setMinQuality(vacancy.min_quality || "");
       setUrgency(vacancy.urgency || 1);
-      setDrivingLicense(vacancy.driving_license || "");
+      setDrivingLicense(vacancy.driving_license || null);
     } else {
       setContactId("");
       setTitle("");
@@ -84,7 +84,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
       setRadiusKm(25);
       setMinQuality("");
       setUrgency(1);
-      setDrivingLicense("");
+      setDrivingLicense(null);
     }
     setContactSearch("");
   }, [vacancy, isOpen]);

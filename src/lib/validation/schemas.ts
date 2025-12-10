@@ -88,6 +88,8 @@ export const CallLogQuerySchema = z.object({
   contact_id: z.string().trim().min(1, 'contact_id is required'),
 });
 
+const DRIVING_LICENSE_VALUES = ["none", "B", "BE", "B_car", "BE_car"] as const;
+
 const tmaBaseSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required"),
   last_name: z.string().trim().min(1, "Last name is required"),
@@ -105,6 +107,7 @@ const tmaBaseSchema = z.object({
   references_url: z.string().url().optional().nullable(),
   short_profile_url: z.string().url().optional().nullable(),
   team_id: z.string().uuid().optional().nullable(),
+  driving_license: z.enum(DRIVING_LICENSE_VALUES).optional().nullable(),
   status_tags: z
     .array(z.enum(TMA_STATUS_LIST))
     .optional()

@@ -10,68 +10,44 @@ interface DrivingLicenseBadgeProps {
   showLabel?: boolean;
 }
 
-// Icons for each license type
+// Simple icons for license types
 function LicenseIcon({ license, className }: { license: DrivingLicense; className?: string }) {
-  switch (license) {
-    case "none":
-      // Crossed out steering wheel
-      return (
-        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <circle cx="12" cy="12" r="8" />
-          <path d="M12 4v4M12 16v4M4 12h4M16 12h4" />
-          <path d="M4 4l16 16" strokeWidth={2.5} />
-        </svg>
-      );
-    case "B":
-      // License/card icon
-      return (
-        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <rect x="2" y="5" width="20" height="14" rx="2" />
-          <path d="M6 9h4M6 13h8" />
-          <circle cx="17" cy="11" r="2" />
-        </svg>
-      );
-    case "BE":
-      // License with trailer indicator
-      return (
-        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <rect x="1" y="5" width="15" height="12" rx="2" />
-          <path d="M4 9h3M4 12h6" />
-          <rect x="17" y="8" width="6" height="6" rx="1" />
-          <path d="M16 11h1" />
-        </svg>
-      );
-    case "B_car":
-      // Car icon
-      return (
-        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <path d="M5 17h14v-4l-2-4H7l-2 4v4z" />
-          <path d="M5 13h14" />
-          <circle cx="7.5" cy="17" r="1.5" />
-          <circle cx="16.5" cy="17" r="1.5" />
-        </svg>
-      );
-    case "BE_car":
-      // Car with trailer
-      return (
-        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <path d="M2 15h9v-3l-1.5-3h-6L2 12v3z" />
-          <circle cx="4" cy="15" r="1.5" />
-          <circle cx="9" cy="15" r="1.5" />
-          <path d="M11 13h2" />
-          <rect x="13" y="11" width="9" height="4" rx="1" />
-          <circle cx="17" cy="15" r="1.5" />
-        </svg>
-      );
+  // Show X for no license, checkmark for license, car for license+car
+  if (license === "none") {
+    // X icon
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    );
   }
+  
+  if (license === "B_car" || license === "BE_car") {
+    // Car icon
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+        <path d="M5 17h14v-4l-2-4H7l-2 4v4z" />
+        <path d="M5 13h14" />
+        <circle cx="7.5" cy="17" r="1.5" />
+        <circle cx="16.5" cy="17" r="1.5" />
+      </svg>
+    );
+  }
+  
+  // Checkmark for license without car
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+      <path d="M5 13l4 4L19 7" />
+    </svg>
+  );
 }
 
 const COLORS: Record<DrivingLicense, { bg: string; text: string; border: string }> = {
   none: { bg: "bg-gray-100", text: "text-gray-500", border: "border-gray-200" },
-  B: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-200" },
-  BE: { bg: "bg-indigo-50", text: "text-indigo-600", border: "border-indigo-200" },
-  B_car: { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-200" },
-  BE_car: { bg: "bg-purple-50", text: "text-purple-600", border: "border-purple-200" },
+  B: { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-200" },
+  BE: { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-200" },
+  B_car: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-200" },
+  BE_car: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-200" },
 };
 
 const SIZES = {
@@ -111,10 +87,61 @@ export const DrivingLicenseBadge = memo(function DrivingLicenseBadge({
   );
 });
 
-// Selector component for forms
+// Simple Yes/No button component
+interface YesNoButtonProps {
+  label: string;
+  value: boolean | null;
+  onChange: (value: boolean) => void;
+  size?: "sm" | "md";
+}
+
+function YesNoButton({ label, value, onChange, size = "md" }: YesNoButtonProps) {
+  const isSmall = size === "sm";
+  
+  return (
+    <div className="flex items-center gap-2">
+      <span className={cn(
+        "font-medium text-gray-700",
+        isSmall ? "text-xs" : "text-sm"
+      )}>
+        {label}
+      </span>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={() => onChange(true)}
+          className={cn(
+            "rounded-lg border font-medium transition-all",
+            isSmall ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm",
+            value === true
+              ? "bg-emerald-500 text-white border-emerald-500"
+              : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+          )}
+        >
+          Ja
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(false)}
+          className={cn(
+            "rounded-lg border font-medium transition-all",
+            isSmall ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm",
+            value === false
+              ? "bg-gray-500 text-white border-gray-500"
+              : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+          )}
+        >
+          Nein
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Simple driving license selector with two-step approach
 interface DrivingLicenseSelectorProps {
-  value: DrivingLicense | "";
-  onChange: (value: DrivingLicense | "") => void;
+  value: DrivingLicense | "" | null;
+  onChange: (value: DrivingLicense | null) => void;
   size?: "sm" | "md";
 }
 
@@ -123,42 +150,46 @@ export const DrivingLicenseSelector = memo(function DrivingLicenseSelector({
   onChange,
   size = "md",
 }: DrivingLicenseSelectorProps) {
-  const licenses: (DrivingLicense | "")[] = ["", "none", "B", "BE", "B_car", "BE_car"];
+  // Derive boolean states from the value
+  // null or "" = not set, "none" = no license, "B" = license no car, "B_car" = license + car
+  const hasLicense = value === "B" || value === "BE" || value === "B_car" || value === "BE_car";
+  const hasCar = value === "B_car" || value === "BE_car";
+  const hasNoLicense = value === "none";
   
-  const isSmall = size === "sm";
+  const handleLicenseChange = (hasIt: boolean) => {
+    if (hasIt) {
+      // Default to license without car
+      onChange("B");
+    } else {
+      onChange("none");
+    }
+  };
+  
+  const handleCarChange = (hasIt: boolean) => {
+    if (hasIt) {
+      onChange("B_car");
+    } else {
+      onChange("B");
+    }
+  };
   
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {licenses.map((license) => {
-        const isSelected = value === license;
-        const colors = license ? COLORS[license] : null;
-        
-        return (
-          <button
-            key={license || "any"}
-            type="button"
-            onClick={() => onChange(license)}
-            className={cn(
-              "inline-flex items-center rounded-lg border transition-all font-medium",
-              isSmall ? "px-2 py-1.5 text-xs gap-1" : "px-3 py-2 text-sm gap-1.5",
-              isSelected
-                ? license
-                  ? `${colors?.bg} ${colors?.text} ${colors?.border} ring-2 ring-offset-1 ring-current/30`
-                  : "bg-gray-900 text-white border-gray-900"
-                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-            )}
-          >
-            {license ? (
-              <>
-                <LicenseIcon license={license} className={isSmall ? "h-3.5 w-3.5" : "h-4 w-4"} />
-                <span>{isSmall ? DRIVING_LICENSE_SHORT[license] : DRIVING_LICENSE_LABELS[license]}</span>
-              </>
-            ) : (
-              <span>Egal</span>
-            )}
-          </button>
-        );
-      })}
+    <div className="flex flex-col gap-3">
+      <YesNoButton
+        label="Autoprüfung?"
+        value={hasLicense ? true : hasNoLicense ? false : null}
+        onChange={handleLicenseChange}
+        size={size}
+      />
+      
+      {hasLicense && (
+        <YesNoButton
+          label="Privatauto?"
+          value={hasCar}
+          onChange={handleCarChange}
+          size={size}
+        />
+      )}
     </div>
   );
 });
