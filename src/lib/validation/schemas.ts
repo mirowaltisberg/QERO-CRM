@@ -120,6 +120,7 @@ const tmaBaseSchema = z.object({
       const order = ["A", "B", "C"] as const;
       return deduped.sort((a, b) => order.indexOf(a as (typeof order)[number]) - order.indexOf(b as (typeof order)[number]));
     }),
+  quality_note: z.string().trim().max(500, "Quality note is too long").optional().nullable(),
 });
 
 export const TmaCreateSchema = tmaBaseSchema.extend({

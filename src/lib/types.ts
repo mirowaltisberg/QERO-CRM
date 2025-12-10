@@ -86,6 +86,7 @@ export interface TmaCandidate {
   canton: string | null;
   status: TmaStatus | null; // Quality: A (Top), B (Ok), C (Flop)
   status_tags: TmaStatus[]; // Multi-select A/B/C
+  quality_note: string | null; // Note explaining the quality rating
   activity: TmaActivity | null; // Activity: active, inactive
   city: string | null;
   street: string | null;

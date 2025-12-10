@@ -35,6 +35,7 @@ export function TmaView({ initialCandidates }: Props) {
     updateActivity,
     scheduleFollowUp,
     updateNotes,
+    updateQualityNote,
     updateDocuments,
     updatePosition,
     updateAddress,
@@ -318,6 +319,7 @@ export function TmaView({ initialCandidates }: Props) {
                 onRefreshRoles={refreshRolePresets}
                 onToggleStatusTag={toggleStatusTag}
                 onClearStatusTags={clearStatusTags}
+                onUpdateQualityNote={updateQualityNote}
                 onUpdateActivity={updateActivity}
                 onClearActivity={clearActivity}
                 onScheduleFollowUp={scheduleFollowUp}
@@ -580,6 +582,7 @@ export function TmaView({ initialCandidates }: Props) {
             onRefreshRoles={refreshRolePresets}
             onToggleStatusTag={toggleStatusTag}
             onClearStatusTags={clearStatusTags}
+            onUpdateQualityNote={updateQualityNote}
             onUpdateActivity={updateActivity}
             onClearActivity={clearActivity}
             onScheduleFollowUp={scheduleFollowUp}

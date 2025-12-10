@@ -460,6 +460,25 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     [activeCandidate, updateCandidateLocally]
   );
 
+  const updateQualityNote = useCallback(
+    async (quality_note: string | null) => {
+      if (!activeCandidate) return;
+      try {
+        const response = await fetch(`/api/tma/${activeCandidate.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quality_note }),
+        });
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || "Failed to save quality note");
+        updateCandidateLocally(json.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to save quality note");
+      }
+    },
+    [activeCandidate, updateCandidateLocally]
+  );
+
   const updateDocuments = useCallback(
     async (
       payload: Partial<Pick<TmaCandidate, "cv_url" | "references_url" | "short_profile_url" | "ahv_url" | "id_url" | "bank_url">>
@@ -739,6 +758,7 @@ export function useTmaCandidates({ initialCandidates = [] }: UseTmaCandidatesOpt
     updateActivity,
     scheduleFollowUp,
     updateNotes,
+    updateQualityNote,
     updateDocuments,
     updatePosition,
     updateAddress,

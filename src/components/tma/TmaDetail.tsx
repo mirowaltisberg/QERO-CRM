@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ interface Props {
   onRefreshRoles: () => Promise<void>;
   onToggleStatusTag: (status: TmaStatus) => Promise<void> | void;
   onClearStatusTags: () => Promise<void> | void;
+  onUpdateQualityNote: (value: string | null) => Promise<void> | void;
   onUpdateActivity: (activity: TmaActivity) => Promise<void> | void;
   onClearActivity: () => Promise<void> | void;
   onScheduleFollowUp: (args: { date: Date; note?: string }) => Promise<void> | void;
@@ -75,6 +76,7 @@ export function TmaDetail({
   onRefreshRoles,
   onToggleStatusTag,
   onClearStatusTags,
+  onUpdateQualityNote,
   onUpdateActivity,
   onClearActivity,
   onScheduleFollowUp,
@@ -103,7 +105,25 @@ export function TmaDetail({
     initialFollowUpDate ? initialFollowUpDate.toISOString().slice(11, 16) : "09:00"
   );
   const [followUpNote, setFollowUpNote] = useState(candidate?.follow_up_note ?? "");
+  const [qualityNote, setQualityNote] = useState(candidate?.quality_note ?? "");
+  const qualityNoteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [uploading, setUploading] = useState<"cv" | "references" | "short_profile" | "ahv" | "id" | "bank" | null>(null);
+
+  // Sync quality note when candidate changes
+  useEffect(() => {
+    setQualityNote(candidate?.quality_note ?? "");
+  }, [candidate?.id, candidate?.quality_note]);
+
+  // Debounced save for quality note
+  const handleQualityNoteChange = useCallback((value: string) => {
+    setQualityNote(value);
+    if (qualityNoteTimeoutRef.current) {
+      clearTimeout(qualityNoteTimeoutRef.current);
+    }
+    qualityNoteTimeoutRef.current = setTimeout(() => {
+      onUpdateQualityNote(value.trim() || null);
+    }, 800);
+  }, [onUpdateQualityNote]);
   const [city, setCity] = useState(() => candidate?.city ?? "");
   const [street, setStreet] = useState(() => candidate?.street ?? "");
   const [postalCode, setPostalCode] = useState(() => candidate?.postal_code ?? "");
@@ -507,6 +527,16 @@ export function TmaDetail({
                 </button>
               )}
             </div>
+            {statusTags.length > 0 && (
+              <div className="mt-3">
+                <Input
+                  value={qualityNote}
+                  onChange={(e) => handleQualityNoteChange(e.target.value)}
+                  placeholder="Warum diese Bewertung? (z.B. Gute Erfahrung, schnell verfügbar...)"
+                  className="text-sm"
+                />
+              </div>
+            )}
           </Panel>
 
           <Panel title={tActivity("label")} description={t("activityDescription")}>
