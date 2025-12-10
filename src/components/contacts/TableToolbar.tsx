@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,8 @@ export function TableToolbar({
   onToggleGroupByCanton,
   availableCantons = [],
 }: TableToolbarProps) {
+  const t = useTranslations("contact");
+  const tCommon = useTranslations("common");
   const [searchValue, setSearchValue] = useState(filters.search ?? "");
   const [cantonPickerOpen, setCantonPickerOpen] = useState(false);
 
@@ -44,7 +47,7 @@ export function TableToolbar({
     <section className="card-surface mb-4 flex flex-wrap items-center justify-between gap-3 border border-gray-100 px-6 py-4">
       <div className="flex flex-wrap items-center gap-3">
         <Input
-          placeholder="Search company, contact, email…"
+          placeholder={t("search")}
           value={searchValue}
           onChange={(event) => {
             setSearchValue(event.target.value);
