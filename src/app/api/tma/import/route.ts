@@ -144,39 +144,78 @@ export async function POST(request: NextRequest) {
         // Only update fields that are currently empty in the existing record
         const existingRecord = existingRows![0];
         const updatePayload = buildUpdatePayload(candidateWithCoords, existingRecord);
+        
+        // Extract notes - we'll add them to tma_notes table even for updates
+        const csvNotes = candidate.notes;
 
-        if (Object.keys(updatePayload).length === 0) {
+        if (Object.keys(updatePayload).length === 0 && !csvNotes?.trim()) {
           console.log(`[TMA Import] Row ${i} skipped - no new fields to update`);
           success += 1;
           continue;
         }
 
-        const { error: updateError } = await writer
-          .from("tma_candidates")
-          .update(updatePayload)
-          .eq("id", existingCandidateId);
+        if (Object.keys(updatePayload).length > 0) {
+          const { error: updateError } = await writer
+            .from("tma_candidates")
+            .update(updatePayload)
+            .eq("id", existingCandidateId);
 
-        if (updateError) {
-          console.log(`[TMA Import] Row ${i} update failed:`, updateError.message, updateError.code);
-          errors.push({ index: i, message: updateError.message });
-        } else {
-          success += 1;
+          if (updateError) {
+            console.log(`[TMA Import] Row ${i} update failed:`, updateError.message, updateError.code);
+            errors.push({ index: i, message: updateError.message });
+            continue;
+          }
         }
+        
+        // If there were notes in the CSV, create them as proper tma_notes
+        if (csvNotes && csvNotes.trim()) {
+          const { error: noteError } = await writer.from("tma_notes").insert({
+            tma_id: existingCandidateId,
+            content: csvNotes.trim(),
+            author_id: user.id,
+          });
+          if (noteError) {
+            console.log(`[TMA Import] Row ${i} note insert failed:`, noteError.message);
+          }
+        }
+        
+        success += 1;
         continue;
       }
 
+      // Extract notes before insert - we'll add them to tma_notes table
+      const legacyNotes = candidateWithCoords.notes;
+      const { notes: _notes, ...candidateWithoutNotes } = candidateWithCoords;
+      
       const dataToInsert = {
-        ...candidateWithCoords,
+        ...candidateWithoutNotes,
         team_id: activeTeamId,
         is_new: true, // Mark new imports as "NEW" by default
       };
       
-      const { error: insertError } = await writer.from("tma_candidates").insert(dataToInsert);
+      const { data: insertedCandidate, error: insertError } = await writer
+        .from("tma_candidates")
+        .insert(dataToInsert)
+        .select("id")
+        .single();
+        
       if (insertError) {
         console.log(`[TMA Import] Row ${i} insert failed:`, insertError.message, insertError.code);
         errors.push({ index: i, message: insertError.message });
       } else {
         success += 1;
+        
+        // If there were notes in the CSV, create them as proper tma_notes
+        if (legacyNotes && legacyNotes.trim() && insertedCandidate?.id) {
+          const { error: noteError } = await writer.from("tma_notes").insert({
+            tma_id: insertedCandidate.id,
+            content: legacyNotes.trim(),
+            author_id: user.id,
+          });
+          if (noteError) {
+            console.log(`[TMA Import] Row ${i} note insert failed:`, noteError.message);
+          }
+        }
       }
     }
 
