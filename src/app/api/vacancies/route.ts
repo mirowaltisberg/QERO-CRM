@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
       min_quality,
       urgency,
       driving_license,
+      min_experience,
       status,
     } = body;
 
@@ -138,6 +139,7 @@ export async function POST(request: NextRequest) {
         min_quality: min_quality || null,
         urgency: urgency || 1,
         driving_license: driving_license || null,
+        min_experience: min_experience || null,
         status: status || "open",
         created_by: user.id,
       })
