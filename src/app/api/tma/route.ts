@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     
     return respondSuccess(allCandidates, {
       status: 200,
-      meta: { count: candidatesWithNotes.length },
+      meta: { count: allCandidates.length },
     });
   } catch (error) {
     console.error("GET /api/tma error", error);
