@@ -120,12 +120,12 @@ export const TmaList = memo(function TmaList({
                         {tag}
                       </span>
                     ))
-                  ) : (candidate.notes_count ?? 0) > 0 ? (
-                    <span className="text-[10px] text-gray-400">Set status</span>
-                  ) : (
+                  ) : candidate.is_new ? (
                     <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-blue-100 text-blue-600 animate-shine">
                       NEW
                     </span>
+                  ) : (
+                    <span className="text-[10px] text-gray-400">Set status</span>
                   )}
                 </div>
               </div>

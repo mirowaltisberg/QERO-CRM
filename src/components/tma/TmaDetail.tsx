@@ -22,8 +22,10 @@ import {
   type TmaStatus,
   type TmaActivity,
   type DrivingLicense,
+  type ExperienceLevel,
 } from "@/lib/utils/constants";
 import { DrivingLicenseSelector, DrivingLicenseBadge } from "@/components/ui/DrivingLicenseBadge";
+import { ExperienceLevelSelector } from "@/components/ui/ExperienceLevelSelector";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils/cn";
 
@@ -50,6 +52,7 @@ interface Props {
   onUpdateAddress: (payload: { city: string | null; street: string | null; postal_code: string | null }) => Promise<void> | void;
   onUpdatePhone: (value: string | null) => Promise<void> | void;
   onUpdateDrivingLicense: (value: DrivingLicense | null) => Promise<void> | void;
+  onUpdateExperienceLevel: (value: ExperienceLevel | null) => Promise<void> | void;
   onClaim: () => Promise<void> | void;
   onUnclaim: () => Promise<void> | void;
   isMobile?: boolean;
@@ -88,6 +91,7 @@ export function TmaDetail({
   onUpdateAddress,
   onUpdatePhone,
   onUpdateDrivingLicense,
+  onUpdateExperienceLevel,
   onClaim,
   onUnclaim,
   isMobile = false,
@@ -581,6 +585,13 @@ export function TmaDetail({
             <DrivingLicenseSelector 
               value={candidate.driving_license} 
               onChange={onUpdateDrivingLicense} 
+            />
+          </Panel>
+
+          <Panel title="Berufserfahrung" description="Wie viele Jahre Erfahrung hat der Kandidat?">
+            <ExperienceLevelSelector 
+              value={candidate.experience_level} 
+              onChange={onUpdateExperienceLevel} 
             />
           </Panel>
 

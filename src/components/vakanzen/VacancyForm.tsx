@@ -5,11 +5,12 @@ import { useTranslations } from "next-intl";
 import type { Vacancy, VacancyUrgency, TmaRole, Team } from "@/lib/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { TMA_STATUS_LIST, type DrivingLicense } from "@/lib/utils/constants";
+import { TMA_STATUS_LIST, type DrivingLicense, type ExperienceLevel } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
 import { UrgencySelector } from "./UrgencyBadge";
 import { VacancyRoleDropdown } from "./VacancyRoleDropdown";
 import { DrivingLicenseSelector } from "@/components/ui/DrivingLicenseBadge";
+import { ExperienceLevelSelector } from "@/components/ui/ExperienceLevelSelector";
 
 // Simplified contact type for vacancy form
 interface ContactForVacancy {
@@ -58,6 +59,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
   const [minQuality, setMinQuality] = useState<"A" | "B" | "C" | "">("");
   const [urgency, setUrgency] = useState<VacancyUrgency>(1);
   const [drivingLicense, setDrivingLicense] = useState<DrivingLicense | null>(null);
+  const [minExperience, setMinExperience] = useState<ExperienceLevel | null>(null);
   const [contactSearch, setContactSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -74,6 +76,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
       setMinQuality(vacancy.min_quality || "");
       setUrgency(vacancy.urgency || 1);
       setDrivingLicense(vacancy.driving_license || null);
+      setMinExperience(vacancy.min_experience || null);
     } else {
       setContactId("");
       setTitle("");
@@ -85,6 +88,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
       setMinQuality("");
       setUrgency(1);
       setDrivingLicense(null);
+      setMinExperience(null);
     }
     setContactSearch("");
   }, [vacancy, isOpen]);
@@ -130,6 +134,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
         min_quality: minQuality || null,
         urgency,
         driving_license: drivingLicense || null,
+        min_experience: minExperience || null,
       });
     } finally {
       setSubmitting(false);
@@ -339,6 +344,17 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
             {tDrivingLicense("required")}
           </label>
           <DrivingLicenseSelector value={drivingLicense} onChange={setDrivingLicense} />
+        </div>
+
+        {/* Min Experience */}
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">
+            Mindest-Berufserfahrung
+          </label>
+          <ExperienceLevelSelector value={minExperience} onChange={setMinExperience} />
+          <p className="mt-1 text-xs text-gray-400">
+            Nur Kandidaten mit dieser Erfahrung oder mehr werden vorgeschlagen
+          </p>
         </div>
 
         {/* Urgency */}

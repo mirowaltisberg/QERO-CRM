@@ -6,6 +6,7 @@ import type { Vacancy, VacancyCandidate, TmaCandidate } from "@/lib/types";
 import { VACANCY_CANDIDATE_STATUS_LIST, VACANCY_CANDIDATE_STATUS_LABELS, VACANCY_CANDIDATE_STATUS_COLORS } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
 import { DrivingLicenseBadge } from "@/components/ui/DrivingLicenseBadge";
+import { ExperienceLevelBadge } from "@/components/ui/ExperienceLevelSelector";
 
 interface ScoreBreakdown {
   base: number;
@@ -121,6 +122,9 @@ const CandidateCard = memo(function CandidateCard({
             <QualityBadge tags={tma.status_tags} status={tma.status} />
             {tma.driving_license && (
               <DrivingLicenseBadge license={tma.driving_license} size="sm" showLabel={false} />
+            )}
+            {tma.experience_level && (
+              <ExperienceLevelBadge level={tma.experience_level} size="sm" />
             )}
           </div>
           {tma.position_title && (

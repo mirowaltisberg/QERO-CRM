@@ -168,6 +168,7 @@ export async function POST(request: NextRequest) {
       const dataToInsert = {
         ...candidateWithCoords,
         team_id: activeTeamId,
+        is_new: true, // Mark new imports as "NEW" by default
       };
       
       const { error: insertError } = await writer.from("tma_candidates").insert(dataToInsert);

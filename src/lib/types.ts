@@ -3,7 +3,7 @@
  * Matches the Supabase schema for future integration
  */
 
-import type { ContactStatus, CallOutcome, TmaStatus, TmaActivity, DrivingLicense } from "./utils/constants";
+import type { ContactStatus, CallOutcome, TmaStatus, TmaActivity, DrivingLicense, ExperienceLevel } from "./utils/constants";
 
 /**
  * Organization - Top-level entity
@@ -110,10 +110,12 @@ export interface TmaCandidate {
   longitude: number | null;
   // Driving license
   driving_license: DrivingLicense | null;
+  // Experience level
+  experience_level: ExperienceLevel | null;
+  // NEW flag - shows "NEW" badge until someone adds a note
+  is_new: boolean;
   // Computed distance (only present in radius search results)
   distance_km?: number;
-  // Computed notes count (for NEW badge display)
-  notes_count?: number;
   // Joined from profiles when fetched
   claimer?: {
     id: string;
@@ -468,6 +470,7 @@ export interface Vacancy {
   min_quality: "A" | "B" | "C" | null;
   urgency: VacancyUrgency; // 1 = Kann warten, 2 = Bald, 3 = Sofort
   driving_license: DrivingLicense | null; // Required driving license
+  min_experience: ExperienceLevel | null; // Minimum experience required
   status: VacancyStatus;
   created_by: string;
   creator?: {

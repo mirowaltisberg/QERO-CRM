@@ -101,18 +101,30 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: error.message, details: error }, { status: 500 });
   }
 
-  // Auto-claim if this is a meaningful note and candidate is unclaimed
+  // When a note is added, set is_new = false (removes "NEW" badge)
+  // Also auto-claim if this is a meaningful note and candidate is unclaimed
   if (isMeaningfulNote(parsed.data.content)) {
     const { data: candidate } = await supabase
       .from("tma_candidates")
-      .select("claimed_by")
+      .select("claimed_by, is_new")
       .eq("id", tma_id)
       .single();
 
+    const updates: { claimed_by?: string; is_new?: boolean } = {};
+    
     if (candidate && !candidate.claimed_by) {
+      updates.claimed_by = user.id;
+    }
+    
+    // Always remove "NEW" status when a meaningful note is added
+    if (candidate?.is_new) {
+      updates.is_new = false;
+    }
+    
+    if (Object.keys(updates).length > 0) {
       await supabase
         .from("tma_candidates")
-        .update({ claimed_by: user.id })
+        .update(updates)
         .eq("id", tma_id);
     }
   }

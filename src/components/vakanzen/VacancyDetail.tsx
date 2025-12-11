@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils/cn";
 import { HoldToConfirmButton } from "@/components/ui/HoldToConfirmButton";
 import { UrgencyBadge } from "./UrgencyBadge";
 import { DrivingLicenseBadge } from "@/components/ui/DrivingLicenseBadge";
+import { ExperienceLevelBadge } from "@/components/ui/ExperienceLevelSelector";
 
 interface Props {
   vacancy: Vacancy;
@@ -219,6 +220,14 @@ export const VacancyDetail = memo(function VacancyDetail({
                 <p className="text-xs text-gray-400">{tDrivingLicense("label")}</p>
                 <div className="mt-1">
                   <DrivingLicenseBadge license={vacancy.driving_license} size="md" />
+                </div>
+              </div>
+            )}
+            {vacancy.min_experience && (
+              <div>
+                <p className="text-xs text-gray-400">Berufserfahrung</p>
+                <div className="mt-1">
+                  <ExperienceLevelBadge level={vacancy.min_experience} size="md" showFullLabel />
                 </div>
               </div>
             )}

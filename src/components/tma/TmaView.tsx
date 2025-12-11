@@ -39,13 +39,14 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
     updateNotes,
     updateQualityNote,
     updateDocuments,
-    incrementNotesCount,
+    markAsNotNew,
     teamFilter,
     setTeamFilter,
     updatePosition,
     updateAddress,
     updatePhone,
     updateDrivingLicense,
+    updateExperienceLevel,
     clearStatusTags,
     clearActivity,
     setStatusFilter,
@@ -342,12 +343,13 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
                 onClearActivity={clearActivity}
                 onScheduleFollowUp={scheduleFollowUp}
                 onUpdateNotes={updateNotes}
-                onNoteAdded={incrementNotesCount}
+                onNoteAdded={markAsNotNew}
                 onUpdateDocuments={updateDocuments}
                 onUpdatePosition={updatePosition}
                 onUpdateAddress={updateAddress}
                 onUpdatePhone={updatePhone}
                 onUpdateDrivingLicense={updateDrivingLicense}
+                onUpdateExperienceLevel={updateExperienceLevel}
                 onClaim={claimCandidate}
                 onUnclaim={unclaimCandidate}
                 isMobile={true}
@@ -625,12 +627,13 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
             onClearActivity={clearActivity}
             onScheduleFollowUp={scheduleFollowUp}
             onUpdateNotes={updateNotes}
-            onNoteAdded={incrementNotesCount}
+            onNoteAdded={markAsNotNew}
             onUpdateDocuments={updateDocuments}
             onUpdatePosition={updatePosition}
             onUpdateAddress={updateAddress}
             onUpdatePhone={updatePhone}
             onUpdateDrivingLicense={updateDrivingLicense}
+            onUpdateExperienceLevel={updateExperienceLevel}
             onClaim={claimCandidate}
             onUnclaim={unclaimCandidate}
           />

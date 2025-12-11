@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TmaCandidate, TmaRole } from "@/lib/types";
-import type { TmaStatus, TmaActivity, DrivingLicense } from "@/lib/utils/constants";
+import type { TmaStatus, TmaActivity, DrivingLicense, ExperienceLevel } from "@/lib/utils/constants";
 import { createClient } from "@/lib/supabase/client";
 import { useTmaCacheOptional } from "@/lib/cache/TmaCacheContext";
 
@@ -250,10 +250,11 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
         });
         break;
       default:
-        // Sort with NEW candidates first (no notes, no status), then by date
+        // Sort with NEW candidates first, then by date
         copy.sort((a, b) => {
-          const aIsNew = (a.notes_count ?? 0) === 0 && (!a.status_tags || a.status_tags.length === 0);
-          const bIsNew = (b.notes_count ?? 0) === 0 && (!b.status_tags || b.status_tags.length === 0);
+          // NEW candidates (is_new = true AND no status) go first
+          const aIsNew = a.is_new && (!a.status_tags || a.status_tags.length === 0);
+          const bIsNew = b.is_new && (!b.status_tags || b.status_tags.length === 0);
           if (aIsNew && !bIsNew) return -1;
           if (!aIsNew && bIsNew) return 1;
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -596,6 +597,28 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
     [activeCandidate, updateCandidateLocally]
   );
 
+  const updateExperienceLevel = useCallback(
+    async (experienceLevel: ExperienceLevel | null) => {
+      if (!activeCandidate) return;
+      setActionState({ type: "saving", message: "Updating experience level..." });
+      try {
+        const response = await fetch(`/api/tma/${activeCandidate.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ experience_level: experienceLevel }),
+        });
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || "Failed to update experience level");
+        updateCandidateLocally(json.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update experience level");
+      } finally {
+        setActionState({ type: null });
+      }
+    },
+    [activeCandidate, updateCandidateLocally]
+  );
+
   const updateActivity = useCallback(
     async (activity: TmaActivity) => {
       if (!activeCandidate || activeCandidate.activity === activity) return;
@@ -749,12 +772,12 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
     }
   }, [activeCandidate, updateCandidateLocally]);
 
-  // Increment notes_count for the active candidate (called when a note is added)
-  const incrementNotesCount = useCallback(() => {
-    if (!activeCandidate) return;
+  // Mark active candidate as no longer "NEW" (called when a note is added)
+  const markAsNotNew = useCallback(() => {
+    if (!activeCandidate || !activeCandidate.is_new) return;
     updateCandidateLocally({
       ...activeCandidate,
-      notes_count: (activeCandidate.notes_count ?? 0) + 1,
+      is_new: false,
     });
   }, [activeCandidate, updateCandidateLocally]);
 
@@ -779,11 +802,12 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
     updateNotes,
     updateQualityNote,
     updateDocuments,
-    incrementNotesCount,
+    markAsNotNew,
     updatePosition,
     updateAddress,
     updatePhone,
     updateDrivingLicense,
+    updateExperienceLevel,
     clearActivity,
     claimCandidate,
     unclaimCandidate,

@@ -284,3 +284,38 @@ export const DRIVING_LICENSE_SHORT: Record<DrivingLicense, string> = {
   BE_car: "BE + Auto",
 };
 
+/**
+ * Experience Level Options
+ */
+export const EXPERIENCE_LEVEL = {
+  LESS_THAN_1: "less_than_1",
+  MORE_THAN_1: "more_than_1",
+  MORE_THAN_3: "more_than_3",
+} as const;
+
+export type ExperienceLevel = (typeof EXPERIENCE_LEVEL)[keyof typeof EXPERIENCE_LEVEL];
+
+export const EXPERIENCE_LEVEL_LIST = [
+  EXPERIENCE_LEVEL.LESS_THAN_1,
+  EXPERIENCE_LEVEL.MORE_THAN_1,
+  EXPERIENCE_LEVEL.MORE_THAN_3,
+] as const;
+
+export const EXPERIENCE_LEVEL_LABELS: Record<ExperienceLevel, string> = {
+  less_than_1: "< 1 Jahr",
+  more_than_1: "> 1 Jahr",
+  more_than_3: "> 3 Jahre",
+};
+
+export const EXPERIENCE_LEVEL_FULL_LABELS: Record<ExperienceLevel, string> = {
+  less_than_1: "Weniger als 1 Jahr",
+  more_than_1: "Mehr als 1 Jahr",
+  more_than_3: "Mehr als 3 Jahre",
+};
+
+export const EXPERIENCE_LEVEL_COLORS: Record<ExperienceLevel, { bg: string; text: string; border: string }> = {
+  less_than_1: { bg: "bg-gray-100", text: "text-gray-600", border: "border-gray-200" },
+  more_than_1: { bg: "bg-blue-100", text: "text-blue-600", border: "border-blue-200" },
+  more_than_3: { bg: "bg-emerald-100", text: "text-emerald-600", border: "border-emerald-200" },
+};
+
