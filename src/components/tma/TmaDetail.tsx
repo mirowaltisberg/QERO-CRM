@@ -284,6 +284,7 @@ export function TmaDetail({
               <>
                 <span className="text-xs text-orange-600 font-medium">{t("unclaimed")}</span>
                 <button
+                  type="button"
                   onClick={onClaim}
                   className="rounded-full border border-blue-500 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-100 transition-colors"
                 >
@@ -513,6 +514,7 @@ export function TmaDetail({
             <div className="flex flex-wrap gap-2">
               {TMA_STATUS_LIST.map((status) => (
                 <button
+                  type="button"
                   key={status}
                   onClick={() => onToggleStatusTag(status)}
                   className={cn(
@@ -527,6 +529,7 @@ export function TmaDetail({
               ))}
               {statusTags.length > 0 && (
                 <button
+                  type="button"
                   onClick={onClearStatusTags}
                   className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600"
                 >
@@ -549,6 +552,7 @@ export function TmaDetail({
           <Panel title={tActivity("label")} description={t("activityDescription")}>
             <div className="flex flex-wrap gap-2">
               <button
+                type="button"
                 onClick={() => onUpdateActivity("active")}
                 className={cn(
                   "rounded-xl border px-4 py-2 text-sm font-medium transition",
@@ -560,6 +564,7 @@ export function TmaDetail({
                 {tActivity("active")}
               </button>
               <button
+                type="button"
                 onClick={() => onUpdateActivity("inactive")}
                 className={cn(
                   "rounded-xl border px-4 py-2 text-sm font-medium transition",
@@ -572,6 +577,7 @@ export function TmaDetail({
               </button>
               {candidate.activity && (
                 <button
+                  type="button"
                   onClick={onClearActivity}
                   className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600"
                 >

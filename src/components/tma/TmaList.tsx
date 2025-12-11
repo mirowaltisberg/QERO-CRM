@@ -72,6 +72,7 @@ export const TmaList = memo(function TmaList({
               : [];
           return (
             <button
+              type="button"
               key={candidate.id}
               onClick={() => onSelect(candidate.id)}
               className={[
