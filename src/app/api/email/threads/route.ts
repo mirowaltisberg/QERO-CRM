@@ -42,11 +42,18 @@ export async function GET(request: NextRequest) {
         *,
         messages:email_messages(
           id,
+          graph_message_id,
           sender_email,
           sender_name,
+          recipients,
+          cc,
+          bcc,
           subject,
           body_preview,
+          body_html,
+          body_text,
           is_read,
+          has_attachments,
           sent_at,
           received_at
         )
