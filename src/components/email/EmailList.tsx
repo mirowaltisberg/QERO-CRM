@@ -170,7 +170,7 @@ export const EmailList = memo(function EmailList({
                         isUnread ? "font-semibold text-gray-900" : "font-medium text-gray-700"
                       )}
                     >
-                      {getSenderDisplay(thread)}
+                      {getThreadLineLabel(thread, folder, mailbox, t)}
                     </p>
                   </div>
                   <p
@@ -219,16 +219,51 @@ export const EmailList = memo(function EmailList({
   );
 });
 
-function getSenderDisplay(thread: EmailThread): string {
-  if (!thread.participants || thread.participants.length === 0) {
-    return "Unknown";
+function getThreadLineLabel(
+  thread: EmailThread,
+  folder: EmailFolder,
+  mailbox: string,
+  t: (key: string, values?: Record<string, string | number>) => string
+): string {
+  const unknown = t("unknown");
+
+  const participants = thread.participants || [];
+  if (participants.length === 0) return unknown;
+
+  if (folder === "sent") {
+    const mailboxLower = mailbox.toLowerCase();
+    const recipient =
+      participants.find((p) => extractEmail(p).toLowerCase() !== mailboxLower) || participants[0];
+    const display = formatParticipantDisplay(recipient);
+    return `${t("to")} ${display || unknown}`;
   }
-  const sender = thread.participants[0];
-  // Extract name part if email format
-  const match = sender.match(/^(.+?)\s*<.+>$/);
-  if (match) return match[1];
-  // Just return email username
-  return sender.split("@")[0];
+
+  // Inbox/drafts/archive/trash: show sender/from (first participant is usually from)
+  const sender = participants[0];
+  return formatParticipantDisplay(sender) || unknown;
+}
+
+function extractEmail(participant: string): string {
+  const m = participant.match(/<([^>]+)>/);
+  return (m?.[1] || participant).trim();
+}
+
+function formatParticipantDisplay(participant: string): string {
+  const trimmed = participant.trim();
+  if (!trimmed) return "";
+
+  // Extract name part if "Name <email>" format
+  const match = trimmed.match(/^(.+?)\s*<([^>]+)>$/);
+  if (match) {
+    const name = match[1].trim();
+    if (name) return name;
+    const email = match[2].trim();
+    return email.split("@")[0] || email;
+  }
+
+  // Otherwise, fall back to email username or raw string
+  const email = extractEmail(trimmed);
+  return email.includes("@") ? email.split("@")[0] : email;
 }
 
 function formatDate(isoDate: string): string {

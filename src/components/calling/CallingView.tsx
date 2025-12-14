@@ -4,7 +4,10 @@ import { useMemo, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { ContactList } from "./ContactList";
 import { ContactDetail } from "./ContactDetail";
-import type { Contact, ContactCallLog, Vacancy } from "@/lib/types";
+import { CandidatePickerModal } from "./CandidatePickerModal";
+import { CandidateModeBanner } from "./CandidateModeBanner";
+import { SelectCandidateButton } from "./SelectCandidateButton";
+import type { Contact, ContactCallLog, Vacancy, TmaCandidate } from "@/lib/types";
 import { useContacts } from "@/lib/hooks/useContacts";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { KEYBOARD_SHORTCUTS } from "@/lib/utils/constants";
@@ -23,8 +26,19 @@ export function CallingView({ initialContacts }: CallingViewProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
+  // Candidate mode state
+  const [showPickerModal, setShowPickerModal] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState<TmaCandidate | null>(null);
+  const [sortedContacts, setSortedContacts] = useState<Contact[] | null>(null);
+  const [sortingLoading, setSortingLoading] = useState(false);
+  const [distanceFilter, setDistanceFilter] = useState<number | null>(null); // null = all, or 10, 25, 50 km
+  const [restoringSession, setRestoringSession] = useState(true);
+
+  // LocalStorage key for persisting candidate selection
+  const CANDIDATE_STORAGE_KEY = "qero_calling_candidate";
+
   const {
-    contacts,
+    contacts: originalContacts,
     activeContact,
     loading,
     error,
@@ -47,6 +61,19 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     setSearchQuery,
   } = useContacts({ initialContacts });
 
+  // Use sorted contacts when in candidate mode, otherwise original contacts
+  // Apply distance filter when in candidate mode
+  const contacts = useMemo(() => {
+    if (!sortedContacts) return originalContacts;
+    if (distanceFilter === null) return sortedContacts;
+    
+    return sortedContacts.filter((c) => {
+      // Keep contacts within the distance filter, or those without distance data at the end
+      if (c.distance_km === null || c.distance_km === undefined) return false;
+      return c.distance_km <= distanceFilter;
+    });
+  }, [sortedContacts, originalContacts, distanceFilter]);
+
   // Mobile detection
   useEffect(() => {
     const checkMobile = () => {
@@ -57,6 +84,93 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  // Restore candidate from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(CANDIDATE_STORAGE_KEY);
+    if (stored) {
+      try {
+        const candidate = JSON.parse(stored) as TmaCandidate;
+        // Restore the candidate and fetch sorted contacts
+        setSelectedCandidate(candidate);
+        
+        if (candidate.latitude && candidate.longitude) {
+          setSortingLoading(true);
+          fetch(`/api/contacts/sorted-by-candidate?candidateId=${candidate.id}`)
+            .then((res) => res.json())
+            .then((json) => {
+              setSortedContacts(json.data || []);
+            })
+            .catch((err) => {
+              console.error("Error restoring sorted contacts:", err);
+            })
+            .finally(() => {
+              setSortingLoading(false);
+              setRestoringSession(false);
+            });
+        } else {
+          setRestoringSession(false);
+        }
+      } catch (err) {
+        console.error("Error parsing stored candidate:", err);
+        localStorage.removeItem(CANDIDATE_STORAGE_KEY);
+        setRestoringSession(false);
+      }
+    } else {
+      setRestoringSession(false);
+    }
+  }, [CANDIDATE_STORAGE_KEY]);
+
+  // Candidate mode handlers
+  const handleOpenCandidatePicker = useCallback(() => {
+    setShowPickerModal(true);
+  }, []);
+
+  const handleCandidateSelected = useCallback(async (candidate: TmaCandidate) => {
+    setSelectedCandidate(candidate);
+    setShowPickerModal(false);
+
+    // Save to localStorage for session persistence
+    localStorage.setItem(CANDIDATE_STORAGE_KEY, JSON.stringify(candidate));
+
+    // Open short profile in new tab if available
+    if (candidate.short_profile_url) {
+      window.open(candidate.short_profile_url, "_blank");
+    }
+
+    // Check if candidate has coordinates
+    if (!candidate.latitude || !candidate.longitude) {
+      console.warn("Candidate has no location data, cannot sort contacts by distance");
+      return;
+    }
+
+    // Fetch sorted contacts
+    setSortingLoading(true);
+    try {
+      const res = await fetch(`/api/contacts/sorted-by-candidate?candidateId=${candidate.id}`);
+      if (res.ok) {
+        const json = await res.json();
+        setSortedContacts(json.data || []);
+      } else {
+        console.error("Failed to fetch sorted contacts");
+      }
+    } catch (err) {
+      console.error("Error fetching sorted contacts:", err);
+    } finally {
+      setSortingLoading(false);
+    }
+  }, [CANDIDATE_STORAGE_KEY]);
+
+  const handleChangeCandidate = useCallback(() => {
+    setShowPickerModal(true);
+  }, []);
+
+  const handleExitCandidateMode = useCallback(() => {
+    setSelectedCandidate(null);
+    setSortedContacts(null);
+    setDistanceFilter(null);
+    localStorage.removeItem(CANDIDATE_STORAGE_KEY);
+  }, [CANDIDATE_STORAGE_KEY]);
 
   // Reset to list view if active contact is cleared on mobile
   useEffect(() => {
@@ -233,6 +347,9 @@ export function CallingView({ initialContacts }: CallingViewProps) {
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          for_candidate_id: selectedCandidate?.id ?? null,
+        }),
         credentials: "include",
         cache: "no-store",
       });
@@ -249,7 +366,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     } catch (err) {
       console.error("Error logging call:", err);
     }
-  }, []);
+  }, [selectedCandidate?.id]);
 
   const actionMessage = useMemo(() => {
     if (actionState.type && actionState.message) {
@@ -354,17 +471,38 @@ export function CallingView({ initialContacts }: CallingViewProps) {
   if (isMobile) {
     return (
       <div className="relative h-full overflow-hidden bg-gray-50">
+        {/* Candidate Picker Modal */}
+        <CandidatePickerModal
+          open={showPickerModal}
+          onClose={() => setShowPickerModal(false)}
+          onSelect={handleCandidateSelected}
+        />
+
         {/* Contact List */}
         <div
           className={`absolute inset-0 bg-gray-50 transition-transform duration-300 ease-out ${
             mobileView === "detail" ? "-translate-x-full" : "translate-x-0"
           }`}
         >
+          {/* Candidate Mode Banner or Select Button */}
+          {selectedCandidate ? (
+            <CandidateModeBanner
+              candidate={selectedCandidate}
+              onChangeCandidate={handleChangeCandidate}
+              onExitMode={handleExitCandidateMode}
+              distanceFilter={distanceFilter}
+              onDistanceFilterChange={setDistanceFilter}
+              filteredCount={contacts.length}
+              totalCount={sortedContacts?.length ?? 0}
+            />
+          ) : (
+            <SelectCandidateButton onClick={handleOpenCandidatePicker} />
+          )}
           <ContactList
             contacts={contacts}
             activeContactId={activeContact?.id ?? null}
             onSelect={handleMobileSelectContact}
-            loading={loading}
+            loading={loading || sortingLoading}
             onRefresh={refreshContacts}
             onFilterByCanton={setCantonFilter}
             onClearCantonFilter={clearCantonFilter}
@@ -436,6 +574,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
               onNoteAdded={handleNoteAdded}
               vacancies={activeContact ? contactVacancies[activeContact.id] : undefined}
               isMobile={true}
+              selectedCandidate={selectedCandidate}
             />
           </div>
         </div>
@@ -445,36 +584,62 @@ export function CallingView({ initialContacts }: CallingViewProps) {
 
   // ==================== DESKTOP ====================
   return (
-    <div className="flex h-full">
-      <ContactList
-        contacts={contacts}
-        activeContactId={activeContact?.id ?? null}
-        onSelect={selectContact}
-        loading={loading}
-        onRefresh={refreshContacts}
-        onFilterByCanton={setCantonFilter}
-        onClearCantonFilter={clearCantonFilter}
-        activeCantonFilter={cantonFilter}
-        availableCantons={uniqueCantons}
-        callLogs={callLogs}
-        contactVacancies={contactVacancies}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+    <div className="flex h-full flex-col">
+      {/* Candidate Picker Modal */}
+      <CandidatePickerModal
+        open={showPickerModal}
+        onClose={() => setShowPickerModal(false)}
+        onSelect={handleCandidateSelected}
       />
-      <ContactDetail
-        key={activeContact?.id ?? "empty"}
-        contact={activeContact}
-        onCall={handleCall}
-        onNext={goToNextContact}
-        onSaveNotes={updateNotes}
-        actionMessage={actionMessage}
-        onUpdateStatus={updateStatus}
-        onScheduleFollowUp={scheduleFollowUp}
-        onClearFollowUp={clearFollowUp}
-        onClearStatus={clearStatus}
-        onNoteAdded={handleNoteAdded}
-        vacancies={activeContact ? contactVacancies[activeContact.id] : undefined}
-      />
+
+      {/* Candidate Mode Banner or Select Button */}
+      {selectedCandidate ? (
+        <CandidateModeBanner
+          candidate={selectedCandidate}
+          onChangeCandidate={handleChangeCandidate}
+          onExitMode={handleExitCandidateMode}
+          distanceFilter={distanceFilter}
+          onDistanceFilterChange={setDistanceFilter}
+          filteredCount={contacts.length}
+          totalCount={sortedContacts?.length ?? 0}
+        />
+      ) : (
+        <SelectCandidateButton onClick={handleOpenCandidatePicker} />
+      )}
+
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        <ContactList
+          contacts={contacts}
+          activeContactId={activeContact?.id ?? null}
+          onSelect={selectContact}
+          loading={loading || sortingLoading}
+          onRefresh={refreshContacts}
+          onFilterByCanton={setCantonFilter}
+          onClearCantonFilter={clearCantonFilter}
+          activeCantonFilter={cantonFilter}
+          availableCantons={uniqueCantons}
+          callLogs={callLogs}
+          contactVacancies={contactVacancies}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
+        <ContactDetail
+          key={activeContact?.id ?? "empty"}
+          contact={activeContact}
+          onCall={handleCall}
+          onNext={goToNextContact}
+          onSaveNotes={updateNotes}
+          actionMessage={actionMessage}
+          onUpdateStatus={updateStatus}
+          onScheduleFollowUp={scheduleFollowUp}
+          onClearFollowUp={clearFollowUp}
+          onClearStatus={clearStatus}
+          onNoteAdded={handleNoteAdded}
+          vacancies={activeContact ? contactVacancies[activeContact.id] : undefined}
+          selectedCandidate={selectedCandidate}
+        />
+      </div>
     </div>
   );
 }

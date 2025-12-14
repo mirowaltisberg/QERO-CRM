@@ -19,6 +19,7 @@ interface FormState {
   mobile: string;
   direct_phone: string;
   email: string;
+  gender: "male" | "female" | "";
 }
 
 const emptyForm: FormState = {
@@ -28,6 +29,7 @@ const emptyForm: FormState = {
   mobile: "",
   direct_phone: "",
   email: "",
+  gender: "",
 };
 
 export function ContactPersonsPanel({ contactId }: ContactPersonsPanelProps) {
@@ -108,6 +110,7 @@ export function ContactPersonsPanel({ contactId }: ContactPersonsPanelProps) {
         mobile: person.mobile ?? "",
         direct_phone: person.direct_phone ?? "",
         email: person.email ?? "",
+        gender: person.gender ?? "",
       });
     } else {
       setEditingPerson(null);
@@ -130,6 +133,7 @@ export function ContactPersonsPanel({ contactId }: ContactPersonsPanelProps) {
     mobile: form.mobile.trim() || null,
     direct_phone: form.direct_phone.trim() || null,
     email: form.email.trim() || null,
+    gender: form.gender || null,
   });
 
   const handleSubmit = async () => {
@@ -251,6 +255,18 @@ export function ContactPersonsPanel({ contactId }: ContactPersonsPanelProps) {
             <InputField label="Vorname" value={form.first_name} onChange={handleChange("first_name")} required />
             <InputField label="Nachname" value={form.last_name} onChange={handleChange("last_name")} required />
             <InputField label="Rolle" value={form.role} onChange={handleChange("role")} />
+            <label className="text-xs font-medium uppercase text-gray-400">
+              Geschlecht
+              <select
+                value={form.gender}
+                onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value as "male" | "female" | "" }))}
+                className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">Keine Angabe</option>
+                <option value="male">Männlich (Herr)</option>
+                <option value="female">Weiblich (Frau)</option>
+              </select>
+            </label>
             <InputField label="E-Mail" value={form.email} onChange={handleChange("email")} type="email" />
             <InputField label="Mobile" value={form.mobile} onChange={handleChange("mobile")} />
             <InputField label="Direktnummer" value={form.direct_phone} onChange={handleChange("direct_phone")} />

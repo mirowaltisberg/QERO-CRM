@@ -89,6 +89,31 @@ const StatusBadge = memo(function StatusBadge({ status, hasFollowUp }: { status:
   return null;
 });
 
+// Distance badge component
+const DistanceBadge = memo(function DistanceBadge({ distance }: { distance: number | null | undefined }) {
+  if (distance === null || distance === undefined) return null;
+  
+  // Color based on distance
+  const getDistanceColor = (km: number) => {
+    if (km <= 10) return "bg-green-100 text-green-700";
+    if (km <= 25) return "bg-blue-100 text-blue-700";
+    if (km <= 50) return "bg-amber-100 text-amber-700";
+    return "bg-gray-100 text-gray-600";
+  };
+
+  return (
+    <span className={cn(
+      "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium",
+      getDistanceColor(distance)
+    )}>
+      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+      </svg>
+      {distance.toFixed(1)} km
+    </span>
+  );
+});
+
 // Memoized list item to prevent re-renders
 const ContactListItem = memo(function ContactListItem({
   contact,
@@ -142,6 +167,7 @@ const ContactListItem = memo(function ContactListItem({
           </p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <DistanceBadge distance={contact.distance_km} />
           {hasVacancy && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-100 text-purple-700">
               <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
@@ -194,6 +220,10 @@ const CallLogDisplay = memo(function CallLogDisplay({
   const avatarUrl = callLog.caller?.avatar_url;
   const relativeTime = formatRelativeTime(callLog.called_at);
 
+  const forCandidateName = callLog.for_candidate 
+    ? `${callLog.for_candidate.first_name} ${callLog.for_candidate.last_name[0]}.`
+    : null;
+
   return (
     <div className="mt-1 flex items-center gap-1.5">
       {avatarUrl ? (
@@ -207,9 +237,12 @@ const CallLogDisplay = memo(function CallLogDisplay({
           {callerInitials}
         </span>
       )}
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-gray-500 truncate">
         <span className="font-medium">{callerName.split(" ")[0]}</span>
         <span className="text-gray-400"> · {relativeTime}</span>
+        {forCandidateName && (
+          <span className="text-blue-500"> · für {forCandidateName}</span>
+        )}
       </p>
     </div>
   );

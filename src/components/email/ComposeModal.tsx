@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils/cn";
 
 interface Props {
   open: boolean;
@@ -17,6 +18,14 @@ interface Props {
 interface AttachmentFile {
   file: File;
   id: string;
+}
+
+interface RecipientSuggestion {
+  type: "contact" | "tma" | "user";
+  id: string;
+  label: string;
+  email: string;
+  secondary?: string;
 }
 
 const ALLOWED_TYPES = [
@@ -76,17 +85,38 @@ const EMAIL_SIGNATURE_HTML = `
 </div>
 `;
 
+/**
+ * Insert an email into a comma-separated list, avoiding duplicates
+ */
+export function insertEmailIntoList(currentValue: string, email: string): string {
+  const emails = currentValue
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+  
+  // Avoid duplicates (case-insensitive)
+  const emailLower = email.toLowerCase();
+  if (emails.some((e) => e.toLowerCase() === emailLower)) {
+    return currentValue;
+  }
+  
+  emails.push(email);
+  return emails.join(", ");
+}
+
 export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
   const t = useTranslations("email");
   const tCommon = useTranslations("common");
   const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
+  const [bcc, setBcc] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [signatureText, setSignatureText] = useState(EMAIL_SIGNATURE);
   const [signatureHtml, setSignatureHtml] = useState(EMAIL_SIGNATURE_HTML);
@@ -119,11 +149,13 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
     } else {
       setTo("");
       setCc("");
+      setBcc("");
       setSubject("");
       setBody("");
       setAttachments([]);
       setError(null);
       setShowCc(false);
+      setShowBcc(false);
     }
   }, [open, replyTo]);
 
@@ -213,6 +245,7 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
     try {
       const recipients = to.split(",").map((e) => e.trim()).filter(Boolean);
       const ccRecipients = cc ? cc.split(",").map((e) => e.trim()).filter(Boolean) : undefined;
+      const bccRecipients = bcc ? bcc.split(",").map((e) => e.trim()).filter(Boolean) : undefined;
 
       // Convert attachments to base64
       const attachmentData = await Promise.all(
@@ -245,6 +278,7 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
         body: JSON.stringify({
           to: recipients,
           cc: ccRecipients,
+          bcc: bccRecipients,
           subject,
           body: htmlBody,
           replyToMessageId: replyTo?.messageId,
@@ -264,7 +298,7 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
     } finally {
       setSending(false);
     }
-  }, [to, cc, subject, body, replyTo, attachments, onSent]);
+  }, [to, cc, bcc, subject, body, replyTo, attachments, onSent, signatureHtml]);
 
   const totalSize = attachments.reduce((acc, a) => acc + a.file.size, 0);
 
@@ -287,35 +321,58 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
         )}
 
         <div className="space-y-3">
+          {/* To field with autocomplete */}
           <div>
             <div className="flex items-center justify-between">
               <label className="text-xs uppercase text-gray-400">{t("to")}</label>
-              {!showCc && (
-                <button
-                  type="button"
-                  onClick={() => setShowCc(true)}
-                  className="text-xs text-gray-500 hover:text-gray-700"
-                >
-                  Add Cc
-                </button>
-              )}
+              <div className="flex gap-2">
+                {!showCc && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCc(true)}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Cc
+                  </button>
+                )}
+                {!showBcc && (
+                  <button
+                    type="button"
+                    onClick={() => setShowBcc(true)}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Bcc
+                  </button>
+                )}
+              </div>
             </div>
-            <Input
+            <RecipientInput
               value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="recipient@example.com"
-              className="mt-1"
+              onChange={setTo}
+              placeholder={t("searchOrTypeEmail")}
             />
           </div>
 
+          {/* Cc field with autocomplete */}
           {showCc && (
             <div>
               <label className="text-xs uppercase text-gray-400">{t("cc")}</label>
-              <Input
+              <RecipientInput
                 value={cc}
-                onChange={(e) => setCc(e.target.value)}
-                placeholder="cc@example.com"
-                className="mt-1"
+                onChange={setCc}
+                placeholder={t("searchOrTypeEmail")}
+              />
+            </div>
+          )}
+
+          {/* Bcc field with autocomplete */}
+          {showBcc && (
+            <div>
+              <label className="text-xs uppercase text-gray-400">{t("bcc")}</label>
+              <RecipientInput
+                value={bcc}
+                onChange={setBcc}
+                placeholder={t("searchOrTypeEmail")}
               />
             </div>
           )}
@@ -419,6 +476,221 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
   );
 }
 
+// ============================================
+// RecipientInput with autocomplete
+// ============================================
+
+interface RecipientInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}
+
+function RecipientInput({ value, onChange, placeholder }: RecipientInputProps) {
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<RecipientSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Extract the "current token" being typed (after the last comma)
+  const getCurrentToken = useCallback(() => {
+    const parts = value.split(",");
+    return parts[parts.length - 1].trim();
+  }, [value]);
+
+  // Search for recipients
+  const searchRecipients = useCallback(async (searchQuery: string) => {
+    if (searchQuery.length < 1) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/email/recipients?q=${encodeURIComponent(searchQuery)}&limit=10`);
+      const json = await response.json();
+      if (response.ok && json.data?.recipients) {
+        setSuggestions(json.data.recipients);
+        setShowSuggestions(json.data.recipients.length > 0);
+        setHighlightIndex(-1);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    } catch {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Handle input change with debounce
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    onChange(newValue);
+    
+    // Get the current token being typed
+    const parts = newValue.split(",");
+    const currentToken = parts[parts.length - 1].trim();
+    setQuery(currentToken);
+
+    // Debounce search
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      searchRecipients(currentToken);
+    }, 200);
+  }, [onChange, searchRecipients]);
+
+  // Select a suggestion
+  const selectSuggestion = useCallback((suggestion: RecipientSuggestion) => {
+    // Replace the current token with the selected email
+    const parts = value.split(",").map((p) => p.trim()).filter(Boolean);
+    
+    // Remove the last (incomplete) token if it exists
+    if (parts.length > 0) {
+      const lastPart = parts[parts.length - 1];
+      // If the last part doesn't look like a complete email, remove it
+      if (!lastPart.includes("@") || lastPart === query) {
+        parts.pop();
+      }
+    }
+    
+    // Add the new email (avoid duplicates)
+    const emailLower = suggestion.email.toLowerCase();
+    if (!parts.some((p) => p.toLowerCase() === emailLower)) {
+      parts.push(suggestion.email);
+    }
+    
+    onChange(parts.join(", ") + ", ");
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setQuery("");
+    inputRef.current?.focus();
+  }, [value, query, onChange]);
+
+  // Handle keyboard navigation
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex((prev) => Math.max(prev - 1, -1));
+    } else if (e.key === "Enter" && highlightIndex >= 0) {
+      e.preventDefault();
+      selectSuggestion(suggestions[highlightIndex]);
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  }, [showSuggestions, suggestions, highlightIndex, selectSuggestion]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative mt-1">
+      <Input
+        ref={inputRef}
+        value={value}
+        onChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        onFocus={() => {
+          if (suggestions.length > 0) {
+            setShowSuggestions(true);
+          }
+        }}
+        placeholder={placeholder}
+      />
+      
+      {/* Suggestions dropdown */}
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+          {suggestions.map((suggestion, idx) => (
+            <button
+              key={`${suggestion.type}-${suggestion.id}`}
+              type="button"
+              onClick={() => selectSuggestion(suggestion)}
+              className={cn(
+                "flex w-full items-center gap-3 px-3 py-2 text-left transition",
+                idx === highlightIndex
+                  ? "bg-gray-100"
+                  : "hover:bg-gray-50"
+              )}
+            >
+              <TypeBadge type={suggestion.type} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-gray-900">
+                  {suggestion.label}
+                </p>
+                <p className="truncate text-xs text-gray-500">
+                  {suggestion.email}
+                  {suggestion.secondary && ` · ${suggestion.secondary}`}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Loading indicator */}
+      {loading && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TypeBadge({ type }: { type: "contact" | "tma" | "user" }) {
+  const colors: Record<string, string> = {
+    contact: "bg-blue-100 text-blue-700",
+    tma: "bg-purple-100 text-purple-700",
+    user: "bg-green-100 text-green-700",
+  };
+  const labels: Record<string, string> = {
+    contact: "Firma",
+    tma: "TMA",
+    user: "User",
+  };
+  return (
+    <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium uppercase", colors[type])}>
+      {labels[type]}
+    </span>
+  );
+}
+
+// ============================================
+// Helper functions and icons
+// ============================================
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const k = 1024;
@@ -479,4 +751,3 @@ function SendIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-

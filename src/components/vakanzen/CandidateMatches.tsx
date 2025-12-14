@@ -1,12 +1,33 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import type { Vacancy, VacancyCandidate, TmaCandidate } from "@/lib/types";
 import { VACANCY_CANDIDATE_STATUS_LIST, VACANCY_CANDIDATE_STATUS_LABELS, VACANCY_CANDIDATE_STATUS_COLORS } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
 import { DrivingLicenseBadge } from "@/components/ui/DrivingLicenseBadge";
 import { ExperienceLevelBadge } from "@/components/ui/ExperienceLevelSelector";
+import { Modal } from "@/components/ui/modal";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { TextShimmer } from "@/components/ui/text-shimmer";
+
+// AI Match result type
+interface AIMatch {
+  id: string;
+  first_name: string;
+  last_name: string;
+  position_title: string | null;
+  city: string | null;
+  canton: string | null;
+  postal_code: string | null;
+  experience_level: string | null;
+  driving_license: string | null;
+  distance_km: number | null;
+  ai_score: number;
+  match_reason: string;
+  rule_score: number;
+}
 
 interface ScoreBreakdown {
   base: number;
@@ -274,10 +295,135 @@ export const CandidateMatches = memo(function CandidateMatches({
   const t = useTranslations("vacancy");
   const tTma = useTranslations("tma");
   const tCommon = useTranslations("common");
-  const [activeTab, setActiveTab] = useState<"assigned" | "suggested">("assigned");
+  const [activeTab, setActiveTab] = useState<"assigned" | "suggested" | "ai">("assigned");
+
+  // AI matching state
+  const [aiMatches, setAiMatches] = useState<AIMatch[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiRan, setAiRan] = useState(false);
+
+  // Email modal state
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [generatingEmail, setGeneratingEmail] = useState<"fast" | "best" | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const assignedCount = candidates?.assigned.length || 0;
   const suggestedCount = candidates?.suggested.length || 0;
+  const aiCount = aiMatches.length;
+
+  // Run AI matching
+  const handleAiMatch = useCallback(async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const response = await fetch("/api/ai/match-candidates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vacancyId: vacancy.id }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || "AI Matching fehlgeschlagen");
+      }
+      setAiMatches(json.data?.matches || []);
+      setAiRan(true);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "AI Matching fehlgeschlagen");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [vacancy.id]);
+
+  // Open email modal
+  const handleOpenEmailModal = useCallback(() => {
+    setShowEmailModal(true);
+    setEmailSubject("");
+    setEmailBody("");
+    setEmailError(null);
+    setEmailSent(false);
+  }, []);
+
+  // Generate email with AI
+  const handleGenerateEmail = useCallback(async (mode: "fast" | "best") => {
+    if (!vacancy.contact_id || assignedCount === 0) return;
+
+    setGeneratingEmail(mode);
+    setEmailError(null);
+    setEmailBody("");
+
+    try {
+      // Get candidate IDs from assigned candidates
+      const candidateIds = candidates?.assigned.map(vc => vc.tma_id) || [];
+      
+      const response = await fetch("/api/ai/generate-vacancy-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vacancyId: vacancy.id,
+          contactId: vacancy.contact_id,
+          candidateIds,
+          mode,
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        throw new Error(json.error || t("emailGenerationError"));
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      setEmailSubject(json.data.subject);
+      setEmailBody(json.data.body);
+    } catch (err) {
+      console.error("Email generation error:", err);
+      setEmailError(err instanceof Error ? err.message : t("emailGenerationError"));
+    } finally {
+      setGeneratingEmail(null);
+    }
+  }, [vacancy.id, vacancy.contact_id, candidates?.assigned, assignedCount, t]);
+
+  // Send email
+  const handleSendEmail = useCallback(async () => {
+    if (!vacancy.contact_id || !emailSubject || !emailBody) return;
+
+    setSendingEmail(true);
+    setEmailError(null);
+
+    try {
+      const candidateIds = candidates?.assigned.map(vc => vc.tma_id) || [];
+
+      const response = await fetch(`/api/contacts/${vacancy.contact_id}/send-vacancy-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vacancyId: vacancy.id,
+          candidateIds,
+          subject: emailSubject,
+          body: emailBody,
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        throw new Error(json.error || t("emailSendError"));
+      }
+
+      setEmailSent(true);
+    } catch (err) {
+      console.error("Email send error:", err);
+      setEmailError(err instanceof Error ? err.message : t("emailSendError"));
+    } finally {
+      setSendingEmail(false);
+    }
+  }, [vacancy.id, vacancy.contact_id, candidates?.assigned, emailSubject, emailBody, t]);
 
   return (
     <aside className={cn(
@@ -331,6 +477,20 @@ export const CandidateMatches = memo(function CandidateMatches({
         >
           {t("suggestions")} ({suggestedCount})
         </button>
+        <button
+          onClick={() => setActiveTab("ai")}
+          className={cn(
+            "flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-1",
+            activeTab === "ai"
+              ? "border-b-2 border-purple-600 text-purple-600"
+              : "text-gray-500 hover:text-purple-600"
+          )}
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+          </svg>
+          AI {aiRan ? `(${aiCount})` : ""}
+        </button>
       </div>
 
       {/* Content */}
@@ -372,9 +532,22 @@ export const CandidateMatches = memo(function CandidateMatches({
                   isAssigned
                 />
               ))}
+              
+              {/* Send Email Button */}
+              {vacancy.contact && (
+                <button
+                  onClick={handleOpenEmailModal}
+                  className="w-full mt-4 flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                  </svg>
+                  {t("sendCandidatesEmail")} ({assignedCount})
+                </button>
+              )}
             </div>
           )
-        ) : (
+        ) : activeTab === "suggested" ? (
           // Suggested candidates
           suggestedCount === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -403,8 +576,382 @@ export const CandidateMatches = memo(function CandidateMatches({
               ))}
             </div>
           )
+        ) : (
+          // AI Matches tab
+          <AIMatchesContent
+            aiMatches={aiMatches}
+            aiLoading={aiLoading}
+            aiError={aiError}
+            aiRan={aiRan}
+            onRun={handleAiMatch}
+            onAdd={onAddCandidate}
+            t={t}
+          />
         )}
       </div>
+
+      {/* Email Modal */}
+      <Modal
+        open={showEmailModal}
+        onClose={() => !sendingEmail && setShowEmailModal(false)}
+        title={t("emailModalTitle")}
+      >
+        <div className="space-y-4 max-w-2xl">
+          {emailSent ? (
+            <div className="text-center py-8">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-gray-900">{t("emailSent")}</h3>
+              <p className="mt-2 text-sm text-gray-500">{t("emailSentDescription")}</p>
+              <button
+                onClick={() => setShowEmailModal(false)}
+                className="mt-6 rounded-lg bg-gray-900 px-6 py-2 text-sm font-medium text-white hover:bg-gray-800"
+              >
+                {tCommon("close")}
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Info */}
+              <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
+                <div className="flex items-start gap-2">
+                  <svg className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">{t("emailModalInfo")}</p>
+                    <p className="text-xs text-blue-600 mt-0.5">
+                      {t("emailModalCompany")}: {vacancy.contact?.company_name || "Unbekannt"}
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      {t("emailModalCandidates")}: {assignedCount}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Generation Buttons */}
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700">{t("generateWithAi")}</label>
+                <div className="flex gap-2">
+                  {/* Fast Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateEmail("fast")}
+                    disabled={!!generatingEmail}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                      generatingEmail === "fast"
+                        ? "bg-gray-200 text-gray-500 cursor-wait border border-gray-300"
+                        : generatingEmail
+                        ? "bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-100"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
+                    )}
+                  >
+                    {generatingEmail === "fast" ? (
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                      </svg>
+                    )}
+                    {t("draftFast")}
+                  </button>
+                  
+                  {/* Best Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateEmail("best")}
+                    disabled={!!generatingEmail}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                      generatingEmail === "best"
+                        ? "bg-purple-200 text-purple-500 cursor-wait"
+                        : generatingEmail
+                        ? "bg-purple-50 text-purple-200 cursor-not-allowed"
+                        : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:from-purple-600 hover:to-indigo-600 shadow-sm hover:shadow-md"
+                    )}
+                  >
+                    {generatingEmail === "best" ? (
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                      </svg>
+                    )}
+                    {t("draftBest")}
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Message */}
+              {emailError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                  {emailError}
+                </div>
+              )}
+
+              {/* Subject */}
+              <div>
+                <label className="text-xs uppercase text-gray-400">{t("emailSubject")}</label>
+                <Input
+                  className="mt-1"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  placeholder={t("emailSubjectPlaceholder")}
+                  disabled={!!generatingEmail}
+                />
+              </div>
+
+              {/* Body with shimmer */}
+              <div>
+                <label className="text-xs uppercase text-gray-400">{t("emailBody")}</label>
+                <div className="relative mt-1">
+                  <Textarea
+                    className={cn(
+                      "min-h-[200px] font-mono text-xs transition-opacity",
+                      generatingEmail && "opacity-30"
+                    )}
+                    value={emailBody}
+                    onChange={(e) => setEmailBody(e.target.value)}
+                    placeholder={t("emailBodyPlaceholder")}
+                    disabled={!!generatingEmail}
+                  />
+                  {/* Shimmer overlay */}
+                  {generatingEmail && (
+                    <div className="absolute inset-0 pointer-events-none rounded-md bg-white/80 backdrop-blur-[1px] flex items-start justify-start p-4">
+                      <div>
+                        <TextShimmer className="text-sm font-medium" duration={1.5}>
+                          {t("generatingEmail")}
+                        </TextShimmer>
+                        <p className="mt-2 text-xs text-gray-400">
+                          {generatingEmail === "fast" ? t("generatingFastHint") : t("generatingBestHint")}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Candidate List (preview) */}
+              <div>
+                <label className="text-xs uppercase text-gray-400">{t("includedCandidates")}</label>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {candidates?.assigned.map(vc => (
+                    <span
+                      key={vc.id}
+                      className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700"
+                    >
+                      {vc.tma?.first_name} {vc.tma?.last_name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  onClick={() => setShowEmailModal(false)}
+                  disabled={sendingEmail}
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {tCommon("cancel")}
+                </button>
+                <button
+                  onClick={handleSendEmail}
+                  disabled={!emailSubject || !emailBody || sendingEmail || !!generatingEmail}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sendingEmail ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      {t("sending")}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                      </svg>
+                      {t("sendEmail")}
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
     </aside>
   );
 });
+
+// AI Matches Content Component
+interface AIMatchesContentProps {
+  aiMatches: AIMatch[];
+  aiLoading: boolean;
+  aiError: string | null;
+  aiRan: boolean;
+  onRun: () => void;
+  onAdd: (tmaId: string) => void;
+  t: ReturnType<typeof useTranslations>;
+}
+
+function AIMatchesContent({ aiMatches, aiLoading, aiError, aiRan, onRun, onAdd, t }: AIMatchesContentProps) {
+  if (!aiRan) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-purple-100">
+          <svg className="h-7 w-7 text-purple-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+          </svg>
+        </div>
+        <p className="mt-4 text-sm font-medium text-gray-900">{t("aiMatchTitle")}</p>
+        <p className="mt-1 text-xs text-gray-500 max-w-[250px]">{t("aiMatchDescription")}</p>
+        <button
+          onClick={onRun}
+          disabled={aiLoading}
+          className="mt-4 flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+        >
+          {aiLoading ? (
+            <>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              {t("aiMatching")}
+            </>
+          ) : (
+            <>
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+              </svg>
+              {t("runAiMatch")}
+            </>
+          )}
+        </button>
+      </div>
+    );
+  }
+
+  if (aiLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-200 border-t-purple-600" />
+        <p className="mt-4 text-sm text-gray-600">{t("aiMatching")}</p>
+        <p className="mt-1 text-xs text-gray-400">{t("aiMatchingWait")}</p>
+      </div>
+    );
+  }
+
+  if (aiError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+          <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+        </div>
+        <p className="mt-3 text-sm text-red-600">{aiError}</p>
+        <button onClick={onRun} className="mt-3 text-sm font-medium text-purple-600 hover:text-purple-700">
+          {t("retry")}
+        </button>
+      </div>
+    );
+  }
+
+  if (aiMatches.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+          <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <p className="mt-3 text-sm text-gray-500">{t("noAiMatches")}</p>
+        <button onClick={onRun} className="mt-3 text-sm font-medium text-purple-600 hover:text-purple-700">
+          {t("retry")}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-xs text-gray-500">{t("aiMatchResults")}</p>
+        <button
+          onClick={onRun}
+          disabled={aiLoading}
+          className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700"
+        >
+          <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+          </svg>
+          {t("refresh")}
+        </button>
+      </div>
+      {aiMatches.map((match) => (
+        <AIMatchCard key={match.id} match={match} onAdd={() => onAdd(match.id)} />
+      ))}
+    </div>
+  );
+}
+
+// AI Match Card Component
+function AIMatchCard({ match, onAdd }: { match: AIMatch; onAdd: () => void }) {
+  const scoreColor = 
+    match.ai_score >= 75 ? "bg-green-100 text-green-700 border-green-200" :
+    match.ai_score >= 50 ? "bg-amber-100 text-amber-700 border-amber-200" :
+    "bg-red-100 text-red-700 border-red-200";
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-3 hover:shadow-sm transition-shadow">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h4 className="font-medium text-gray-900 text-sm truncate">
+              {match.first_name} {match.last_name}
+            </h4>
+            <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold border", scoreColor)}>
+              {match.ai_score}%
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 truncate mt-0.5">
+            {match.position_title || "Keine Position"}
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {[match.postal_code, match.city || match.canton].filter(Boolean).join(" ") || "Unbekannt"}
+            {match.distance_km !== null && ` · ${match.distance_km} km`}
+          </p>
+        </div>
+        <button
+          onClick={onAdd}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-purple-100 hover:text-purple-600"
+          title="Hinzufügen"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      </div>
+      {/* AI Match Reason */}
+      <div className="mt-2 p-2 rounded bg-purple-50 border border-purple-100">
+        <div className="flex items-start gap-1.5">
+          <svg className="h-3.5 w-3.5 text-purple-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+          </svg>
+          <p className="text-xs text-purple-800">{match.match_reason}</p>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -12,6 +12,7 @@ const PERSON_SELECT = `
   mobile,
   direct_phone,
   email,
+  gender,
   created_at,
   updated_at,
   created_by,
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       mobile: parsed.data.mobile ?? null,
       direct_phone: parsed.data.direct_phone ?? null,
       email: parsed.data.email ?? null,
+      gender: parsed.data.gender ?? null,
       created_by: user.id,
       updated_by: user.id,
     };

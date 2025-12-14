@@ -55,17 +55,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return respondError("Unauthorized", 401);
     }
 
-    // Get the latest call log with user info
+    // Get the latest call log with user info and for_candidate info
     const { data: callLog, error } = await adminSupabase
       .from("contact_call_logs")
       .select(`
         id,
         called_at,
         user_id,
+        for_candidate_id,
         caller:profiles!contact_call_logs_user_id_fkey (
           id,
           full_name,
           avatar_url
+        ),
+        for_candidate:tma_candidates!contact_call_logs_for_candidate_id_fkey (
+          id,
+          first_name,
+          last_name
         )
       `)
       .eq("contact_id", contactId)
@@ -95,6 +101,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!user) {
       return respondError("Unauthorized", 401);
+    }
+
+    // Parse optional body for for_candidate_id
+    let forCandidateId: string | null = null;
+    try {
+      const body = await request.json();
+      forCandidateId = body?.for_candidate_id ?? null;
+    } catch {
+      // No body or invalid JSON, that's fine
     }
 
     // Verify contact exists and belongs to user's team
@@ -142,15 +157,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
         contact_id: contactId,
         user_id: user.id,
         called_at: new Date().toISOString(),
+        for_candidate_id: forCandidateId,
       })
       .select(`
         id,
         called_at,
         user_id,
+        for_candidate_id,
         caller:profiles!contact_call_logs_user_id_fkey (
           id,
           full_name,
           avatar_url
+        ),
+        for_candidate:tma_candidates!contact_call_logs_for_candidate_id_fkey (
+          id,
+          first_name,
+          last_name
         )
       `)
       .single();

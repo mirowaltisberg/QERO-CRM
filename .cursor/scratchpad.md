@@ -7,6 +7,7 @@
 - New issue reported: repeated 400 errors on `POST /api/contacts/call-logs` plus realtime subscriptions flapping (SUBSCRIBED → CLOSED → SUBSCRIBED).
 - New regression: personal status still shows "Not set" after reload (Task 19 not stable).
 - **NEW: Task 25 - Complete Mobile UI Revamp** - Make the app feel native on iPhone 16 Pro/Pro Max
+- **NEW: Improve Email client** - full email bodies (no cut off), correct recipients (no \"An Unbekannt\"), and conversation-based Inbox/Sent behavior
 
 ---
 
@@ -217,6 +218,10 @@ user_tma_settings (
 - [x] **Task 20: Fix call-log 400s & realtime flapping** ✅ COMPLETE
 - [x] **Task 21: Diagnose and fix non-working status/follow-up buttons** ✅ COMPLETE
 - [x] **Task 23: Fix personal status SSR/auth merge** ✅ DEPLOYED (commit: 95cd4ea)
+- [ ] **Task 27: Fix contact person emails not sending + diagnostics UI**
+  - Add attempted/sent/failed recipients to send response and surface in UI
+  - Normalize/validate emails, dedupe correctly, fetch contact persons fresh at send-time
+  - Ensure prompts reject “call me back” phrasing
 
 # Current Status / Progress Tracking
 - **Task 20 COMPLETE** ✅
@@ -260,6 +265,47 @@ Root cause identified: API routes were using browser Supabase client (`createBro
 
 **✅ DEPLOYED (commit: 95cd4ea)**
 
+**Task 27: Fix contact person emails not sending** (IN PROGRESS - EXECUTOR)
+- Goal: Each contact person gets an individual email with correct greeting; send response returns attempted/sent/failed for UI; emails normalized/deduped; prompts avoid “call me back”.
+- ✅ Implemented backend diagnostics: attempted/sent/failed recipients returned; invalid emails reported; normalization (trim/lowercase) and dedupe added; contact persons fetched fresh at send-time.
+- ✅ Frontend now shows attempted/sent/failed with warning state; partial failures visible; send button only locks on full success.
+
+---
+
+## Email client improvements (IN PROGRESS)
+- ✅ Added local Supabase migration `supabase/migrations/030_email_messages_folder.sql`:
+  - Adds `email_messages.folder`
+  - Ensures `email_messages.internet_message_id` exists
+  - Adds indexes + best-effort backfill from `email_threads.folder`
+- ✅ Updated email sync to always store/update: `folder`, `internet_message_id`, recipients/cc/bcc, and keep `email_threads` metadata fresh (participants/snippet/last_message_at).
+- ✅ Updated `/api/email/threads` to be conversation-folder based (Inbox/Sent determined by existence of messages in that folder).
+- ✅ Added `/api/email/message/[id]/hydrate` + Email UI hydration so missing bodies/recipients get fetched from Graph and persisted (fixes cut-off body + \"An Unbekannt\").
+- ✅ Email list now shows Sent as `An {recipient}` (localized) instead of showing your own mailbox.
+- ✅ Bumped version label to `v1.16.1` in sidebar (do this before any deploy).
+
+---
+
+## Email Recipient Autocomplete (NEW - v1.17.0)
+- ✅ Added Supabase migration `supabase/migrations/031_profiles_email_rls.sql`:
+  - Adds `profiles.email` column
+  - Backfills from `auth.users`
+  - Updates trigger to copy email on signup
+  - Opens RLS so any authenticated user can read other profiles' `id, full_name, email, avatar_url`
+- ✅ Added `/api/email/recipients` endpoint:
+  - Searches contacts, tma_candidates, and profiles (users) by name/email
+  - Returns unified results with type badges (Firma, TMA, User)
+  - Deduplicates by email, sorts by relevance
+- ✅ Updated `ComposeModal`:
+  - Added Bcc field (toggle like Cc)
+  - All recipient fields (To/Cc/Bcc) now have autocomplete
+  - Typing triggers debounced search, dropdown shows results
+  - Selecting a result inserts the email
+  - Free typing of email addresses still works
+- ✅ Added i18n keys for `searchOrTypeEmail` in en.json and de.json
+- ✅ Added unit test `tests/recipient-insert.test.ts` for insertEmailIntoList helper
+- ✅ All 10 tests pass, build compiles successfully
+- ✅ Bumped version to `v1.17.0`
+
 # Executor's Feedback or Assistance Requests
 - **Task 23 deployed - needs manual verification**
 - Please test in production:
@@ -268,6 +314,81 @@ Root cause identified: API routes were using browser Supabase client (`createBro
   3. Hard refresh the page (Cmd+Shift+R or Ctrl+Shift+R)
   4. **Expected:** Status should persist (not show "Not set")
   5. Check that the status tag shows correctly in both the contact list sidebar and the detail header
+
+- Email DB migration application (needed before conversation-folder improvements can work):
+  - Preferred: `supabase db push` from your machine (linked to the prod project).
+  - Fallback: run the SQL from `supabase/migrations/030_email_messages_folder.sql` in the Supabase SQL editor.
+
+- Email Recipient Autocomplete migration (needed before recipient search works for users):
+  - Apply `supabase/migrations/031_profiles_email_rls.sql` in Supabase.
+  - This adds `profiles.email`, backfills from auth.users, and opens RLS for authenticated user reads.
+
+---
+
+# NEW: Two-stage email drafts + multi-recipient sending (Calling)
+
+## Current Problem
+- User reports: adding an additional `contact_person` with an email address (e.g. their own email) does **not** result in a separate email being sent to that contact person.
+- User cannot see server logs (Vercel logs not visible), so debugging via `console.log` is not practical.
+
+## Expected Behavior (Spec)
+- When sending from Calling → **send separate emails**, not a single email with multiple recipients:
+  - 1 email to the **general/company email** (if present) with greeting: `Sehr geehrtes <Firmenname> Team,`
+  - 1 email to **each contact person** (Ansprechperson) with their own greeting:
+    - male → `Sehr geehrter Herr <Nachname>,`
+    - female → `Sehr geehrte Frau <Nachname>,`
+    - unknown → `Sehr geehrte/r <Vorname> <Nachname>,`
+- Each email should include the same attachments (KP PDFs + AGB) and the same subject/body (draft body stored without greeting; greeting injected at send-time).
+
+## Hypotheses (Most likely causes)
+1) **Recipient collection bug**: the code might not be reading the contact person email field that the UI writes (schema mismatch or different column).
+2) **Recipient de-dupe bug**: the new contact person email could be considered “duplicate” and dropped unintentionally (case/whitespace normalization issues).
+3) **Graph send failures are being swallowed**: some sends may fail (e.g., invalid recipient format) but the UI still reports success; user doesn’t see failures.
+4) **UI is sending to a different endpoint than expected** or not reloading after adding contact persons (stale data).
+
+## Fix Plan (Small steps with success criteria)
+
+### Step A — Make failures visible to the user (no log dependency)
+- Update the send endpoint response to include:
+  - `attemptedRecipients: string[]`
+  - `sentRecipients: string[]`
+  - `failedRecipients: { email: string; error: string }[]`
+- Update frontend “Sent” message in the email modal to show:
+  - “Sent to X recipients”
+  - If any failed: show the failed list
+
+**Success criteria**
+- After pressing “Mail senden”, the UI always shows exactly which recipients were attempted/sent/failed.
+
+### Step B — Normalize + validate recipient emails
+- Trim and lowercase emails before de-duping.
+- Skip invalid emails (basic `@` presence) and report them in `failedRecipients` before calling Graph.
+
+**Success criteria**
+- Adding `test@domain.ch ` (with trailing space) still results in a send attempt to `test@domain.ch`.
+
+### Step C — Ensure contact persons are actually fetched from DB at send-time
+- On send-time, fetch contact persons from DB fresh and include them; do not rely on UI state.
+- Confirm the select includes the correct email column (`contact_persons.email`) and that the UI saves into that column.
+
+**Success criteria**
+- Adding a new contact person and immediately clicking “Mail senden” includes that contact person in `attemptedRecipients`.
+
+### Step D — Fix dedupe rule
+- Only dedupe exact normalized matches; do not drop distinct emails.
+- Dedup between company email and contact person email.
+
+**Success criteria**
+- If company email is `info@x.ch` and contact person email is `me@x.ch`, both are attempted.
+- If both are `info@x.ch`, only one is attempted.
+
+### Step E — Update prompts per latest instruction
+- Latest instruction: AI drafts must NOT say “call me back / Rückruf / rufen Sie mich an”.
+- Ensure validator also rejects “Rückruf” / “rufen Sie mich an” patterns if necessary.
+
+**Success criteria**
+- Generated drafts do not contain “Rückruf” or “rufen Sie mich an”.
+
 
 # Lessons
 - VAPID keys are free to generate
@@ -282,3 +403,4 @@ Root cause identified: API routes were using browser Supabase client (`createBro
 - **CRITICAL: Never hardcode status_tags in API payloads** - The `scheduleFollowUp` was sending `status_tags: ["C"]` which wiped out existing quality ratings. Follow-ups should be independent from quality assessment.
 - **Realtime can cause race conditions** - When updating data, realtime subscription might fire and overwrite local state. Use a skip mechanism to ignore realtime updates for recently-modified records.
 - **ALWAYS update version number** on every deploy (format: v1.XX.X - major.middle.small)
+- If `npm test` fails with an esbuild platform/binary mismatch, running `npm rebuild esbuild` can fix it without reinstalling everything.

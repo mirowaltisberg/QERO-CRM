@@ -44,7 +44,7 @@ export function EmailView({ account }: Props) {
   // Thread lookup map for O(1) access
   const threadMapRef = useRef<Map<string, EmailThread>>(new Map());
 
-  // Fetch threads from database (includes full message content for instant display)
+  // Fetch thread list from database (conversation-based folders; full thread is fetched on open)
   const fetchThreads = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     if (!account) return;
     
@@ -161,15 +161,29 @@ export function EmailView({ account }: Props) {
 
   // Handle URL param for thread selection (from command palette)
   useEffect(() => {
-    if (pendingThreadId && threads.length > 0) {
-      const thread = threadMapRef.current.get(pendingThreadId);
-      if (thread) {
-        setSelectedThread(thread);
+    if (!pendingThreadId || threads.length === 0) return;
+    const summary = threadMapRef.current.get(pendingThreadId);
+    if (!summary) return;
+
+    setLoadingDetail(true);
+    setError(null);
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/email/threads/${pendingThreadId}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Failed to load email thread");
+        setSelectedThread(json.data);
+      } catch (err) {
+        console.error("Failed to load thread from URL param:", err);
+        setSelectedThread(summary);
+        setError(err instanceof Error ? err.message : "Failed to load email");
+      } finally {
+        setLoadingDetail(false);
         setPendingThreadId(null);
-        // Clear URL param
         window.history.replaceState({}, "", "/email");
       }
-    }
+    })();
   }, [pendingThreadId, threads]);
 
   // Cleanup timeout on unmount
@@ -202,24 +216,39 @@ export function EmailView({ account }: Props) {
     }
   }, [fetchThreads]);
 
-  // Select thread - instant from memory, or fetch for search results
+  // Select thread - fetch full thread for DB threads, or fetch from Graph for live results
   const handleSelectThread = useCallback(async (threadId: string, isLiveResult?: boolean, graphMessageId?: string) => {
     // Check if thread is in local map (synced emails)
     const thread = threadMapRef.current.get(threadId);
     
     if (thread) {
-      // Instant display - no API call needed!
-      setSelectedThread(thread);
-      
-      // Mark as read if unread (in background)
+      // Mark as read in list UI immediately (background sync below)
       if (!thread.is_read) {
         const updated = { ...thread, is_read: true };
         threadMapRef.current.set(threadId, updated);
-        setSelectedThread(updated);
         setThreads((prev) =>
           prev.map((t) => (t.id === threadId ? { ...t, is_read: true } : t))
         );
-        
+      }
+
+      // Fetch full thread details (messages + bodies) for display
+      setLoadingDetail(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/email/threads/${threadId}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Failed to load email thread");
+        setSelectedThread(json.data);
+      } catch (err) {
+        console.error("Failed to fetch thread detail:", err);
+        setSelectedThread(thread); // fallback to summary
+        setError(err instanceof Error ? err.message : "Failed to load email");
+      } finally {
+        setLoadingDetail(false);
+      }
+      
+      // Mark as read if unread (in background)
+      if (!thread.is_read) {
         fetch(`/api/email/threads/${threadId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -279,8 +308,6 @@ export function EmailView({ account }: Props) {
           };
           
           setSelectedThread(liveThread);
-          // Add to map for future clicks
-          threadMapRef.current.set(threadId, liveThread);
         }
       } catch (err) {
         console.error("Failed to fetch live email:", err);
@@ -289,7 +316,7 @@ export function EmailView({ account }: Props) {
         setLoadingDetail(false);
       }
     }
-  }, [folder]);
+  }, [account?.id, folder]);
 
   // Handle reply
   const handleReply = useCallback((threadId: string, messageId: string) => {

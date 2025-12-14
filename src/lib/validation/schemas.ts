@@ -67,6 +67,8 @@ export const ContactFilterSchema = z.object({
   pageSize: z.number().int().min(1).max(1000).optional(),
 });
 
+const GENDER_VALUES = ["male", "female"] as const;
+
 export const ContactPersonSchema = z.object({
   first_name: z.string().trim().min(1, 'First name is required'),
   last_name: z.string().trim().min(1, 'Last name is required'),
@@ -74,6 +76,7 @@ export const ContactPersonSchema = z.object({
   mobile: phoneSchema,
   direct_phone: phoneSchema,
   email: emailSchema,
+  gender: z.enum(GENDER_VALUES).nullable().optional(),
 });
 
 export const CallLogCreateSchema = z.object({

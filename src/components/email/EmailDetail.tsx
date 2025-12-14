@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
@@ -98,6 +98,7 @@ export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onT
             key={message.id}
             message={message}
             isLast={index === messages.length - 1}
+            threadParticipants={thread.participants || []}
             t={t}
           />
         ))}
@@ -122,10 +123,71 @@ export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onT
 interface MessageBubbleProps {
   message: EmailMessage;
   isLast: boolean;
+  threadParticipants: string[];
 }
 
-function MessageBubble({ message, isLast, t }: MessageBubbleProps & { t: (key: string, values?: Record<string, string>) => string }) {
-  const senderInitials = (message.sender_name || message.sender_email)
+function MessageBubble({
+  message,
+  isLast,
+  threadParticipants,
+  t,
+}: MessageBubbleProps & { t: (key: string, values?: Record<string, string>) => string }) {
+  const [hydrated, setHydrated] = useState<EmailMessage | null>(null);
+  const [hydrating, setHydrating] = useState(false);
+
+  const effective = hydrated || message;
+
+  const needsHydration =
+    (!!message.graph_message_id && (!message.body_html && !message.body_text)) ||
+    (Array.isArray(message.recipients) && message.recipients.length === 0);
+
+  const inferRecipientsFallback = useCallback((): string[] => {
+    if (!threadParticipants || threadParticipants.length === 0) return [];
+    const senderEmail = (effective.sender_email || "").toLowerCase();
+    const emails = threadParticipants
+      .map((p) => {
+        const m = p.match(/<([^>]+)>/);
+        return (m?.[1] || p).trim();
+      })
+      .filter((e) => e.includes("@"));
+
+    const filtered = emails.filter((e) => e.toLowerCase() !== senderEmail);
+    // Dedup while preserving order
+    const seen = new Set<string>();
+    return filtered.filter((e) => {
+      const k = e.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }, [threadParticipants, effective.sender_email]);
+
+  useEffect(() => {
+    if (!needsHydration) return;
+    if (!message.graph_message_id) return;
+    if (hydrated || hydrating) return;
+
+    setHydrating(true);
+    (async () => {
+      try {
+        const res = await fetch(`/api/email/message/${encodeURIComponent(message.graph_message_id)}/hydrate`, {
+          method: "POST",
+        });
+        const json = await res.json();
+        if (!res.ok) return;
+        if (json.data?.persisted === true && json.data?.message?.id) {
+          setHydrated(json.data.message);
+        }
+      } catch (err) {
+        // Best-effort; fall back to preview
+        console.error("Failed to hydrate email:", err);
+      } finally {
+        setHydrating(false);
+      }
+    })();
+  }, [needsHydration, message.graph_message_id, hydrated, hydrating]);
+
+  const senderInitials = ((effective.sender_name || effective.sender_email || "") as string)
     .split(" ")
     .map((n) => n[0])
     .join("")
@@ -134,9 +196,9 @@ function MessageBubble({ message, isLast, t }: MessageBubbleProps & { t: (key: s
 
   // Rewrite cid: URLs in HTML to point to our attachment endpoint
   const processedHtml = useMemo(() => {
-    if (!message.body_html) return null;
+    if (!effective.body_html) return null;
     
-    let html = message.body_html;
+    let html = effective.body_html;
     
     // Replace cid: references with our API endpoint
     // Pattern: src="cid:xxxxx" or src='cid:xxxxx'
@@ -150,7 +212,12 @@ function MessageBubble({ message, isLast, t }: MessageBubbleProps & { t: (key: s
     );
     
     return sanitizeHtml(html);
-  }, [message.body_html, message.graph_message_id]);
+  }, [effective.body_html, effective.graph_message_id]);
+
+  const recipientsDisplay =
+    (effective.recipients && effective.recipients.length > 0
+      ? effective.recipients
+      : inferRecipientsFallback()).join(", ");
 
   return (
     <article
@@ -166,17 +233,17 @@ function MessageBubble({ message, isLast, t }: MessageBubbleProps & { t: (key: s
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-gray-900">
-            {message.sender_name || message.sender_email}
+            {effective.sender_name || effective.sender_email}
           </p>
           <p className="truncate text-xs text-gray-500">
-            {t("to")} {message.recipients?.join(", ") || t("unknown")}
-            {message.cc && message.cc.length > 0 && (
-              <span className="text-gray-400"> · {t("cc")}: {message.cc.join(", ")}</span>
+            {t("to")} {recipientsDisplay || t("unknown")}
+            {effective.cc && effective.cc.length > 0 && (
+              <span className="text-gray-400"> · {t("cc")}: {effective.cc.join(", ")}</span>
             )}
           </p>
         </div>
         <time className="text-xs text-gray-400 whitespace-nowrap">
-          {formatDateTime(message.received_at || message.sent_at, t)}
+          {formatDateTime(effective.received_at || effective.sent_at, t)}
         </time>
       </div>
 
@@ -189,19 +256,19 @@ function MessageBubble({ message, isLast, t }: MessageBubbleProps & { t: (key: s
           />
         ) : (
           <p className="whitespace-pre-wrap text-sm text-gray-700">
-            {message.body_text || message.body_preview}
+            {effective.body_text || effective.body_preview}
           </p>
         )}
       </div>
 
       {/* Attachments */}
-      {message.has_attachments && (
+      {effective.has_attachments && (
         <div className="mt-4 pt-3 border-t border-gray-100">
           <p className="flex items-center gap-2 text-xs font-medium text-gray-600 mb-2">
             <AttachmentIcon className="h-4 w-4" />
             {t("attachments")}
           </p>
-          <AttachmentsList messageId={message.graph_message_id} />
+          <AttachmentsList messageId={effective.graph_message_id} />
         </div>
       )}
     </article>

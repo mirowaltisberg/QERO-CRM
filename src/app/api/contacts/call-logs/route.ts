@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       return respondSuccess({});
     }
 
-    // Get latest call log for each contact
+    // Get latest call log for each contact (with for_candidate info)
     const { data: callLogs, error } = await adminSupabase
       .from("contact_call_logs")
       .select(`
@@ -55,10 +55,16 @@ export async function POST(request: NextRequest) {
         contact_id,
         called_at,
         user_id,
+        for_candidate_id,
         caller:profiles!contact_call_logs_user_id_fkey (
           id,
           full_name,
           avatar_url
+        ),
+        for_candidate:tma_candidates!contact_call_logs_for_candidate_id_fkey (
+          id,
+          first_name,
+          last_name
         )
       `)
       .in("contact_id", validContactIds)

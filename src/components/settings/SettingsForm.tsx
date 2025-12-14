@@ -15,6 +15,7 @@ import { motion } from "framer-motion";
 import { Modal } from "@/components/ui/modal";
 import type { EmailAccount } from "@/lib/types";
 import type { Locale } from "@/i18n/config";
+import { Changelog } from "./Changelog";
 
 interface Profile {
   id: string;
@@ -631,6 +632,9 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
           <LanguageSwitcher currentLocale={locale} variant="buttons" />
         </div>
       </Panel>
+
+      {/* Changelog */}
+      <Changelog />
 
       {/* Danger Zone */}
       <Panel title={tCommon("logout")} description="Sign out of your account">

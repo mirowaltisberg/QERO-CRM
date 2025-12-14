@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -11,10 +11,21 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { NotesPanel } from "./NotesPanel";
 import { ContactPersonsPanel } from "./ContactPersonsPanel";
+
+type EmailSentState = { status: "success" | "warning" | "error"; message: string };
 import { VacancyQuickView } from "./VacancyQuickView";
-import type { Contact, Vacancy } from "@/lib/types";
+import { CandidatePickerModal } from "./CandidatePickerModal";
+import { TextShimmer } from "@/components/ui/text-shimmer";
+import type { Contact, Vacancy, TmaCandidate } from "@/lib/types";
 import type { ContactStatus } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
+
+// Attachment info returned from API
+interface AttachmentInfo {
+  name: string;
+  type: "candidate" | "agb";
+  error?: string;
+}
 
 interface ContactDetailProps {
   contact: Contact | null;
@@ -29,6 +40,7 @@ interface ContactDetailProps {
   onNoteAdded?: () => void;
   vacancies?: Vacancy[];
   isMobile?: boolean;
+  selectedCandidate?: TmaCandidate | null;
 }
 
 export const ContactDetail = memo(function ContactDetail({
@@ -44,25 +56,75 @@ export const ContactDetail = memo(function ContactDetail({
   onNoteAdded,
   vacancies,
   isMobile = false,
+  selectedCandidate = null,
 }: ContactDetailProps) {
   const t = useTranslations("contact");
   const tStatus = useTranslations("status");
   const tCommon = useTranslations("common");
   const tTma = useTranslations("tma");
+  const tEmail = useTranslations("email");
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [customDate, setCustomDate] = useState(() => getDefaultDateISO());
   const [customTime, setCustomTime] = useState("09:00");
   const [customNote, setCustomNote] = useState(contact?.follow_up_note ?? "");
   const [sendingEmail, setSendingEmail] = useState(false);
-  const [emailSent, setEmailSent] = useState<{ success: boolean; message: string } | null>(null);
+  const [emailSent, setEmailSent] = useState<EmailSentState | null>(null);
   const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  
+  // Email compose state
   const [emailPreview, setEmailPreview] = useState<{
     recipients: string[];
     subject: string;
     body: string;
+    attachments: AttachmentInfo[];
     hasAttachment: boolean;
+    candidateErrors: boolean;
+    canSend: boolean;
   } | null>(null);
-  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [emailCandidates, setEmailCandidates] = useState<TmaCandidate[]>([]);
+  const [editableSubject, setEditableSubject] = useState("");
+  const [editableBody, setEditableBody] = useState("");
+  const [showCandidatePicker, setShowCandidatePicker] = useState(false);
+  const [generatingAi, setGeneratingAi] = useState<"standard" | "best" | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [activeDraftType, setActiveDraftType] = useState<"standard" | "best">("standard");
+  const [researchConfidence, setResearchConfidence] = useState<"high" | "medium" | "low" | null>(null);
+
+  // Initialize emailCandidates with selectedCandidate when it changes
+  useEffect(() => {
+    if (selectedCandidate) {
+      setEmailCandidates([selectedCandidate]);
+    } else {
+      setEmailCandidates([]);
+    }
+  }, [selectedCandidate]);
+
+  // Pre-generate standard draft in background when candidate is selected
+  useEffect(() => {
+    if (!selectedCandidate || !contact) return;
+
+    // Fire and forget - pre-generate standard draft
+    const preGenerateDraft = async () => {
+      try {
+        console.log(`[Pre-generate] Starting for candidate ${selectedCandidate.id} -> company ${contact.id}`);
+        await fetch("/api/email-draft/standard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            candidateId: selectedCandidate.id,
+            companyId: contact.id,
+          }),
+        });
+        console.log("[Pre-generate] Standard draft cached");
+      } catch (err) {
+        console.error("[Pre-generate] Failed:", err);
+        // Silent fail - will generate when user opens email modal
+      }
+    };
+
+    preGenerateDraft();
+  }, [selectedCandidate, contact]);
 
   const displayPhone = contact?.phone ?? "No phone number";
   const displayEmail = contact?.email ?? "No email";
@@ -79,8 +141,15 @@ export const ContactDetail = memo(function ContactDetail({
     if (!contact) return;
     setLoadingPreview(true);
     setEmailSent(null);
+    setActiveDraftType("standard");
+    setResearchConfidence(null);
+    
     try {
-      const response = await fetch(`/api/contacts/${contact.id}/send-email?preview=1`, {
+      // Build URL with candidate IDs
+      const candidateIds = emailCandidates.map((c) => c.id).join(",");
+      const url = `/api/contacts/${contact.id}/send-email${candidateIds ? `?candidateIds=${candidateIds}` : ""}`;
+      
+      const response = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
@@ -91,45 +160,285 @@ export const ContactDetail = memo(function ContactDetail({
       setEmailPreview({
         recipients: json.data.recipients,
         subject: json.data.subject,
-        body: json.data.body,
+        body: json.data.bodyHtml, // Full HTML with signature for preview display
+        attachments: json.data.attachments || [],
         hasAttachment: json.data.hasAttachment,
+        candidateErrors: json.data.candidateErrors || false,
+        canSend: json.data.canSend !== false,
       });
+      
+      // Auto-fetch standard draft if we have a candidate
+      const candidateForDraft = emailCandidates[0];
+      if (candidateForDraft) {
+        setGeneratingAi("standard");
+        try {
+          const draftResponse = await fetch("/api/email-draft/standard", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              candidateId: candidateForDraft.id,
+              companyId: contact.id,
+            }),
+          });
+          const draftJson = await draftResponse.json();
+          if (draftResponse.ok && draftJson.data?.body) {
+            setEditableSubject(draftJson.data.subject || json.data.subject);
+            setEditableBody(draftJson.data.body);
+            setActiveDraftType("standard");
+          } else {
+            // Fallback to default body
+            setEditableSubject(json.data.subject);
+            setEditableBody(json.data.bodyText);
+          }
+        } catch {
+          // Fallback to default body
+          setEditableSubject(json.data.subject);
+          setEditableBody(json.data.bodyText);
+        } finally {
+          setGeneratingAi(null);
+        }
+      } else {
+        setEditableSubject(json.data.subject);
+        setEditableBody(json.data.bodyText);
+      }
     } catch (err) {
       setEmailSent({
-        success: false,
+        status: "error",
         message: err instanceof Error ? err.message : "Vorschau konnte nicht geladen werden",
       });
     } finally {
       setLoadingPreview(false);
     }
-  }, [contact]);
+  }, [contact, emailCandidates]);
 
   const handleSendEmail = useCallback(async () => {
     if (!contact) return;
     setSendingEmail(true);
     try {
+      const candidateIds = emailCandidates.map((c) => c.id);
       const response = await fetch(`/api/contacts/${contact.id}/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateIds,
+          subject: editableSubject,
+          body: editableBody,
+        }),
       });
       const json = await response.json();
+      
       if (!response.ok) {
-        throw new Error(json.error || "E-Mail konnte nicht gesendet werden");
+        // Include debug info in error message if available
+        let errorMsg = json.error || "E-Mail konnte nicht gesendet werden";
+        if (json.details?.debugInfo) {
+          const dbg = json.details.debugInfo;
+          console.log("[Email Send Debug]", dbg);
+          errorMsg += `\n\n📋 Debug: ${dbg.contactPersonsCount} Kontaktperson(en) gefunden`;
+          if (dbg.contactPersons?.length > 0) {
+            errorMsg += `: ${dbg.contactPersons.map((p: { name: string; email: string }) => 
+              `${p.name} (${p.email})`).join(", ")}`;
+          }
+        }
+        throw new Error(errorMsg);
       }
+      
+      // Build message with attempted/sent/failed
+      const { recipients = [], failedRecipients = [], attemptedRecipients = [], debugInfo } = json.data;
+      console.log("[Email Send Success]", { recipients, failedRecipients, attemptedRecipients, debugInfo });
+      
+      const sentCount = recipients.length;
+      const failedCount = failedRecipients?.length || 0;
+      const attemptedCount = attemptedRecipients?.length || sentCount + failedCount;
+      const hasFailures = failedCount > 0;
+      const status: EmailSentState["status"] = hasFailures
+        ? sentCount > 0
+          ? "warning"
+          : "error"
+        : "success";
+
+      const sentLine = sentCount > 0 ? `Gesendet: ${recipients.join(", ")}` : "Gesendet: –";
+      const attemptedLine =
+        attemptedRecipients && attemptedRecipients.length > 0
+          ? `Versucht: ${attemptedRecipients.map((a: { email: string; name?: string }) => a.name ? `${a.name} <${a.email}>` : a.email).join(", ")}`
+          : undefined;
+      const failedLine =
+        failedCount > 0
+          ? `Fehlgeschlagen: ${failedRecipients
+              .map((f: { email: string; error: string }) => `${f.email} (${f.error})`)
+              .join(", ")}`
+          : undefined;
+
+      let message = hasFailures
+        ? `⚠️ ${sentCount}/${attemptedCount} E-Mails gesendet.\n${sentLine}`
+        : `✅ E-Mail gesendet an ${sentCount} Empfänger:\n${recipients.join(", ")}`;
+
+      if (attemptedLine) {
+        message += `\n${attemptedLine}`;
+      }
+      if (failedLine) {
+        message += `\n${failedLine}`;
+      }
+      
       setEmailSent({
-        success: true,
-        message: `E-Mail gesendet an: ${json.data.recipients.join(", ")}`,
+        status,
+        message,
       });
-      setEmailPreview(null);
+      if (status === "success") {
+        setEmailPreview(null);
+      }
     } catch (err) {
       setEmailSent({
-        success: false,
+        status: "error",
         message: err instanceof Error ? err.message : "E-Mail konnte nicht gesendet werden",
       });
     } finally {
       setSendingEmail(false);
     }
-  }, [contact]);
+  }, [contact, emailCandidates, editableSubject, editableBody]);
+
+  // Remove a candidate from the email attachments
+  const handleRemoveCandidate = useCallback((candidateId: string) => {
+    setEmailCandidates((prev) => prev.filter((c) => c.id !== candidateId));
+    // Update local attachments list
+    setEmailPreview((prev) => {
+      if (!prev) return prev;
+      const candidate = emailCandidates.find((c) => c.id === candidateId);
+      if (!candidate) return prev;
+      const fileName = `KP - ${candidate.first_name} ${candidate.last_name}.pdf`;
+      const newAttachments = prev.attachments.filter((a) => a.name !== fileName);
+      return {
+        ...prev,
+        attachments: newAttachments,
+        candidateErrors: newAttachments.some((a) => a.type === "candidate" && a.error),
+        canSend: !newAttachments.some((a) => a.type === "candidate" && a.error),
+      };
+    });
+  }, [emailCandidates]);
+
+  // Add a candidate from the picker
+  const handleAddCandidate = useCallback((candidate: TmaCandidate) => {
+    setEmailCandidates((prev) => {
+      // Don't add duplicates
+      if (prev.some((c) => c.id === candidate.id)) return prev;
+      return [...prev, candidate];
+    });
+    // Add to local attachments list (optimistic - will be validated on send)
+    setEmailPreview((prev) => {
+      if (!prev) return prev;
+      const fileName = `KP - ${candidate.first_name} ${candidate.last_name}.pdf`;
+      // Check if already in attachments
+      if (prev.attachments.some((a) => a.name === fileName)) return prev;
+      // Add new candidate attachment before AGB
+      const agbIndex = prev.attachments.findIndex((a) => a.type === "agb");
+      const newAttachment: AttachmentInfo = {
+        name: fileName,
+        type: "candidate",
+        // Optimistically assume profile exists - will be validated on send
+        error: candidate.short_profile_url ? undefined : "Kein Kurzprofil vorhanden",
+      };
+      const newAttachments = [...prev.attachments];
+      if (agbIndex >= 0) {
+        newAttachments.splice(agbIndex, 0, newAttachment);
+      } else {
+        newAttachments.push(newAttachment);
+      }
+      return {
+        ...prev,
+        attachments: newAttachments,
+        candidateErrors: newAttachments.some((a) => a.type === "candidate" && a.error),
+        canSend: !newAttachments.some((a) => a.type === "candidate" && a.error),
+      };
+    });
+    setShowCandidatePicker(false);
+  }, []);
+
+  // Generate standard draft (cached, no web research)
+  const handleGenerateStandard = useCallback(async () => {
+    if (!contact) return;
+    
+    const candidateForDraft = emailCandidates[0];
+    if (!candidateForDraft) {
+      setAiError(tEmail("aiNoCandidateError"));
+      return;
+    }
+
+    setGeneratingAi("standard");
+    setAiError(null);
+    setEditableBody("");
+
+    try {
+      const response = await fetch("/api/email-draft/standard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateId: candidateForDraft.id,
+          companyId: contact.id,
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        throw new Error(json.error || tEmail("aiError"));
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      setEditableSubject(json.data.subject);
+      setEditableBody(json.data.body);
+      setActiveDraftType("standard");
+      setResearchConfidence(null);
+    } catch (err) {
+      console.error("Standard draft error:", err);
+      setAiError(err instanceof Error ? err.message : tEmail("aiError"));
+    } finally {
+      setGeneratingAi(null);
+    }
+  }, [contact, emailCandidates, tEmail]);
+
+  // Generate best draft (with web research)
+  const handleGenerateBest = useCallback(async () => {
+    if (!contact) return;
+    
+    const candidateForDraft = emailCandidates[0];
+    if (!candidateForDraft) {
+      setAiError(tEmail("aiNoCandidateError"));
+      return;
+    }
+
+    setGeneratingAi("best");
+    setAiError(null);
+    setEditableBody("");
+
+    try {
+      const response = await fetch("/api/email-draft/best", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateId: candidateForDraft.id,
+          companyId: contact.id,
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        throw new Error(json.error || tEmail("aiError"));
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      setEditableSubject(json.data.subject);
+      setEditableBody(json.data.body);
+      setActiveDraftType("best");
+      setResearchConfidence(json.data.confidence || null);
+    } catch (err) {
+      console.error("Best draft error:", err);
+      setAiError(err instanceof Error ? err.message : tEmail("aiError"));
+    } finally {
+      setGeneratingAi(null);
+    }
+  }, [contact, emailCandidates, tEmail]);
 
   if (!contact) {
     return (
@@ -218,8 +527,10 @@ export const ContactDetail = memo(function ContactDetail({
             {emailSent && (
               <div className={cn(
                 "mt-3 rounded-lg px-3 py-2 text-sm",
-                emailSent.success 
+                emailSent.status === "success"
                   ? "bg-green-50 text-green-700 border border-green-200" 
+                  : emailSent.status === "warning"
+                  ? "bg-amber-50 text-amber-700 border border-amber-200"
                   : "bg-red-50 text-red-600 border border-red-200"
               )}>
                 {emailSent.message}
@@ -362,17 +673,106 @@ export const ContactDetail = memo(function ContactDetail({
 
       {/* Email Preview Modal */}
       <Modal open={emailPreview !== null} onClose={() => setEmailPreview(null)}>
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">E-Mail Vorschau</h3>
-            <p className="text-sm text-gray-500">Überprüfe die E-Mail bevor du sie versendest.</p>
+        <div className="space-y-4 max-w-2xl">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">{tEmail("preview")}</h3>
+              <p className="text-sm text-gray-500">{tEmail("previewDescription")}</p>
+            </div>
+            {/* AI Generate Buttons - Standard & Best (with research) */}
+            {emailCandidates.length > 0 && (
+              <div className="flex gap-2">
+                {/* Standard Draft Button */}
+                <button
+                  type="button"
+                  onClick={handleGenerateStandard}
+                  disabled={!!generatingAi}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                    generatingAi === "standard"
+                      ? "bg-gray-200 text-gray-500 cursor-wait border border-gray-300"
+                      : generatingAi
+                      ? "bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-100"
+                      : activeDraftType === "standard"
+                      ? "bg-gray-200 text-gray-800 border border-gray-300"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
+                  )}
+                >
+                  {generatingAi === "standard" ? (
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                    </svg>
+                  )}
+                  {tEmail("draftStandard")}
+                </button>
+                
+                {/* Best Draft Button (with research) */}
+                <button
+                  type="button"
+                  onClick={handleGenerateBest}
+                  disabled={!!generatingAi}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                    generatingAi === "best"
+                      ? "bg-purple-200 text-purple-500 cursor-wait"
+                      : generatingAi
+                      ? "bg-purple-50 text-purple-200 cursor-not-allowed"
+                      : activeDraftType === "best"
+                      ? "bg-purple-600 text-white shadow-md"
+                      : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:from-purple-600 hover:to-indigo-600 shadow-sm hover:shadow-md"
+                  )}
+                >
+                  {generatingAi === "best" ? (
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  )}
+                  {tEmail("draftBest")}
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* AI Error Message */}
+          {aiError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+              {aiError}
+            </div>
+          )}
+
+          {/* Research Confidence Indicator (for Best drafts) */}
+          {activeDraftType === "best" && researchConfidence && (
+            <div className={cn(
+              "rounded-lg border px-3 py-2 text-sm flex items-center gap-2",
+              researchConfidence === "high" 
+                ? "border-green-200 bg-green-50 text-green-700"
+                : researchConfidence === "medium"
+                ? "border-amber-200 bg-amber-50 text-amber-700"
+                : "border-gray-200 bg-gray-50 text-gray-600"
+            )}>
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {tEmail("researchConfidence")}: {tEmail(`confidence${researchConfidence.charAt(0).toUpperCase() + researchConfidence.slice(1)}`)}
+            </div>
+          )}
           
           {emailPreview && (
             <>
               <div className="space-y-3">
+                {/* Recipients */}
                 <div>
-                  <label className="text-xs uppercase text-gray-400">Empfänger</label>
+                  <label className="text-xs uppercase text-gray-400">{tEmail("recipients")}</label>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {emailPreview.recipients.map((email, i) => (
                       <span key={i} className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
@@ -381,53 +781,169 @@ export const ContactDetail = memo(function ContactDetail({
                     ))}
                   </div>
                 </div>
+
+                {/* Editable Subject */}
                 <div>
-                  <label className="text-xs uppercase text-gray-400">Betreff</label>
-                  <p className="mt-1 text-sm font-medium text-gray-900">{emailPreview.subject}</p>
-                </div>
-                <div>
-                  <label className="text-xs uppercase text-gray-400">Nachricht</label>
-                  <div 
-                    className="mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700"
-                    dangerouslySetInnerHTML={{ __html: emailPreview.body }}
+                  <label className="text-xs uppercase text-gray-400">{tEmail("subject")}</label>
+                  <Input
+                    className="mt-1"
+                    value={editableSubject}
+                    onChange={(e) => setEditableSubject(e.target.value)}
+                    placeholder={tEmail("subjectPlaceholder")}
                   />
                 </div>
-                {emailPreview.hasAttachment && (
-                  <div>
-                    <label className="text-xs uppercase text-gray-400">Anhang</label>
-                    <div className="mt-1 flex items-center gap-2 text-sm text-gray-700">
-                      <svg className="h-4 w-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                      </svg>
-                      AGB QERO AG.pdf
-                    </div>
+
+                {/* Editable Body */}
+                <div>
+                  <label className="text-xs uppercase text-gray-400">{tEmail("message")}</label>
+                  <div className="relative mt-1">
+                    <Textarea
+                      className={cn(
+                        "min-h-[150px] font-mono text-xs transition-opacity",
+                        generatingAi && "opacity-30"
+                      )}
+                      value={editableBody}
+                      onChange={(e) => setEditableBody(e.target.value)}
+                      placeholder={tEmail("messagePlaceholder")}
+                      disabled={!!generatingAi}
+                    />
+                    {/* Shimmer overlay while generating */}
+                    {generatingAi && (
+                      <div className="absolute inset-0 pointer-events-none rounded-md bg-white/80 backdrop-blur-[1px] flex items-start justify-start p-4">
+                        <div>
+                          <TextShimmer className="text-sm font-medium" duration={1.5}>
+                            {generatingAi === "best" ? tEmail("generatingBest") : tEmail("generatingStandard")}
+                          </TextShimmer>
+                          <p className="mt-2 text-xs text-gray-400">
+                            {generatingAi === "best" ? tEmail("generatingBestHint") : tEmail("generatingStandardHint")}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                  <p className="mt-1 text-xs text-gray-400">{tEmail("signatureNote")}</p>
+                </div>
+
+                {/* Attachments */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs uppercase text-gray-400">{tEmail("attachments")}</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCandidatePicker(true)}
+                      className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                    >
+                      <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      {tEmail("addCandidate")}
+                    </button>
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    {emailPreview.attachments.map((att, i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg border px-3 py-2",
+                          att.error
+                            ? "border-red-200 bg-red-50"
+                            : "border-gray-200 bg-gray-50"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <svg
+                            className={cn("h-4 w-4", att.error ? "text-red-500" : "text-red-500")}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span className={cn("text-sm", att.error ? "text-red-700" : "text-gray-700")}>
+                            {att.name}
+                          </span>
+                          {att.error && (
+                            <span className="text-xs text-red-500">— {att.error}</span>
+                          )}
+                        </div>
+                        {att.type === "candidate" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Find and remove the candidate matching this attachment
+                              const candidateName = att.name.replace("KP - ", "").replace(".pdf", "");
+                              const candidate = emailCandidates.find(
+                                (c) => `${c.first_name} ${c.last_name}` === candidateName
+                              );
+                              if (candidate) {
+                                handleRemoveCandidate(candidate.id);
+                              }
+                            }}
+                            className="ml-2 rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                            title={tCommon("remove")}
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {emailPreview.attachments.length === 0 && (
+                      <p className="text-sm text-gray-400 italic">{tEmail("noAttachments")}</p>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {emailSent && (
-                <div className={cn(
+              {/* Error/Success Messages */}
+            {emailSent && (
+              <div
+                className={cn(
                   "rounded-lg px-3 py-2 text-sm",
-                  emailSent.success 
-                    ? "bg-green-50 text-green-700 border border-green-200" 
+                  emailSent.status === "success"
+                    ? "bg-green-50 text-green-700 border border-green-200"
+                    : emailSent.status === "warning"
+                    ? "bg-amber-50 text-amber-700 border border-amber-200"
                     : "bg-red-50 text-red-600 border border-red-200"
-                )}>
-                  {emailSent.message}
+                )}
+              >
+                {emailSent.message}
+              </div>
+            )}
+
+              {emailPreview.candidateErrors && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                  {tEmail("missingProfilesWarning")}
                 </div>
               )}
 
+              {/* Actions */}
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => setEmailPreview(null)} disabled={sendingEmail}>
-                  Abbrechen
+                  {tCommon("cancel")}
                 </Button>
-                <Button onClick={handleSendEmail} disabled={sendingEmail || emailSent?.success}>
-                  {sendingEmail ? "Senden..." : emailSent?.success ? "Gesendet ✓" : "Senden"}
+                <Button
+                  onClick={handleSendEmail}
+                  disabled={sendingEmail || emailSent?.status === "success" || !emailPreview.canSend}
+                >
+                  {sendingEmail ? tEmail("sending") : emailSent?.status === "success" ? tEmail("sent") : tEmail("send")}
                 </Button>
               </div>
             </>
           )}
         </div>
       </Modal>
+
+      {/* Candidate Picker Modal for adding to email */}
+      <CandidatePickerModal
+        open={showCandidatePicker}
+        onClose={() => setShowCandidatePicker(false)}
+        onSelect={handleAddCandidate}
+      />
 
       {/* Vacancy Quick View Popup */}
       <VacancyQuickView

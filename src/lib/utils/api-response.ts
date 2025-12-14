@@ -9,6 +9,7 @@ interface ApiSuccessResponse<T> {
 interface ApiErrorResponse {
   data: null;
   error: string;
+  details?: Record<string, unknown>;
 }
 
 export function respondSuccess<T>(
@@ -24,10 +25,11 @@ export function respondSuccess<T>(
   return NextResponse.json(payload, { status: options?.status ?? 200 });
 }
 
-export function respondError(message: string, status = 400) {
+export function respondError(message: string, status = 400, details?: Record<string, unknown>) {
   const payload: ApiErrorResponse = {
     data: null,
     error: message,
+    ...(details ? { details } : {}),
   };
   return NextResponse.json(payload, { status });
 }

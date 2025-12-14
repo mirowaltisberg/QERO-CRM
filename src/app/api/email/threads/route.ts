@@ -35,31 +35,26 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
 
-    // Build query
+    // Conversation-based folders:
+    // - inbox: threads with at least one email_messages.folder='inbox'
+    // - sent:  threads with at least one email_messages.folder='sent'
+    //
+    // We filter via an inner-join to email_messages. The UI will fetch full thread
+    // details via /api/email/threads/[id] when a thread is opened.
     let query = supabase
       .from("email_threads")
-      .select(`
+      .select(
+        `
         *,
-        messages:email_messages(
+        folder_messages:email_messages!inner(
           id,
-          graph_message_id,
-          sender_email,
-          sender_name,
-          recipients,
-          cc,
-          bcc,
-          subject,
-          body_preview,
-          body_html,
-          body_text,
-          is_read,
-          has_attachments,
-          sent_at,
-          received_at
+          folder
         )
-      `, { count: "exact" })
+      `,
+        { count: "exact" }
+      )
       .eq("account_id", account.id)
-      .eq("folder", folder)
+      .eq("folder_messages.folder", folder)
       .order("last_message_at", { ascending: false });
 
     if (isStarred) {
@@ -82,8 +77,16 @@ export async function GET(request: NextRequest) {
       return respondError("Failed to fetch emails", 500);
     }
 
+    const cleanedThreads =
+      (threads || []).map((t: Record<string, unknown>) => {
+        // Remove the join-only field so the client still receives a clean EmailThread shape
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { folder_messages, ...rest } = t as Record<string, unknown>;
+        return rest;
+      });
+
     return respondSuccess({
-      threads: threads || [],
+      threads: cleanedThreads,
       total: count || 0,
       page,
       pageSize,

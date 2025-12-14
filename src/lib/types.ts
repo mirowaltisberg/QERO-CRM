@@ -66,6 +66,7 @@ export interface ContactPerson {
   mobile: string | null;
   direct_phone: string | null;
   email: string | null;
+  gender: "male" | "female" | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -377,11 +378,18 @@ export interface ContactCallLog {
   user_id: string;
   called_at: string;
   created_at: string;
+  for_candidate_id?: string | null;
   // Joined from profiles
   caller?: {
     id: string;
     full_name: string;
     avatar_url: string | null;
+  } | null;
+  // Joined from tma_candidates (when call was made for a specific candidate)
+  for_candidate?: {
+    id: string;
+    first_name: string;
+    last_name: string;
   } | null;
 }
 

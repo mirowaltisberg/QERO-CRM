@@ -191,19 +191,31 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
       if (cantonFilter && candidate.canton !== cantonFilter) return false;
       if (teamFilter && candidate.team_id !== teamFilter) return false;
       
-      // Search filter
+      // Search filter - matches any part of name, email, phone, position, or canton
       if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const searchableFields = [
-          candidate.first_name,
-          candidate.last_name,
-          candidate.email,
-          candidate.phone,
-          candidate.position_title,
-          candidate.canton,
-        ].filter(Boolean).join(" ").toLowerCase();
+        const query = searchQuery.toLowerCase().trim();
+        const firstName = (candidate.first_name || "").toLowerCase();
+        const lastName = (candidate.last_name || "").toLowerCase();
+        const fullName = `${firstName} ${lastName}`;
+        const reverseName = `${lastName} ${firstName}`;
+        const email = (candidate.email || "").toLowerCase();
+        const phone = (candidate.phone || "").toLowerCase();
+        const position = (candidate.position_title || "").toLowerCase();
+        const canton = (candidate.canton || "").toLowerCase();
+        const city = (candidate.city || "").toLowerCase();
         
-        if (!searchableFields.includes(query)) return false;
+        const matches = 
+          firstName.includes(query) ||
+          lastName.includes(query) ||
+          fullName.includes(query) ||
+          reverseName.includes(query) ||
+          email.includes(query) ||
+          phone.includes(query) ||
+          position.includes(query) ||
+          canton.includes(query) ||
+          city.includes(query);
+        
+        if (!matches) return false;
       }
       
       return true;
