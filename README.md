@@ -29,6 +29,21 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Environment Variables
+
+The following environment variables are required:
+
+### Required
+- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (server-side only)
+
+### Optional
+- `OPENROUTESERVICE_API_KEY` - API key for OpenRouteService (used for driving time calculation)
+  - Get a free key at https://openrouteservice.org/dev/#/signup
+  - Free tier: 2,000 requests/day, 40 requests/minute
+  - Without this key, the car travel time feature will not work
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.

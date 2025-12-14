@@ -14,6 +14,16 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.30.0",
+    date: "2025-12-14",
+    type: "minor",
+    changes: [
+      "Travel time widget: see drive time (Auto) and public transport time (ÖV) from TMA to company",
+      "Click on travel time to open route in Google Maps",
+      "Uses OpenRouteService for driving and Swiss transport API for public transport",
+    ],
+  },
+  {
     version: "1.29.0",
     date: "2025-12-14",
     type: "minor",

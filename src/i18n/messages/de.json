@@ -499,5 +499,17 @@
     "callForCandidate": "Für einen Kandidaten anrufen?",
     "callForCandidateHint": "Firmen werden nach Entfernung sortiert",
     "companies": "Firmen"
+  },
+  "travelTime": {
+    "title": "Reisezeit",
+    "byCar": "Auto",
+    "byTransit": "ÖV",
+    "calculating": "Berechne...",
+    "error": "Fehler",
+    "routeError": "Route nicht gefunden",
+    "openInMaps": "In Google Maps öffnen",
+    "calculateDriving": "Fahrzeit berechnen",
+    "calculateTransit": "ÖV-Zeit berechnen",
+    "missingCoordinates": "Koordinaten fehlen"
   }
 }

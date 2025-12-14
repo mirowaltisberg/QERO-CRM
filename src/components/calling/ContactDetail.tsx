@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { NotesPanel } from "./NotesPanel";
 import { ContactPersonsPanel } from "./ContactPersonsPanel";
+import { TravelTimeWidget } from "./TravelTimeWidget";
 
 type EmailSentState = { status: "success" | "warning" | "error"; message: string };
 import { VacancyQuickView } from "./VacancyQuickView";
@@ -509,6 +510,19 @@ export const ContactDetail = memo(function ContactDetail({
                   {[contact.street, contact.postal_code, contact.city].filter(Boolean).join(", ")}
                 </span>
               </div>
+            )}
+            {/* Travel time widget - only show when candidate is selected and both have coordinates */}
+            {selectedCandidate?.latitude && selectedCandidate?.longitude && 
+             contact.latitude && contact.longitude && (
+              <TravelTimeWidget
+                fromLat={selectedCandidate.latitude}
+                fromLng={selectedCandidate.longitude}
+                toLat={contact.latitude}
+                toLng={contact.longitude}
+                candidateName={`${selectedCandidate.first_name} ${selectedCandidate.last_name}`}
+                companyName={contact.company_name}
+                className="mt-4 pt-3 border-t border-gray-100"
+              />
             )}
             {/* Mobile email button */}
             {isMobile && (

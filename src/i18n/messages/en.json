@@ -503,5 +503,17 @@
     "callForCandidate": "Call for a specific candidate?",
     "callForCandidateHint": "Companies will be sorted by distance",
     "companies": "companies"
+  },
+  "travelTime": {
+    "title": "Travel Time",
+    "byCar": "Car",
+    "byTransit": "Transit",
+    "calculating": "Calculating...",
+    "error": "Error",
+    "routeError": "Route not found",
+    "openInMaps": "Open in Google Maps",
+    "calculateDriving": "Calculate drive time",
+    "calculateTransit": "Calculate transit time",
+    "missingCoordinates": "Coordinates missing"
   }
 }
