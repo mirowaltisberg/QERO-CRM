@@ -79,24 +79,32 @@ async function findNearestStation(
   // transport.opendata.ch uses x=lat, y=lng (unusual order)
   const url = `${TRANSPORT_API_URL}/locations?x=${lat}&y=${lng}&type=station`;
   
-  const response = await fetch(url);
-  if (!response.ok) {
-    console.error("[TravelTime] Transport API locations error:", response.status);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error("[TravelTime] Transport API locations error:", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    const stations = data.stations || [];
+    
+    // Find the first station with a valid ID (filter out addresses with null ID)
+    const validStation = stations.find((s: { id: string | null; name: string }) => s.id !== null);
+    
+    if (!validStation) {
+      console.log("[TravelTime] No valid station found near", lat, lng);
+      return null;
+    }
+
+    return {
+      id: validStation.id,
+      name: validStation.name,
+    };
+  } catch (err) {
+    console.error("[TravelTime] Error finding station:", err);
     return null;
   }
-
-  const data = await response.json();
-  const stations = data.stations || [];
-  
-  if (stations.length === 0) {
-    return null;
-  }
-
-  // Return the first (nearest) station
-  return {
-    id: stations[0].id,
-    name: stations[0].name,
-  };
 }
 
 /**
