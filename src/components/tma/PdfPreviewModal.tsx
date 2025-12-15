@@ -69,10 +69,31 @@ export function PdfPreviewModal({
   // Container ref for measuring available space
   const containerRef = useRef<HTMLDivElement>(null);
   
+  // Measured container dimensions
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(0);
+  
   // Keep ref in sync
   useEffect(() => {
     annotationsRef.current = annotations;
   }, [annotations]);
+  
+  // Measure container with ResizeObserver
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        // Use contentRect for inner dimensions (excluding padding)
+        setContainerWidth(entry.contentRect.width);
+        setContainerHeight(entry.contentRect.height);
+      }
+    });
+    
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   // Load annotations on open
   useEffect(() => {
@@ -162,8 +183,18 @@ export function PdfPreviewModal({
     triggerAutoSave();
   }, [triggerAutoSave]);
 
-  // Calculate viewport dimensions based on view size
+  // Calculate viewport dimensions based on view size AND measured container
   const getViewportDimensions = useCallback(() => {
+    // If we have measured dimensions, use them (subtract padding)
+    if (containerWidth > 0 && containerHeight > 0) {
+      const padding = 32; // p-4 = 16px * 2
+      return {
+        maxWidth: containerWidth - padding,
+        maxHeight: containerHeight - padding,
+      };
+    }
+    
+    // Fallback before container is measured
     if (typeof window === "undefined") {
       return { maxWidth: 700, maxHeight: 600 };
     }
@@ -172,28 +203,28 @@ export function PdfPreviewModal({
       case "fullscreen":
         return {
           maxWidth: window.innerWidth - 100,
-          maxHeight: window.innerHeight - 200, // Account for header/footer
+          maxHeight: window.innerHeight - 250,
         };
       case "large":
         return {
           maxWidth: 1000,
-          maxHeight: window.innerHeight - 280,
+          maxHeight: window.innerHeight - 300,
         };
       default:
         return {
           maxWidth: 700,
-          maxHeight: 600,
+          maxHeight: 550,
         };
     }
-  }, [viewSize]);
+  }, [viewSize, containerWidth, containerHeight]);
 
-  // Recalculate render dimensions when view size or PDF dimensions change
+  // Recalculate render dimensions when container size or PDF dimensions change
   const calculateRenderSize = useCallback(() => {
     if (pdfWidth === 0 || pdfHeight === 0) return;
     
     const { maxWidth, maxHeight } = getViewportDimensions();
     
-    // Fit-to-page: scale to fit both width AND height
+    // Fit-to-page: scale to fit both width AND height (no scrolling)
     const scaleW = maxWidth / pdfWidth;
     const scaleH = maxHeight / pdfHeight;
     const scale = Math.min(scaleW, scaleH, 2); // Cap at 2x zoom
@@ -202,10 +233,10 @@ export function PdfPreviewModal({
     setRenderHeight(Math.round(pdfHeight * scale));
   }, [pdfWidth, pdfHeight, getViewportDimensions]);
 
-  // Recalculate when view size changes
+  // Recalculate when view size, container dimensions, or PDF dimensions change
   useEffect(() => {
     calculateRenderSize();
-  }, [viewSize, calculateRenderSize]);
+  }, [calculateRenderSize]);
 
   const handleClearAll = useCallback(() => {
     if (confirm("Alle Notizen löschen?")) {
@@ -226,19 +257,10 @@ export function PdfPreviewModal({
   };
 
   const onPageLoadSuccess = useCallback(({ width, height }: { width: number; height: number }) => {
-    // Store original PDF dimensions
+    // Store original PDF dimensions - this triggers calculateRenderSize via useEffect
     setPdfWidth(width);
     setPdfHeight(height);
-    
-    // Calculate initial render size
-    const { maxWidth, maxHeight } = getViewportDimensions();
-    const scaleW = maxWidth / width;
-    const scaleH = maxHeight / height;
-    const scale = Math.min(scaleW, scaleH, 2);
-    
-    setRenderWidth(Math.round(width * scale));
-    setRenderHeight(Math.round(height * scale));
-  }, [getViewportDimensions]);
+  }, []);
 
   // Determine modal size
   const modalSize = viewSize === "fullscreen" ? "full" : viewSize === "large" ? "xl" : "lg";
