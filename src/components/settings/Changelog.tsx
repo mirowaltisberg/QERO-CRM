@@ -14,6 +14,16 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.30.1",
+    date: "2025-12-14",
+    type: "patch",
+    changes: [
+      "Redesigned travel time buttons with logo-only icons",
+      "Car button with blue car icon, ÖV button with official SBB logo",
+      "Time displays next to logo when calculated",
+    ],
+  },
+  {
     version: "1.30.0",
     date: "2025-12-14",
     type: "minor",

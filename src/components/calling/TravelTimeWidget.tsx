@@ -112,71 +112,78 @@ export function TravelTimeWidget({
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <p className="text-xs uppercase tracking-wide text-gray-400 flex items-center gap-1.5">
-        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H19.5m-9.75 0h10.5M3.375 14.25h10.5M3.375 14.25v-1.5c0-.621.504-1.125 1.125-1.125h1.5m0 0h10.5m-10.5 0V9.375c0-.621.504-1.125 1.125-1.125h8.25c.621 0 1.125.504 1.125 1.125v2.25" />
-        </svg>
+      <p className="text-xs uppercase tracking-wide text-gray-400">
         {t("title")}
       </p>
       
-      <div className="flex gap-2 flex-wrap">
-        {/* Driving button */}
-        <Button
-          size="sm"
-          variant={drivingResult && !drivingResult.error ? "secondary" : "ghost"}
+      <div className="flex gap-3 items-center">
+        {/* Driving button - Car logo */}
+        <button
           onClick={handleDrivingClick}
           disabled={loadingDriving}
           className={cn(
-            "flex items-center gap-1.5 text-xs",
-            drivingResult && !drivingResult.error && "bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+            "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all",
+            "hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500",
+            loadingDriving && "opacity-50 cursor-wait",
+            drivingResult && !drivingResult.error 
+              ? "bg-blue-50 border-blue-200 hover:bg-blue-100" 
+              : "bg-white border-gray-200 hover:border-gray-300"
           )}
           title={drivingResult && !drivingResult.error ? t("openInMaps") : t("calculateDriving")}
         >
-          {/* Car icon */}
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H19.5m-9.75 0h10.5M3.375 14.25h10.5M3.375 14.25v-1.5c0-.621.504-1.125 1.125-1.125h1.5m0 0h10.5m-10.5 0V9.375c0-.621.504-1.125 1.125-1.125h8.25c.621 0 1.125.504 1.125 1.125v2.25" />
+          {/* Car logo - filled style */}
+          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
+            <path 
+              d="M5 11l1.5-4.5a2 2 0 0 1 1.9-1.5h7.2a2 2 0 0 1 1.9 1.5L19 11M5 11v6a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-6M5 11h14M7.5 14.5a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0Zm8 0a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0Z" 
+              stroke="#2563eb" 
+              strokeWidth="1.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            />
           </svg>
           {loadingDriving ? (
-            <span className="animate-pulse">{t("calculating")}</span>
+            <span className="text-sm text-gray-500 animate-pulse">...</span>
           ) : drivingResult ? (
             drivingResult.error ? (
-              <span className="text-red-500">{t("error")}</span>
+              <span className="text-sm text-red-500">!</span>
             ) : (
-              <span>{formatDurationMinutes(drivingResult.durationMinutes)}</span>
+              <span className="text-sm font-medium text-blue-700">
+                {formatDurationMinutes(drivingResult.durationMinutes)}
+              </span>
             )
-          ) : (
-            t("byCar")
-          )}
-        </Button>
+          ) : null}
+        </button>
 
-        {/* Transit button */}
-        <Button
-          size="sm"
-          variant={transitResult && !transitResult.error ? "secondary" : "ghost"}
+        {/* Transit button - SBB logo */}
+        <button
           onClick={handleTransitClick}
           disabled={loadingTransit}
           className={cn(
-            "flex items-center gap-1.5 text-xs",
-            transitResult && !transitResult.error && "bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+            "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all",
+            "hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500",
+            loadingTransit && "opacity-50 cursor-wait",
+            transitResult && !transitResult.error 
+              ? "bg-red-50 border-red-200 hover:bg-red-100" 
+              : "bg-white border-gray-200 hover:border-gray-300"
           )}
           title={transitResult && !transitResult.error ? t("openInMaps") : t("calculateTransit")}
         >
           {/* SBB Swiss Railway logo */}
-          <svg className="h-4 w-4" viewBox="0 0 298 186" fill="none">
+          <svg className="h-6 w-6" viewBox="0 0 298 186" fill="none">
             <path fill="#D82E20" d="M 204.0 154.5 L 169.5 154.0 L 217.0 106.5 L 157.0 106.5 L 156.0 154.5 L 128.5 154.0 L 128.0 106.5 L 68.0 106.5 L 115.5 154.0 L 81.0 154.5 L 18.5 92.0 L 80.0 30.5 L 115.5 31.0 L 68.0 78.5 L 128.0 78.5 L 129.0 30.5 L 156.5 31.0 L 157.0 78.5 L 217.0 78.5 L 169.5 31.0 L 205.0 30.5 L 265.5 93.0 Z"/>
           </svg>
           {loadingTransit ? (
-            <span className="animate-pulse">{t("calculating")}</span>
+            <span className="text-sm text-gray-500 animate-pulse">...</span>
           ) : transitResult ? (
             transitResult.error ? (
-              <span className="text-red-500">{t("error")}</span>
+              <span className="text-sm text-red-500">!</span>
             ) : (
-              <span>{formatDurationMinutes(transitResult.durationMinutes)}</span>
+              <span className="text-sm font-medium text-red-700">
+                {formatDurationMinutes(transitResult.durationMinutes)}
+              </span>
             )
-          ) : (
-            t("byTransit")
-          )}
-        </Button>
+          ) : null}
+        </button>
       </div>
 
       {/* Show station info for transit if available */}
