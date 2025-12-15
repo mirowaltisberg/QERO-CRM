@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@supabase/ssr";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const MICROSOFT_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
@@ -49,11 +49,32 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/settings?error=invalid_state", request.url));
   }
 
-  // Verify user is still logged in
-  const supabase = await createClient();
+  // Verify user is still logged in (use request cookies for API routes)
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll() {
+          // No-op for read-only auth check
+        },
+      },
+    }
+  );
   const { data: { user } } = await supabase.auth.getUser();
 
+  console.log("[Email Callback] Auth check:", {
+    hasUser: !!user,
+    userId: user?.id,
+    expectedUserId: userId,
+    match: user?.id === userId,
+  });
+
   if (!user || user.id !== userId) {
+    console.error("[Email Callback] User mismatch or not logged in");
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@supabase/ssr";
 
 // Microsoft OAuth endpoints
 const MICROSOFT_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
@@ -16,10 +16,33 @@ const SCOPES = [
 ].join(" ");
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Create Supabase client with request cookies directly (for API routes)
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll() {
+          // No-op for read-only auth check
+        },
+      },
+    }
+  );
+  
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  console.log("[Email Connect] Auth check:", {
+    hasUser: !!user,
+    userId: user?.id,
+    authError: authError?.message,
+    cookies: request.cookies.getAll().map(c => c.name),
+  });
 
   if (!user) {
+    console.error("[Email Connect] No user session, redirecting to login");
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
