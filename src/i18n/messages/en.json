@@ -249,7 +249,8 @@
     "newFile": "New file",
     "replace": "Replace",
     "invalidFileType": "Invalid file type. Please use PDF or DOCX.",
-    "fileTooLarge": "File too large. Maximum size is 5 MB."
+    "fileTooLarge": "File too large. Maximum size is 5 MB.",
+    "preview": "Preview"
   },
   "contact": {
     "title": "Contact",

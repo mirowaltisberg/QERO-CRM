@@ -13,6 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { NotesPanel } from "@/components/calling/NotesPanel";
 import { RoleDropdown } from "./RoleDropdown";
 import { DocumentDropCard } from "./DocumentDropCard";
+import { PdfPreviewModal } from "./PdfPreviewModal";
 import { HoldToConfirmButton } from "@/components/ui/HoldToConfirmButton";
 import type { TmaCandidate, TmaRole } from "@/lib/types";
 import { 
@@ -115,6 +116,7 @@ export function TmaDetail({
   const [qualityNote, setQualityNote] = useState(candidate?.quality_note ?? "");
   const qualityNoteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [uploading, setUploading] = useState<"cv" | "references" | "short_profile" | "ahv" | "id" | "bank" | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Sync quality note when candidate changes
   useEffect(() => {
@@ -237,6 +239,7 @@ export function TmaDetail({
     replace: t("replace"),
     invalidType: t("invalidFileType"),
     fileTooLarge: t("fileTooLarge"),
+    preview: t("preview"),
   }), [t, tCommon]);
   const statusTags = useMemo(() => getStatusTags(candidate), [candidate]);
   const activeRole = useMemo(() => {
@@ -640,6 +643,7 @@ export function TmaDetail({
                 url={candidate.short_profile_url}
                 uploading={uploading === "short_profile"}
                 onUpload={(file) => handleUpload(file, "short_profile")}
+                onPreview={candidate.short_profile_url ? () => setPreviewOpen(true) : undefined}
                 labels={documentLabels}
               />
             </div>
@@ -702,6 +706,17 @@ export function TmaDetail({
           </div>
         </div>
       </Modal>
+
+      {/* PDF Preview Modal for Short Profile */}
+      {candidate.short_profile_url && (
+        <PdfPreviewModal
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          pdfUrl={candidate.short_profile_url}
+          candidateId={candidate.id}
+          candidateName={`${candidate.first_name} ${candidate.last_name}`}
+        />
+      )}
     </section>
   );
 }

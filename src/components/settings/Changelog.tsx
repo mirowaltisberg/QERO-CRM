@@ -14,6 +14,17 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.32.0",
+    date: "2025-12-14",
+    type: "minor",
+    changes: [
+      "PDF Preview for Short Profile (Kurzprofil) with annotation tools",
+      "Draw on PDFs with pen tool, add text notes at any position",
+      "Annotations are saved and persist across sessions",
+      "Annotations are for viewing only - never sent with emails",
+    ],
+  },
+  {
     version: "1.31.1",
     date: "2025-12-14",
     type: "patch",

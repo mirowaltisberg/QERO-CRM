@@ -249,7 +249,8 @@
     "newFile": "Neue Datei",
     "replace": "Ersetzen",
     "invalidFileType": "Ungültiger Dateityp. Bitte PDF oder DOCX verwenden.",
-    "fileTooLarge": "Datei zu gross. Maximale Grösse ist 5 MB."
+    "fileTooLarge": "Datei zu gross. Maximale Grösse ist 5 MB.",
+    "preview": "Vorschau"
   },
   "contact": {
     "title": "Kontakt",

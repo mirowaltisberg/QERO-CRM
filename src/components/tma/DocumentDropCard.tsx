@@ -16,6 +16,8 @@ interface DocumentDropCardProps {
   accept?: string;
   uploading: boolean;
   onUpload: (file: File) => void;
+  /** Optional preview handler - when provided, shows a Preview button */
+  onPreview?: () => void;
   /** i18n labels */
   labels?: {
     formats?: string;
@@ -31,6 +33,7 @@ interface DocumentDropCardProps {
     replace?: string;
     invalidType?: string;
     fileTooLarge?: string;
+    preview?: string;
   };
 }
 
@@ -48,6 +51,7 @@ const defaultLabels = {
   replace: "Replace",
   invalidType: "Invalid file type. Please use PDF or DOCX.",
   fileTooLarge: "File too large. Maximum size is 5 MB.",
+  preview: "Preview",
 };
 
 export function DocumentDropCard({
@@ -56,6 +60,7 @@ export function DocumentDropCard({
   accept = ".pdf,.doc,.docx",
   uploading,
   onUpload,
+  onPreview,
   labels: customLabels,
 }: DocumentDropCardProps) {
   const labels = { ...defaultLabels, ...customLabels };
@@ -191,15 +196,33 @@ export function DocumentDropCard({
           <p className="text-xs text-gray-500">{labels.formats}</p>
           
           {url ? (
-            <a 
-              href={url} 
-              target="_blank" 
-              rel="noreferrer" 
-              className="mt-2 inline-flex text-sm text-blue-600 hover:text-blue-700"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {labels.viewDocument}
-            </a>
+            <div className="mt-2 flex items-center gap-3">
+              <a 
+                href={url} 
+                target="_blank" 
+                rel="noreferrer" 
+                className="text-sm text-blue-600 hover:text-blue-700"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {labels.viewDocument}
+              </a>
+              {onPreview && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPreview();
+                  }}
+                  className="flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {labels.preview}
+                </button>
+              )}
+            </div>
           ) : (
             <p className="mt-2 text-xs text-gray-400">{labels.noFile}</p>
           )}
