@@ -8,6 +8,7 @@ import { EmailList } from "./EmailList";
 import { EmailDetail } from "./EmailDetail";
 import { ComposeModal } from "./ComposeModal";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils/cn";
 import type { EmailThread, EmailFolder, EmailAccount } from "@/lib/types";
 
 interface Props {
@@ -41,8 +42,20 @@ export function EmailView({ account }: Props) {
   const [total, setTotal] = useState(0);
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
+  // Mobile state
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
+
   // Thread lookup map for O(1) access
   const threadMapRef = useRef<Map<string, EmailThread>>(new Map());
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Fetch thread list from database (conversation-based folders; full thread is fetched on open)
   const fetchThreads = useCallback(async (pageNum: number = 1, append: boolean = false) => {
@@ -218,6 +231,11 @@ export function EmailView({ account }: Props) {
 
   // Select thread - fetch full thread for DB threads, or fetch from Graph for live results
   const handleSelectThread = useCallback(async (threadId: string, isLiveResult?: boolean, graphMessageId?: string) => {
+    // On mobile, switch to detail view immediately
+    if (isMobile) {
+      setMobileView("detail");
+    }
+
     // Check if thread is in local map (synced emails)
     const thread = threadMapRef.current.get(threadId);
     
@@ -316,7 +334,13 @@ export function EmailView({ account }: Props) {
         setLoadingDetail(false);
       }
     }
-  }, [account?.id, folder]);
+  }, [account?.id, folder, isMobile]);
+
+  // Mobile back handler
+  const handleMobileBack = useCallback(() => {
+    setMobileView("list");
+    setSelectedThread(null);
+  }, []);
 
   // Handle reply
   const handleReply = useCallback((threadId: string, messageId: string) => {
@@ -395,6 +419,119 @@ export function EmailView({ account }: Props) {
   // Determine which threads to display
   const displayThreads = searchResults !== null ? searchResults : threads;
 
+  // Mobile layout
+  if (isMobile) {
+    return (
+      <div className="relative flex h-full w-full overflow-hidden">
+        {/* List View */}
+        <div
+          className="absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-out"
+          style={{
+            transform: mobileView === "list" ? "translateX(0)" : "translateX(-100%)",
+          }}
+        >
+          {/* Mobile Header with folder selector */}
+          <header 
+            className="flex items-center justify-between border-b border-gray-200 px-4 py-3"
+            style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
+          >
+            <div className="flex items-center gap-3">
+              <select
+                value={folder}
+                onChange={(e) => setFolder(e.target.value as EmailFolder)}
+                className="text-lg font-semibold text-gray-900 bg-transparent border-none focus:outline-none focus:ring-0 pr-6 appearance-none"
+                style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0 center", backgroundRepeat: "no-repeat", backgroundSize: "1.25rem" }}
+              >
+                <option value="inbox">{t("inbox")}</option>
+                <option value="sent">{t("sent")}</option>
+                <option value="drafts">{t("drafts")}</option>
+                <option value="archive">{t("archive")}</option>
+                <option value="trash">{t("trash")}</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition",
+                  syncing && "animate-pulse"
+                )}
+              >
+                <SyncIcon className={cn("h-5 w-5", syncing && "animate-spin")} />
+              </button>
+              <button
+                onClick={() => {
+                  setReplyTo(null);
+                  setComposeOpen(true);
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white"
+              >
+                <ComposeIcon className="h-5 w-5" />
+              </button>
+            </div>
+          </header>
+
+          <EmailList
+            threads={displayThreads}
+            selectedId={selectedThread?.id || null}
+            loading={loading}
+            loadingMore={loadingMore}
+            syncing={syncing}
+            error={error}
+            searchQuery={searchQuery}
+            searchSource={searchSource}
+            onSearchChange={handleSearchChange}
+            onSelect={handleSelectThread}
+            onSync={handleSync}
+            onToggleStar={handleToggleStar}
+            onLoadMore={handleLoadMore}
+            hasMore={hasMore && searchResults === null}
+            total={searchResults !== null ? displayThreads.length : total}
+            folder={folder}
+            mailbox={account.mailbox}
+            lastSyncAt={account.last_sync_at}
+            isMobile
+          />
+        </div>
+
+        {/* Detail View */}
+        <div
+          className="absolute inset-0 bg-white transition-transform duration-300 ease-out"
+          style={{
+            transform: mobileView === "detail" ? "translateX(0)" : "translateX(100%)",
+          }}
+        >
+          <EmailDetail
+            thread={selectedThread}
+            loading={loadingDetail}
+            onReply={handleReply}
+            onArchive={(id) => handleMoveThread(id, "archive")}
+            onDelete={(id) => handleMoveThread(id, "trash")}
+            onToggleStar={handleToggleStar}
+            onBack={handleMobileBack}
+            isMobile
+          />
+        </div>
+
+        <ComposeModal
+          open={composeOpen}
+          onClose={() => {
+            setComposeOpen(false);
+            setReplyTo(null);
+          }}
+          replyTo={replyTo}
+          onSent={() => {
+            setComposeOpen(false);
+            setReplyTo(null);
+            handleSync();
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Desktop layout
   return (
     <div className="flex h-full">
       <EmailFoldersRail
@@ -450,6 +587,22 @@ export function EmailView({ account }: Props) {
         }}
       />
     </div>
+  );
+}
+
+function SyncIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+    </svg>
+  );
+}
+
+function ComposeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+    </svg>
   );
 }
 

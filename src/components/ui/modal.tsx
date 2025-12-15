@@ -80,9 +80,10 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm"
       onClick={handleOverlayClick}
       role="presentation"
+      data-qero-modal="true"
     >
       <div
         ref={dialogRef}
@@ -95,6 +96,8 @@ export function Modal({
           sizeMap[size]
         )}
         style={{ transform: 'translateY(0)', animation: 'modalIn 280ms var(--transition-base)' }}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         {(title || description) && (
           <header className="border-b border-gray-100 px-4 py-3">

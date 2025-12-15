@@ -14,6 +14,66 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.36.0",
+    date: "2025-12-15",
+    type: "minor",
+    changes: [
+      "iOS Mobile Optimization: App now feels native on iPhone 16 Pro/Pro Max",
+      "Floating tab bar with rounded corners that doesn't clip on iPhone corners",
+      "Added 'More' tab with bottom sheet for Vacancies, Dashboard, Settings",
+      "Email redesigned for mobile with list/detail slide navigation",
+      "Proper iOS PWA safe-area support (viewport-fit: cover, 100dvh)",
+      "All pages updated with consistent safe-area padding",
+    ],
+  },
+  {
+    version: "1.35.7",
+    date: "2025-12-15",
+    type: "patch",
+    changes: [
+      "Fixed: Search now works in Calling tab when TMA candidate is selected",
+      "Company list properly filters by search query in candidate mode",
+    ],
+  },
+  {
+    version: "1.35.6",
+    date: "2025-12-15",
+    type: "patch",
+    changes: [
+      "Fixed: 'Neue Ansprechperson' modal now stays open when clicking inputs",
+      "Sheet component now uses non-modal mode to allow nested portaled modals",
+      "Overlay click-to-close preserved with nested modal protection",
+    ],
+  },
+  {
+    version: "1.35.1",
+    date: "2025-12-15",
+    type: "patch",
+    changes: [
+      "Ansprechpersonen now shown inline as chips in header (no click required)",
+      "Contact persons display name + initial, colored blue chips",
+      "Shows up to 3 contact persons, with +N badge for more",
+      "Realtime updates when contact persons are added/removed",
+      "Add button shows dashed border when no contact persons exist",
+    ],
+  },
+  {
+    version: "1.35.0",
+    date: "2025-12-15",
+    type: "major",
+    changes: [
+      "Complete Calling UI redesign — Apple-native minimalist aesthetic",
+      "Frosted sticky header with company info, status controls, and actions",
+      "New segmented control for status (Working/Hot) with sliding pill indicator",
+      "Ansprechpersonen moved to slide-over drawer (Apple-style sheet)",
+      "Compact info chips for phone, email, canton, and location",
+      "Notes panel now dominates the workspace — maximum visual priority",
+      "Travel time widget integrated inline in header when candidate selected",
+      "Vacancy indicator as compact banner in header",
+      "Smooth 300ms drawer animations with backdrop blur",
+    ],
+  },
+  {
     version: "1.34.0",
     date: "2025-12-14",
     type: "major",

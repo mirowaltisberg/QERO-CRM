@@ -2,7 +2,6 @@
 
 import { memo, useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
-import { Panel } from "@/components/ui/panel";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
@@ -208,24 +207,33 @@ export const NotesPanel = memo(function NotesPanel({
 
   return (
     <>
-    <Panel title="Notes" description="Team notes with attribution" className="h-full flex flex-col min-h-0 overflow-hidden">
-      {/* New note input */}
-      <div className="mb-4 flex-shrink-0">
+    <div className="h-full flex flex-col min-h-0 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 flex-shrink-0 bg-gray-50/30">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900">Notes</h2>
+          <p className="text-xs text-gray-500">Team notes with attribution</p>
+        </div>
+      </div>
+      
+      {/* New note input - clean card style */}
+      <div className="px-4 pt-4 pb-3 flex-shrink-0 border-b border-gray-100 bg-white">
         <Textarea
           value={newNote}
           onChange={(e) => setNewNote(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={entityType === "contact" && contactForVacancy 
             ? "Add a note... (type 'sucht:' to create vacancy)"
-            : "Add a note... (Cmd+Enter to submit)"
+            : "Add a note... (⌘+Enter to submit)"
           }
-          className="min-h-[80px]"
+          className="min-h-[72px] resize-none border-gray-200 focus:border-gray-300 focus:ring-1 focus:ring-gray-300"
         />
         <div className="mt-2 flex justify-end">
           <Button
             size="sm"
             onClick={handleSubmit}
             disabled={!newNote.trim() || submitting}
+            className="shadow-sm"
           >
             {submitting ? "Adding..." : "Add Note"}
           </Button>
@@ -233,11 +241,11 @@ export const NotesPanel = memo(function NotesPanel({
       </div>
 
       {/* Notes list - scrollable */}
-      <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0 bg-gray-50/30">
         {loading ? (
-          <p className="text-sm text-gray-400">Loading notes...</p>
+          <p className="text-sm text-gray-400 text-center py-8">Loading notes...</p>
         ) : notes.length === 0 ? (
-          <p className="text-sm text-gray-400">No notes yet. Add the first one!</p>
+          <p className="text-sm text-gray-400 text-center py-8">No notes yet. Add the first one!</p>
         ) : (
           notes.map((note) => (
             <NoteCard
@@ -255,7 +263,7 @@ export const NotesPanel = memo(function NotesPanel({
 
         {/* Legacy notes (if any exist and no new notes) */}
         {legacyNotes && notes.length === 0 && (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4">
+          <div className="rounded-xl border border-dashed border-gray-200 bg-white p-4">
             <p className="text-xs text-gray-400 mb-2">Legacy notes (pre-team system)</p>
             <Textarea
               value={legacyNotes}
@@ -268,7 +276,7 @@ export const NotesPanel = memo(function NotesPanel({
           </div>
         )}
       </div>
-    </Panel>
+    </div>
     
     {/* Quick Vacancy Popup */}
     {contactForVacancy && (

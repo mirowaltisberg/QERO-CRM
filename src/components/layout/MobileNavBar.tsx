@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils/cn";
+import { MobileMoreSheet } from "./MobileMoreSheet";
 
+// Primary tabs (fit comfortably in the bar)
 const navigationKeys = [
   { key: "calling", href: "/calling", icon: PhoneIcon },
   { key: "companies", href: "/contacts", icon: BuildingIcon },
@@ -13,6 +15,9 @@ const navigationKeys = [
   { key: "email", href: "/email", icon: EmailIcon },
   { key: "chat", href: "/chat", icon: ChatIcon },
 ];
+
+// Secondary pages accessible via "More" (vakanzen, dashboard, settings)
+const morePagePaths = ["/vakanzen", "/dashboard", "/settings"];
 
 interface MobileNavBarProps {
   chatUnreadCount?: number;
@@ -22,68 +27,101 @@ export function MobileNavBar({ chatUnreadCount = 0 }: MobileNavBarProps) {
   const pathname = usePathname();
   const t = useTranslations("nav");
   const [mounted, setMounted] = useState(false);
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Check if current page is one of the "More" pages
+  const isOnMorePage = morePagePaths.some(p => pathname === p || pathname?.startsWith(p + "/"));
+
   // Don't render until mounted to avoid hydration mismatch
   if (!mounted) return null;
 
   return (
-    <nav 
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-gray-200/80"
-    >
-      {/* Tab bar content - sits above the home indicator */}
-      <div 
-        className="flex items-center justify-around"
-        style={{ 
-          height: "56px",
-          paddingBottom: "2px"
+    <>
+      <nav 
+        className="fixed z-50 bg-white/95 backdrop-blur-xl border border-gray-200/60 shadow-lg"
+        style={{
+          /* Float above home indicator with side insets for iPhone rounded corners */
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
+          left: "12px",
+          right: "12px",
+          borderRadius: "20px",
         }}
       >
-        {navigationKeys.map((item) => {
-          const isActive = pathname === item.href || 
-            (item.href !== "/" && pathname?.startsWith(item.href));
-          const name = t(item.key);
-          
-          return (
-            <Link
-              key={item.key}
-              href={item.href}
-              prefetch={true}
-              className={cn(
-                "flex flex-col items-center justify-center flex-1 h-full transition-colors",
-                isActive ? "text-blue-600" : "text-gray-400 active:text-gray-600"
-              )}
-            >
-              <div className="relative">
-                <item.icon 
-                  className={cn(
-                    "w-7 h-7 transition-transform",
-                    isActive && "scale-105"
-                  )} 
-                  filled={isActive}
-                />
-                {item.key === "chat" && chatUnreadCount > 0 && (
-                  <span className="absolute -top-1 -right-2.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
-                    {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
-                  </span>
+        {/* Tab bar content */}
+        <div 
+          className="flex items-center justify-around"
+          style={{ height: "56px" }}
+        >
+          {navigationKeys.map((item) => {
+            const isActive = pathname === item.href || 
+              (item.href !== "/" && pathname?.startsWith(item.href));
+            const name = t(item.key);
+            
+            return (
+              <Link
+                key={item.key}
+                href={item.href}
+                prefetch={true}
+                className={cn(
+                  "flex flex-col items-center justify-center flex-1 h-full transition-colors",
+                  isActive ? "text-blue-600" : "text-gray-400 active:text-gray-600"
                 )}
-              </div>
-              <span className={cn(
-                "text-[11px] mt-1 font-medium",
-                isActive ? "text-blue-600" : "text-gray-400"
-              )}>
-                {name}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-      {/* Home indicator safe area spacer */}
-      <div style={{ height: "env(safe-area-inset-bottom, 0px)" }} />
-    </nav>
+              >
+                <div className="relative">
+                  <item.icon 
+                    className={cn(
+                      "w-6 h-6 transition-transform",
+                      isActive && "scale-110"
+                    )} 
+                    filled={isActive}
+                  />
+                  {item.key === "chat" && chatUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-2.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+                      {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                    </span>
+                  )}
+                </div>
+                <span className={cn(
+                  "text-[10px] mt-0.5 font-medium",
+                  isActive ? "text-blue-600" : "text-gray-400"
+                )}>
+                  {name}
+                </span>
+              </Link>
+            );
+          })}
+
+          {/* More button */}
+          <button
+            onClick={() => setMoreSheetOpen(true)}
+            className={cn(
+              "flex flex-col items-center justify-center flex-1 h-full transition-colors",
+              isOnMorePage || moreSheetOpen ? "text-blue-600" : "text-gray-400 active:text-gray-600"
+            )}
+          >
+            <MoreIcon 
+              className={cn(
+                "w-6 h-6 transition-transform",
+                (isOnMorePage || moreSheetOpen) && "scale-110"
+              )} 
+              filled={isOnMorePage || moreSheetOpen}
+            />
+            <span className={cn(
+              "text-[10px] mt-0.5 font-medium",
+              isOnMorePage || moreSheetOpen ? "text-blue-600" : "text-gray-400"
+            )}>
+              {t("more")}
+            </span>
+          </button>
+        </div>
+      </nav>
+
+      <MobileMoreSheet open={moreSheetOpen} onOpenChange={setMoreSheetOpen} />
+    </>
   );
 }
 
@@ -160,6 +198,21 @@ function ChatIcon({ className, filled }: { className?: string; filled?: boolean 
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+    </svg>
+  );
+}
+
+function MoreIcon({ className, filled }: { className?: string; filled?: boolean }) {
+  if (filled) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="M4.5 12a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm6 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm6 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z" clipRule="evenodd" />
+      </svg>
+    );
+  }
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
     </svg>
   );
 }

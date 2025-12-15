@@ -71,7 +71,7 @@ export function AppShell({ user, profile, children }: AppShellProps) {
   // Server-side render: show nothing for navigation (will hydrate)
   if (!mounted) {
     return (
-      <div className="flex h-screen">
+      <div className="flex" style={{ height: "100dvh" }}>
         <div className="hidden md:flex w-56 border-r border-border bg-gray-50" />
         <main className="flex-1 overflow-hidden">{children}</main>
       </div>
@@ -80,13 +80,17 @@ export function AppShell({ user, profile, children }: AppShellProps) {
 
   // Mobile layout
   if (isMobile) {
+    // Floating tab bar: 56px height + 12px offset from bottom + safe-area + 8px breathing room
+    const mobileBottomPadding = "calc(56px + 12px + env(safe-area-inset-bottom, 0px) + 8px)";
+    
     return (
-      <div className="flex flex-col h-screen">
+      <div 
+        className="flex flex-col"
+        style={{ height: "100dvh" }}
+      >
         <main 
           className="flex-1 overflow-hidden"
-          style={{ 
-            paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" 
-          }}
+          style={{ paddingBottom: mobileBottomPadding }}
         >
           {children}
         </main>
@@ -97,7 +101,7 @@ export function AppShell({ user, profile, children }: AppShellProps) {
 
   // Desktop layout
   return (
-    <div className="flex h-screen">
+    <div className="flex" style={{ height: "100dvh" }}>
       <Sidebar user={user} profile={profile} />
       <main className="flex-1 overflow-hidden">{children}</main>
     </div>

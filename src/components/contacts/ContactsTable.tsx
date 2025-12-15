@@ -191,8 +191,11 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
   }, [fixingEncoding, router]);
 
   return (
-    <section className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <section 
+      className="flex h-full flex-col"
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-4 px-4 md:px-0">
         <TableToolbar
           filters={filters}
           totalCount={clientContacts.length}

@@ -110,13 +110,18 @@ export function TravelTimeWidget({
     }
   }, [transitResult, fromLat, fromLng, toLat, toLng, fetchTravelTime]);
 
+  // Check if we're in horizontal (inline) mode
+  const isHorizontal = className?.includes("flex-row");
+
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <p className="text-xs uppercase tracking-wide text-gray-400">
-        {t("title")}
-      </p>
+      {!isHorizontal && (
+        <p className="text-xs uppercase tracking-wide text-gray-400">
+          {t("title")}
+        </p>
+      )}
       
-      <div className="flex gap-3 items-center">
+      <div className={cn("flex gap-3 items-center", isHorizontal && "gap-2")}>
         {/* Driving button - Car logo */}
         <button
           onClick={handleDrivingClick}

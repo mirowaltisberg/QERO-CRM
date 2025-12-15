@@ -11,43 +11,45 @@
 
 ---
 
-# Task 25: Mobile UI Revamp (Native iOS Feel)
+# Task 25: Mobile UI Revamp (Native iOS Feel) ✅ COMPLETED
 
 ## Goal
 Transform the mobile experience to feel like a native iOS app, specifically optimized for iPhone 16 Pro/Pro Max.
 
-## Current Problems
-1. Desktop sidebar shows on mobile (except Chat) - cramped & unusable
-2. No bottom tab navigation (standard iOS pattern)
-3. List+Detail views lack proper slide transitions
-4. No safe area handling for Dynamic Island or home indicator
-5. Touch targets too small, spacing too tight
+## Completed Work (Dec 15, 2025)
 
-## High-level Task Breakdown
+### 1. iOS PWA Safe-Area Support ✅
+- Added `viewportFit: "cover"` to viewport metadata in `layout.tsx`
+- Added `100dvh` height support for iOS PWA in `globals.css`
+- Added iOS-specific text size stability and body overflow prevention
 
-### Phase 1: Global Mobile Shell
-- [ ] **1.1** Create `MobileNavBar` - iOS-style bottom tab bar (5 tabs: Calling, Companies, TMA, Email, Chat)
-- [ ] **1.2** Modify `layout.tsx` - Sidebar for desktop (≥768px), MobileNavBar for mobile
-- [ ] **1.3** Safe areas - `env(safe-area-inset-*)` for Dynamic Island + home indicator
+### 2. Floating Tab Bar (Higher Up, Won't Clip on iPhone Corners) ✅
+- Redesigned `MobileNavBar` to float with side insets (12px from edges)
+- Uses `bottom: calc(env(safe-area-inset-bottom) + 12px)` to sit above home indicator
+- Rounded corners (20px) for iOS-native appearance
+- Updated `AppShell` mobile layout to properly pad content for floating bar
 
-### Phase 2: Calling Page Mobile  
-- [ ] **2.1** Mobile detection + state management (`isMobile`, `mobileView: 'list' | 'detail'`)
-- [ ] **2.2** Slide transitions (translateX) like ChatView
-- [ ] **2.3** Mobile header with back button + contact name
-- [ ] **2.4** Optimize ContactDetail for touch (44px targets, better spacing)
+### 3. "More" Tab with Bottom Sheet for Vacancies ✅
+- Added "More" tab to bottom nav bar
+- Created `MobileMoreSheet.tsx` - iOS-style bottom sheet with drag handle
+- Includes navigation to: Vacancies, Dashboard, Settings
+- iOS-style 52px touch targets with chevron indicators
 
-### Phase 3: TMA Page Mobile
-- [ ] **3.1** List/detail split with transitions
-- [ ] **3.2** Filters in collapsible sheet or pill bar
-- [ ] **3.3** Candidate cards with key info visible
+### 4. Email Mobile Layout (List → Detail) ✅
+- Full mobile redesign of `EmailView.tsx`
+- List and detail views with slide transitions
+- Mobile header with folder dropdown selector
+- Back button navigation from detail to list
+- Added overflow handling for email body content in `globals.css`
 
-### Phase 4: Other Pages
-- [ ] **4.1** Email - folder selector + thread transitions
-- [ ] **4.2** Dashboard - single column cards
-- [ ] **4.3** Settings/Profile - move to nav bar menu
+### 5. App-Wide Mobile Polish ✅
+- All main pages (Calling, Contacts, TMA, Chat, Dashboard, Vacancies, Settings) have safe-area padding
+- Dashboard and Settings pages updated with mobile-friendly spacing
+- ContactsTable updated with safe-area support
 
 ### Design Specs
-- **Bottom nav height**: 83px (49pt tabs + 34pt home indicator)
+- **Bottom nav height**: 56px in floating pill
+- **Bottom offset**: 12px + safe-area-inset-bottom
 - **Touch targets**: min 44px
 - **Transitions**: 300ms ease-out
 - **Safe areas**: top (Dynamic Island ~59pt), bottom (home indicator ~34pt)
@@ -221,7 +223,10 @@ user_tma_settings (
 - [ ] **Task 27: Fix contact person emails not sending + diagnostics UI**
   - Add attempted/sent/failed recipients to send response and surface in UI
   - Normalize/validate emails, dedupe correctly, fetch contact persons fresh at send-time
-  - Ensure prompts reject “call me back” phrasing
+  - Ensure prompts reject "call me back" phrasing
+- [x] **Task 29: Fix Ansprechperson Modal Clickthrough** ✅ COMPLETE
+  - Root cause: Radix Dialog modal mode blocked pointer events on nested portaled modals
+  - Fix: Set Sheet to `modal={false}` by default; added context-based close handler for overlay; preserved nested modal dismiss guard
 
 # Current Status / Progress Tracking
 - **Task 20 COMPLETE** ✅
@@ -389,6 +394,59 @@ Root cause identified: API routes were using browser Supabase client (`createBro
 **Success criteria**
 - Generated drafts do not contain “Rückruf” or “rufen Sie mich an”.
 
+
+---
+
+# Task 28: Calling UI Redesign (Apple-Native)
+
+## Goal
+Redesign the Calling page to feel like an Apple-native app with:
+- Notes as the primary workspace (largest, most prominent area)
+- Status controls moved into a frosted sticky header
+- Ansprechpersonen moved into a slide-over drawer (triggered from header)
+- Compact info chips for contact details (phone/email/canton/address)
+- Minimal, calm aesthetic with smooth interactions
+
+## Implementation Completed ✅
+
+### New Components Created
+1. **`src/components/ui/sheet.tsx`** - Apple-style slide-over drawer using Radix Dialog
+2. **`src/components/ui/segmented-control.tsx`** - iOS-style segmented control with sliding indicator
+
+### Files Modified
+1. **`src/components/calling/ContactDetail.tsx`** - Complete redesign:
+   - Frosted sticky header with company name, status segmented control, follow-up chip
+   - Compact info chips row (phone, email, canton, location, Ansprechpersonen button)
+   - Call/Email action buttons in header
+   - Travel time widget inline in header when candidate selected
+   - Vacancy banner compact in header
+   - Notes panel takes full remaining space
+   - Minimal footer with keyboard shortcuts
+
+2. **`src/components/calling/NotesPanel.tsx`** - Enhanced styling:
+   - Removed Panel wrapper, using custom card styling
+   - Cleaner input area with better placeholder
+   - Improved scrollable notes list with subtle background
+
+3. **`src/components/calling/TravelTimeWidget.tsx`** - Added horizontal layout support
+
+4. **`src/app/globals.css`** - Added slide animations for Sheet component
+
+### Dependencies Added
+- `@radix-ui/react-dialog` - For Sheet component
+- `lucide-react` - For icons
+
+### Build Status
+✅ Build passes successfully with no TypeScript/linting errors
+
+## Success Criteria Met
+- ✅ Status controls visible and usable in header without scrolling
+- ✅ Notes area is the largest section (dominant visual priority)
+- ✅ Ansprechpersonen accessible via header button opening slide-over drawer
+- ✅ All existing Calling features preserved (Call/Email, navigation, notes, vacancies, etc.)
+- ✅ Apple-native feel: frosted header, segmented control, smooth drawer, subtle styling
+
+---
 
 # Lessons
 - VAPID keys are free to generate

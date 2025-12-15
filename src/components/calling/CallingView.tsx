@@ -62,17 +62,38 @@ export function CallingView({ initialContacts }: CallingViewProps) {
   } = useContacts({ initialContacts });
 
   // Use sorted contacts when in candidate mode, otherwise original contacts
-  // Apply distance filter when in candidate mode
+  // Apply distance filter AND search query when in candidate mode
   const contacts = useMemo(() => {
     if (!sortedContacts) return originalContacts;
-    if (distanceFilter === null) return sortedContacts;
     
-    return sortedContacts.filter((c) => {
-      // Keep contacts within the distance filter, or those without distance data at the end
-      if (c.distance_km === null || c.distance_km === undefined) return false;
-      return c.distance_km <= distanceFilter;
-    });
-  }, [sortedContacts, originalContacts, distanceFilter]);
+    let filtered = sortedContacts;
+    
+    // Apply distance filter
+    if (distanceFilter !== null) {
+      filtered = filtered.filter((c) => {
+        if (c.distance_km === null || c.distance_km === undefined) return false;
+        return c.distance_km <= distanceFilter;
+      });
+    }
+    
+    // Apply search query filter (same logic as useContacts)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((c) => {
+        const searchableFields = [
+          c.company_name,
+          c.contact_name,
+          c.email,
+          c.phone,
+          c.canton,
+          c.notes,
+        ].filter(Boolean).join(" ").toLowerCase();
+        return searchableFields.includes(query);
+      });
+    }
+    
+    return filtered;
+  }, [sortedContacts, originalContacts, distanceFilter, searchQuery]);
 
   // Mobile detection
   useEffect(() => {

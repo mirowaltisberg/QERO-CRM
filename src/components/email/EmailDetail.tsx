@@ -13,9 +13,11 @@ interface Props {
   onArchive: (threadId: string) => void;
   onDelete: (threadId: string) => void;
   onToggleStar: (threadId: string, starred: boolean) => void;
+  onBack?: () => void;
+  isMobile?: boolean;
 }
 
-export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onToggleStar }: Props) {
+export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onToggleStar, onBack, isMobile = false }: Props) {
   const t = useTranslations("email");
   const tCommon = useTranslations("common");
   
@@ -30,7 +32,10 @@ export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onT
 
   if (loading) {
     return (
-      <section className="flex flex-1 items-center justify-center bg-gray-50/50">
+      <section className={cn(
+        "flex flex-1 items-center justify-center bg-gray-50/50",
+        isMobile && "h-full"
+      )}>
         <div className="flex flex-col items-center gap-2 text-center">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
           <p className="text-sm text-gray-500">Loading email...</p>
@@ -41,7 +46,10 @@ export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onT
 
   if (!thread) {
     return (
-      <section className="flex flex-1 items-center justify-center bg-gray-50/50">
+      <section className={cn(
+        "flex flex-1 items-center justify-center bg-gray-50/50",
+        isMobile && "h-full"
+      )}>
         <div className="flex flex-col items-center gap-2 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100">
             <EmailIcon className="h-6 w-6 text-gray-400" />
@@ -55,35 +63,51 @@ export function EmailDetail({ thread, loading, onReply, onArchive, onDelete, onT
   const lastMessage = messages[messages.length - 1];
 
   return (
-    <section className="flex flex-1 flex-col overflow-hidden">
+    <section className={cn(
+      "flex flex-1 flex-col overflow-hidden",
+      isMobile && "h-full"
+    )}>
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-semibold text-gray-900">
-            {thread.subject || t("noSubject")}
-          </h1>
-          <p className="mt-0.5 text-xs text-gray-500">
-            {t("messagesInThread", { count: messages.length })}
-          </p>
+      <header 
+        className="flex items-center justify-between border-b border-gray-200 px-4 py-3"
+        style={isMobile ? { paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" } : undefined}
+      >
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          {isMobile && onBack && (
+            <button
+              onClick={onBack}
+              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 -ml-1 flex-shrink-0"
+            >
+              <BackIcon className="h-5 w-5 text-gray-600" />
+            </button>
+          )}
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-base font-semibold text-gray-900">
+              {thread.subject || t("noSubject")}
+            </h1>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {t("messagesInThread", { count: messages.length })}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => onToggleStar(thread.id, !thread.is_starred)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-100"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100"
             title={thread.is_starred ? t("unstar") : t("star")}
           >
             <StarIcon filled={thread.is_starred} />
           </button>
           <button
             onClick={() => onArchive(thread.id)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-100"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100"
             title={t("archive")}
           >
             <ArchiveIcon />
           </button>
           <button
             onClick={() => onDelete(thread.id)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-100 hover:text-red-500"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-red-500"
             title={tCommon("delete")}
           >
             <TrashIcon />
@@ -405,6 +429,14 @@ function EmailIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+    </svg>
+  );
+}
+
+function BackIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
     </svg>
   );
 }

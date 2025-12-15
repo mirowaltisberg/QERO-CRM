@@ -10,8 +10,11 @@ export default async function DashboardPage() {
   const t = await getTranslations("dashboard");
 
   return (
-    <div className="h-full bg-gray-50">
-      <div className="mx-auto flex h-full max-w-6xl flex-col gap-6 p-6">
+    <div className="h-full bg-gray-50 overflow-y-auto">
+      <div 
+        className="mx-auto flex max-w-6xl flex-col gap-4 md:gap-6 p-4 md:p-6"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
+      >
         <div className="grid gap-4 md:grid-cols-4">
           <StatsCard label={t("callsToday")} value={stats.callsToday} />
           <StatsCard label={t("callsThisWeek")} value={stats.callsThisWeek} />

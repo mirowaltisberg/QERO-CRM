@@ -15,7 +15,10 @@ export default async function SettingsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-2xl px-6 py-8 pb-24">
+      <div 
+        className="mx-auto max-w-2xl px-4 md:px-6 py-6 md:py-8"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 24px)" }}
+      >
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-gray-900">Account Settings</h1>
           <p className="mt-1 text-sm text-gray-500">

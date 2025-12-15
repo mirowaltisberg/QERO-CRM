@@ -29,6 +29,7 @@ interface Props {
   onSync: () => void;
   onToggleStar: (id: string, starred: boolean) => void;
   onLoadMore: () => void;
+  isMobile?: boolean;
 }
 
 export const EmailList = memo(function EmailList({
@@ -50,6 +51,7 @@ export const EmailList = memo(function EmailList({
   onSync,
   onToggleStar,
   onLoadMore,
+  isMobile = false,
 }: Props) {
   const t = useTranslations("email");
   const tCommon = useTranslations("common");
@@ -69,44 +71,62 @@ export const EmailList = memo(function EmailList({
   }, []);
 
   return (
-    <aside className="flex h-full w-80 flex-col border-r border-gray-200 bg-gray-50">
-      {/* Header */}
-      <header className="border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-gray-400">{FOLDER_LABELS[folder]}</p>
-            <p className="text-sm font-semibold text-gray-900">{threads.length} {t("emails")}</p>
+    <aside className={cn(
+      "flex h-full flex-col bg-gray-50",
+      isMobile ? "w-full" : "w-80 border-r border-gray-200"
+    )}>
+      {/* Header - hide on mobile (parent provides it) */}
+      {!isMobile && (
+        <header className="border-b border-gray-200 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-400">{FOLDER_LABELS[folder]}</p>
+              <p className="text-sm font-semibold text-gray-900">{threads.length} {t("emails")}</p>
+            </div>
+            <button
+              onClick={onSync}
+              disabled={syncing}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-100 hover:text-gray-700",
+                syncing && "animate-pulse"
+              )}
+              title="Sync emails"
+            >
+              <SyncIcon className={cn("h-4 w-4", syncing && "animate-spin")} />
+            </button>
           </div>
-          <button
-            onClick={onSync}
-            disabled={syncing}
-            className={cn(
-              "flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-100 hover:text-gray-700",
-              syncing && "animate-pulse"
-            )}
-            title="Sync emails"
-          >
-            <SyncIcon className={cn("h-4 w-4", syncing && "animate-spin")} />
-          </button>
-        </div>
-        <p className="mt-1 truncate text-xs text-gray-400" title={mailbox}>
-          {mailbox}
-        </p>
-        {mounted && lastSyncAt && (
-          <p className="text-[10px] text-gray-400">
-            Last sync: {formatRelativeTime(lastSyncAt)}
+          <p className="mt-1 truncate text-xs text-gray-400" title={mailbox}>
+            {mailbox}
           </p>
-        )}
-        <div className="mt-2">
+          {mounted && lastSyncAt && (
+            <p className="text-[10px] text-gray-400">
+              Last sync: {formatRelativeTime(lastSyncAt)}
+            </p>
+          )}
+          <div className="mt-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={t("searchEmails")}
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0"
+            />
+          </div>
+        </header>
+      )}
+
+      {/* Mobile search bar */}
+      {isMobile && (
+        <div className="px-4 py-2 border-b border-gray-200">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={t("searchEmails")}
-            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0"
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0"
           />
         </div>
-      </header>
+      )}
 
       {/* Error state */}
       {error && (

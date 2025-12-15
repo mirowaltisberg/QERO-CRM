@@ -3,12 +3,13 @@
 import { memo, useCallback, useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Panel } from "@/components/ui/panel";
 import { Tag } from "@/components/ui/tag";
 import { CantonTag } from "@/components/ui/CantonTag";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { NotesPanel } from "./NotesPanel";
 import { ContactPersonsPanel } from "./ContactPersonsPanel";
 import { TravelTimeWidget } from "./TravelTimeWidget";
@@ -17,9 +18,10 @@ type EmailSentState = { status: "success" | "warning" | "error"; message: string
 import { VacancyQuickView } from "./VacancyQuickView";
 import { CandidatePickerModal } from "./CandidatePickerModal";
 import { TextShimmer } from "@/components/ui/text-shimmer";
-import type { Contact, Vacancy, TmaCandidate } from "@/lib/types";
+import type { Contact, Vacancy, TmaCandidate, ContactPerson } from "@/lib/types";
 import type { ContactStatus } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils/cn";
+import { createClient } from "@/lib/supabase/client";
 
 // Attachment info returned from API
 interface AttachmentInfo {
@@ -72,6 +74,59 @@ export const ContactDetail = memo(function ContactDetail({
   const [emailSent, setEmailSent] = useState<EmailSentState | null>(null);
   const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  
+  // Contact persons state
+  const [contactPersonsOpen, setContactPersonsOpen] = useState(false);
+  const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
+  const [contactPersonsLoading, setContactPersonsLoading] = useState(false);
+  
+  // Fetch contact persons when contact changes
+  useEffect(() => {
+    if (!contact?.id) {
+      setContactPersons([]);
+      return;
+    }
+    
+    const fetchContactPersons = async () => {
+      setContactPersonsLoading(true);
+      try {
+        const response = await fetch(`/api/contacts/${contact.id}/persons`, { cache: "no-store" });
+        const json = await response.json();
+        if (response.ok && json.data) {
+          setContactPersons(json.data);
+        }
+      } catch (err) {
+        console.error("Error fetching contact persons:", err);
+      } finally {
+        setContactPersonsLoading(false);
+      }
+    };
+    
+    fetchContactPersons();
+    
+    // Set up realtime subscription for contact persons
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`contact-persons-inline-${contact.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "contact_persons",
+          filter: `contact_id=eq.${contact.id}`,
+        },
+        () => {
+          // Refetch on any change
+          fetchContactPersons();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [contact?.id]);
   
   // Email compose state
   const [emailPreview, setEmailPreview] = useState<{
@@ -441,6 +496,12 @@ export const ContactDetail = memo(function ContactDetail({
     }
   }, [contact, emailCandidates, tEmail]);
 
+  // Status options for segmented control
+  const statusOptions = [
+    { value: "working" as const, label: tStatus("working"), color: "rgb(17 24 39)" },
+    { value: "hot" as const, label: tStatus("hot"), color: "rgb(249 115 22)" },
+  ];
+
   if (!contact) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
@@ -449,71 +510,316 @@ export const ContactDetail = memo(function ContactDetail({
     );
   }
 
+  // Mobile layout
+  if (isMobile) {
+    return (
+      <>
+        <section className="flex flex-1 flex-col overflow-hidden p-4">
+          {/* Compact Info Cards */}
+          <div className="flex-shrink-0 space-y-3 mb-4">
+            {/* Phone & Email Row */}
+            <div className="flex gap-2">
+              {contact.phone && !contact.phone.includes("No ") && (
+                <a
+                  href={`tel:${contact.phone.replace(/\s+/g, "")}`}
+                  className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <span className="text-sm font-medium text-gray-700 truncate">{contact.phone}</span>
+                </a>
+              )}
+              {contact.email && !contact.email.includes("No ") && (
+                <a
+                  href={`mailto:${contact.email}`}
+                  className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm font-medium text-gray-700 truncate">{contact.email}</span>
+                </a>
+              )}
+            </div>
+
+            {/* Status & Follow-up Row */}
+            <div className="flex items-center gap-3">
+              <SegmentedControl
+                options={statusOptions}
+                value={contact.status as ContactStatus | null}
+                onChange={(val) => val ? onUpdateStatus(val) : onClearStatus()}
+                allowDeselect
+              />
+              <FollowUpChip
+                currentDate={followUpDate}
+                onSelect={(preset) => {
+                  if (preset === "custom") {
+                    setIsFollowUpModalOpen(true);
+                  } else if (preset === "tomorrow9") {
+                    onScheduleFollowUp({ date: getTomorrowNine(), note: contact.follow_up_note ?? undefined });
+                  } else if (preset === "today5") {
+                    onScheduleFollowUp({ date: getTodayFive(), note: contact.follow_up_note ?? undefined });
+                  }
+                }}
+                onClear={onClearFollowUp}
+              />
+            </div>
+          </div>
+
+          {/* Notes Panel - Takes all remaining space */}
+          <div className="flex-1 min-h-0 overflow-hidden mb-4">
+            <NotesPanel
+              entityId={contact.id}
+              entityType="contact"
+              legacyNotes={contact.notes}
+              onSaveLegacyNotes={onSaveNotes}
+              onNoteAdded={onNoteAdded}
+              contactForVacancy={{
+                id: contact.id,
+                company_name: contact.company_name,
+                city: contact.city,
+                postal_code: contact.postal_code,
+                latitude: contact.latitude,
+                longitude: contact.longitude,
+                team_id: contact.team_id,
+              }}
+            />
+          </div>
+
+          {/* Bottom Action Bar */}
+          <div className="flex-shrink-0 space-y-3">
+            {/* Contact Persons Row - show as cards */}
+            {contactPersons.length > 0 ? (
+              <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
+                {contactPersons.map((person) => (
+                  <button
+                    key={person.id}
+                    onClick={() => setContactPersonsOpen(true)}
+                    className="flex-shrink-0 flex flex-col items-start px-3 py-2 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/80"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-900">
+                        {person.first_name} {person.last_name}
+                      </span>
+                    </div>
+                    {person.role && (
+                      <span className="text-xs text-gray-500 mt-0.5 ml-5">{person.role}</span>
+                    )}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setContactPersonsOpen(true)}
+                  className="flex-shrink-0 flex items-center justify-center w-12 h-full min-h-[48px] rounded-xl bg-gray-50 border border-dashed border-gray-300 text-gray-400"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setContactPersonsOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm font-medium text-gray-500 bg-gray-50 border border-dashed border-gray-300"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                </svg>
+                Ansprechperson hinzufügen
+              </button>
+            )}
+            
+            {/* Actions Row */}
+            <div className="flex items-center gap-3">
+              <Button 
+                onClick={handleOpenEmailPreview} 
+                variant="secondary"
+                disabled={loadingPreview}
+                className="flex-1"
+              >
+                {loadingPreview ? "Laden..." : "E-Mail senden"}
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        {/* Modals and Drawers */}
+        {renderModalsAndDrawers()}
+      </>
+    );
+  }
+
+  // Desktop layout - Apple-native redesign
   return (
     <>
-      <section className={cn(
-        "flex flex-1 flex-col overflow-hidden",
-        isMobile ? "p-4" : "p-6"
-      )}>
-        {/* Header - hidden on mobile (shown in CallingView header) */}
-        {!isMobile && (
-          <div className="flex items-center justify-between flex-shrink-0 mb-4">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-gray-400">Now calling</p>
-              <h1 className="text-2xl font-semibold text-gray-900">{contact.company_name}</h1>
-              <p className="text-sm text-gray-500">{contact.contact_name ?? "Hiring Team"}</p>
-            </div>
-            <Tag status={contact.status} tone="muted" fallbackLabel="Set status" />
-          </div>
-        )}
-
-        {/* Call panel - fixed */}
-        <div className="flex-shrink-0 mb-4">
-          <Panel
-            title="Kontakt"
-            description={isMobile ? undefined : "Anrufen oder E-Mail senden"}
-            actions={
-              !isMobile ? (
-                <div className="flex gap-2">
-                  <Button onClick={onCall} size="lg">
-                    Anrufen
-                  </Button>
-                  <Button 
-                    onClick={handleOpenEmailPreview} 
-                    size="lg" 
-                    variant="secondary"
-                    disabled={loadingPreview}
-                  >
-                    {loadingPreview ? "Laden..." : "E-Mail senden"}
-                  </Button>
-                </div>
-              ) : undefined
-            }
-          >
-            <div className={cn(
-              "grid gap-4 text-sm text-gray-600",
-              isMobile ? "grid-cols-1" : "md:grid-cols-3"
-            )}>
-              <InfoBlock label="Phone" value={displayPhone} isMobile={isMobile} />
-              <InfoBlock label="Email" value={displayEmail} isMobile={isMobile} />
-              <InfoBlock label="Canton" isMobile={isMobile}>
-                <CantonTag canton={contact.canton} size="md" />
-              </InfoBlock>
-            </div>
-            {(contact.street || contact.city || contact.postal_code) && (
-              <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-400">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-                </svg>
-                <span>
-                  {[contact.street, contact.postal_code, contact.city].filter(Boolean).join(", ")}
-                </span>
+      <section className="flex flex-1 flex-col overflow-hidden">
+        {/* ========== FROSTED HEADER ========== */}
+        <header className="flex-shrink-0 sticky top-0 z-20 backdrop-blur-xl bg-white/80 border-b border-gray-100">
+          <div className="px-6 py-4">
+            {/* Top row: Company name + Status */}
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl font-semibold text-gray-900 truncate">
+                  {contact.company_name}
+                </h1>
+                <p className="text-sm text-gray-500 truncate">
+                  {contact.contact_name ?? "Hiring Team"}
+                </p>
               </div>
-            )}
-            {/* Travel time widget - only show when candidate is selected and both have coordinates */}
-            {selectedCandidate?.latitude && selectedCandidate?.longitude && 
-             contact.latitude && contact.longitude && (
+              
+              {/* Status Segmented Control */}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <SegmentedControl
+                  options={statusOptions}
+                  value={contact.status as ContactStatus | null}
+                  onChange={(val) => val ? onUpdateStatus(val) : onClearStatus()}
+                  allowDeselect
+                />
+                <FollowUpChip
+                  currentDate={followUpDate}
+                  onSelect={(preset) => {
+                    if (preset === "custom") {
+                      setIsFollowUpModalOpen(true);
+                    } else if (preset === "tomorrow9") {
+                      onScheduleFollowUp({ date: getTomorrowNine(), note: contact.follow_up_note ?? undefined });
+                    } else if (preset === "today5") {
+                      onScheduleFollowUp({ date: getTodayFive(), note: contact.follow_up_note ?? undefined });
+                    }
+                  }}
+                  onClear={onClearFollowUp}
+                />
+              </div>
+            </div>
+
+            {/* Bottom row: Info chips + Actions */}
+            <div className="flex items-center justify-between gap-4">
+              {/* Info Chips */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Phone chip */}
+                <InfoChip 
+                  icon={<PhoneIcon />}
+                  label={displayPhone}
+                  href={contact.phone && !contact.phone.includes("No ") ? `tel:${contact.phone.replace(/\s+/g, "")}` : undefined}
+                />
+                
+                {/* Email chip */}
+                <InfoChip 
+                  icon={<EmailIcon />}
+                  label={displayEmail}
+                  href={contact.email && !contact.email.includes("No ") ? `mailto:${contact.email}` : undefined}
+                />
+                
+                {/* Canton chip */}
+                <CantonTag canton={contact.canton} size="sm" />
+                
+                {/* Location chip */}
+                {(contact.street || contact.city) && (
+                  <InfoChip 
+                    icon={<LocationIcon />}
+                    label={[contact.street, contact.postal_code, contact.city].filter(Boolean).join(", ")}
+                  />
+                )}
+                
+                {/* Ansprechpersonen - show as cards if they exist */}
+                {contactPersonsLoading ? (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 bg-gray-50">
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  </div>
+                ) : contactPersons.length > 0 ? (
+                  // Show contact persons as clear cards with name + role
+                  <div className="flex items-center gap-2">
+                    {contactPersons.map((person) => (
+                      <button
+                        key={person.id}
+                        onClick={() => setContactPersonsOpen(true)}
+                        className={cn(
+                          "flex flex-col items-start px-3 py-2 rounded-xl text-left",
+                          "bg-gradient-to-br from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100",
+                          "border border-blue-100/80 transition-all duration-150",
+                          "shadow-sm hover:shadow"
+                        )}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          <span className="text-sm font-medium text-gray-900">
+                            {person.first_name} {person.last_name}
+                          </span>
+                        </div>
+                        {person.role && (
+                          <span className="text-xs text-gray-500 mt-0.5 ml-5">
+                            {person.role}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setContactPersonsOpen(true)}
+                      className={cn(
+                        "flex items-center justify-center w-10 h-10 rounded-xl",
+                        "bg-gray-50 hover:bg-gray-100 border border-dashed border-gray-300",
+                        "text-gray-400 hover:text-gray-600 transition-colors"
+                      )}
+                      title="Ansprechperson hinzufügen"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  // No contact persons - show add button
+                  <button
+                    onClick={() => setContactPersonsOpen(true)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium",
+                      "bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors",
+                      "border border-dashed border-gray-300"
+                    )}
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    Ansprechperson hinzufügen
+                  </button>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button onClick={onCall} size="md" className="shadow-sm">
+                  <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  Anrufen
+                </Button>
+                <Button 
+                  onClick={handleOpenEmailPreview} 
+                  variant="secondary"
+                  size="md"
+                  disabled={loadingPreview}
+                  className="shadow-sm"
+                >
+                  <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  {loadingPreview ? "Laden..." : "E-Mail"}
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          {/* Travel Time Widget - inline in header when candidate selected */}
+          {selectedCandidate?.latitude && selectedCandidate?.longitude && 
+           contact.latitude && contact.longitude && (
+            <div className="px-6 pb-3 border-t border-gray-100/50 pt-3">
               <TravelTimeWidget
                 fromLat={selectedCandidate.latitude}
                 fromLng={selectedCandidate.longitude}
@@ -521,110 +827,22 @@ export const ContactDetail = memo(function ContactDetail({
                 toLng={contact.longitude}
                 candidateName={`${selectedCandidate.first_name} ${selectedCandidate.last_name}`}
                 companyName={contact.company_name}
-                className="mt-4 pt-3 border-t border-gray-100"
+                className="flex-row items-center gap-4"
               />
-            )}
-            {/* Mobile email button */}
-            {isMobile && (
-              <div className="mt-4">
-                <Button 
-                  onClick={handleOpenEmailPreview} 
-                  size="lg" 
-                  variant="secondary"
-                  disabled={loadingPreview}
-                  className="w-full"
-                >
-                  {loadingPreview ? "Laden..." : "E-Mail senden"}
-                </Button>
-              </div>
-            )}
-            {emailSent && (
-              <div className={cn(
-                "mt-3 rounded-lg px-3 py-2 text-sm",
-                emailSent.status === "success"
-                  ? "bg-green-50 text-green-700 border border-green-200" 
-                  : emailSent.status === "warning"
-                  ? "bg-amber-50 text-amber-700 border border-amber-200"
-                  : "bg-red-50 text-red-600 border border-red-200"
-              )}>
-                {emailSent.message}
-              </div>
-            )}
-          </Panel>
-        </div>
-
-        {/* Contact persons */}
-        <div className="flex-shrink-0 mb-4">
-          <ContactPersonsPanel contactId={contact.id} />
-        </div>
-
-        {/* Vacancy Indicator */}
-        {vacancies && vacancies.length > 0 && (
-          <div className="flex-shrink-0 mb-4">
-            <VacancyIndicator 
+            </div>
+          )}
+          
+          {/* Vacancy Indicator - compact in header */}
+          {vacancies && vacancies.length > 0 && (
+            <VacancyBanner 
               vacancies={vacancies} 
               onViewDetails={(vacancy) => setSelectedVacancy(vacancy)} 
             />
-          </div>
-        )}
-
-        {/* Compact status + follow-up toolbar - fixed */}
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 flex-shrink-0 mb-4">
-          <span className="text-xs text-gray-400 mr-1">Status</span>
-          <Button
-            size="sm"
-            variant={contact.status === "working" ? "secondary" : "ghost"}
-            className={cn(
-              "text-xs",
-              contact.status === "working" && "bg-gray-900 text-white hover:bg-gray-800"
-            )}
-            onClick={() => onUpdateStatus("working")}
-          >
-            {tStatus("working")}
-          </Button>
-          <Button
-            size="sm"
-            variant={contact.status === "hot" ? "secondary" : "ghost"}
-            className={cn(
-              "text-xs",
-              contact.status === "hot" && "bg-orange-500 text-white hover:bg-orange-600"
-            )}
-            onClick={() => onUpdateStatus("hot")}
-          >
-            {tStatus("hot")}
-          </Button>
-          {contact.status && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-xs text-gray-400 hover:text-gray-700"
-              onClick={onClearStatus}
-            >
-              ✕
-            </Button>
           )}
+        </header>
 
-          <div className="mx-2 h-4 w-px bg-gray-200" />
-
-          <span className="text-xs text-gray-400 mr-1">Follow-up</span>
-          <FollowUpDropdown
-            currentDate={followUpDate}
-            onSelect={(preset) => {
-              if (preset === "custom") {
-                setIsFollowUpModalOpen(true);
-              } else if (preset === "tomorrow9") {
-                onScheduleFollowUp({ date: getTomorrowNine(), note: contact.follow_up_note ?? undefined });
-              } else if (preset === "today5") {
-                onScheduleFollowUp({ date: getTodayFive(), note: contact.follow_up_note ?? undefined });
-              }
-            }}
-            onClear={onClearFollowUp}
-          />
-        </div>
-
-        {/* Notes panel - takes remaining space and scrolls */}
-
-        <div className="flex-1 min-h-0 overflow-hidden mb-4">
+        {/* ========== MAIN CONTENT: NOTES ========== */}
+        <div className="flex-1 min-h-0 overflow-hidden p-6">
           <NotesPanel
             entityId={contact.id}
             entityType="contact"
@@ -643,369 +861,451 @@ export const ContactDetail = memo(function ContactDetail({
           />
         </div>
 
-        {/* Footer - fixed */}
-        <div className="flex items-center justify-between flex-shrink-0">
-          <div className="text-xs text-gray-400">
-            {actionMessage ?? "J/K to move • C to call • 1-5 outcomes • N focus notes"}
+        {/* ========== FOOTER ========== */}
+        <footer className="flex-shrink-0 px-6 py-3 border-t border-gray-100 bg-gray-50/50">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-400">
+              {actionMessage ?? "J/K to move • C to call • 1-5 outcomes • N focus notes"}
+            </div>
+            <Button variant="ghost" onClick={onNext} size="sm">
+              Next Company ↵
+            </Button>
           </div>
-          <Button variant="ghost" onClick={onNext}>
-            Next Company ↵
-          </Button>
-        </div>
+        </footer>
       </section>
 
-      <Modal open={isFollowUpModalOpen} onClose={() => setIsFollowUpModalOpen(false)}>
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">{tTma("scheduleFollowUp")}</h3>
-            <p className="text-sm text-gray-500">
-              Pick when this company should reappear in your follow-up list.
-            </p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <div>
-              <label className="text-xs uppercase text-gray-400">Date</label>
-              <Input type="date" value={customDate} onChange={(event) => setCustomDate(event.target.value)} />
-            </div>
-            <div>
-              <label className="text-xs uppercase text-gray-400">Time</label>
-              <Input type="time" value={customTime} onChange={(event) => setCustomTime(event.target.value)} />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs uppercase text-gray-400">Note</label>
-            <Textarea value={customNote} onChange={(event) => setCustomNote(event.target.value)} placeholder="Optional context" />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setIsFollowUpModalOpen(false)}>
-              {tCommon("cancel")}
-            </Button>
-            <Button onClick={handleCustomFollowUp}>{tTma("saveFollowUp")}</Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Email Preview Modal */}
-      <Modal open={emailPreview !== null} onClose={() => setEmailPreview(null)}>
-        <div className="space-y-4 max-w-2xl">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">{tEmail("preview")}</h3>
-              <p className="text-sm text-gray-500">{tEmail("previewDescription")}</p>
-            </div>
-            {/* AI Generate Buttons - Standard & Best (with research) */}
-            {emailCandidates.length > 0 && (
-              <div className="flex gap-2">
-                {/* Standard Draft Button */}
-                <button
-                  type="button"
-                  onClick={handleGenerateStandard}
-                  disabled={!!generatingAi}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-                    generatingAi === "standard"
-                      ? "bg-gray-200 text-gray-500 cursor-wait border border-gray-300"
-                      : generatingAi
-                      ? "bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-100"
-                      : activeDraftType === "standard"
-                      ? "bg-gray-200 text-gray-800 border border-gray-300"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
-                  )}
-                >
-                  {generatingAi === "standard" ? (
-                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  ) : (
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                    </svg>
-                  )}
-                  {tEmail("draftStandard")}
-                </button>
-                
-                {/* Best Draft Button (with research) */}
-                <button
-                  type="button"
-                  onClick={handleGenerateBest}
-                  disabled={!!generatingAi}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-                    generatingAi === "best"
-                      ? "bg-purple-200 text-purple-500 cursor-wait"
-                      : generatingAi
-                      ? "bg-purple-50 text-purple-200 cursor-not-allowed"
-                      : activeDraftType === "best"
-                      ? "bg-purple-600 text-white shadow-md"
-                      : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:from-purple-600 hover:to-indigo-600 shadow-sm hover:shadow-md"
-                  )}
-                >
-                  {generatingAi === "best" ? (
-                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  ) : (
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  )}
-                  {tEmail("draftBest")}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* AI Error Message */}
-          {aiError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-              {aiError}
-            </div>
-          )}
-
-          {/* Research Confidence Indicator (for Best drafts) */}
-          {activeDraftType === "best" && researchConfidence && (
-            <div className={cn(
-              "rounded-lg border px-3 py-2 text-sm flex items-center gap-2",
-              researchConfidence === "high" 
-                ? "border-green-200 bg-green-50 text-green-700"
-                : researchConfidence === "medium"
-                ? "border-amber-200 bg-amber-50 text-amber-700"
-                : "border-gray-200 bg-gray-50 text-gray-600"
-            )}>
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              {tEmail("researchConfidence")}: {tEmail(`confidence${researchConfidence.charAt(0).toUpperCase() + researchConfidence.slice(1)}`)}
-            </div>
-          )}
-          
-          {emailPreview && (
-            <>
-              <div className="space-y-3">
-                {/* Recipients */}
-                <div>
-                  <label className="text-xs uppercase text-gray-400">{tEmail("recipients")}</label>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {emailPreview.recipients.map((email, i) => (
-                      <span key={i} className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-                        {email}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Editable Subject */}
-                <div>
-                  <label className="text-xs uppercase text-gray-400">{tEmail("subject")}</label>
-                  <Input
-                    className="mt-1"
-                    value={editableSubject}
-                    onChange={(e) => setEditableSubject(e.target.value)}
-                    placeholder={tEmail("subjectPlaceholder")}
-                  />
-                </div>
-
-                {/* Editable Body */}
-                <div>
-                  <label className="text-xs uppercase text-gray-400">{tEmail("message")}</label>
-                  <div className="relative mt-1">
-                    <Textarea
-                      className={cn(
-                        "min-h-[150px] font-mono text-xs transition-opacity",
-                        generatingAi && "opacity-30"
-                      )}
-                      value={editableBody}
-                      onChange={(e) => setEditableBody(e.target.value)}
-                      placeholder={tEmail("messagePlaceholder")}
-                      disabled={!!generatingAi}
-                    />
-                    {/* Shimmer overlay while generating */}
-                    {generatingAi && (
-                      <div className="absolute inset-0 pointer-events-none rounded-md bg-white/80 backdrop-blur-[1px] flex items-start justify-start p-4">
-                        <div>
-                          <TextShimmer className="text-sm font-medium" duration={1.5}>
-                            {generatingAi === "best" ? tEmail("generatingBest") : tEmail("generatingStandard")}
-                          </TextShimmer>
-                          <p className="mt-2 text-xs text-gray-400">
-                            {generatingAi === "best" ? tEmail("generatingBestHint") : tEmail("generatingStandardHint")}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-gray-400">{tEmail("signatureNote")}</p>
-                </div>
-
-                {/* Attachments */}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs uppercase text-gray-400">{tEmail("attachments")}</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowCandidatePicker(true)}
-                      className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
-                    >
-                      <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                      </svg>
-                      {tEmail("addCandidate")}
-                    </button>
-                  </div>
-                  <div className="mt-2 space-y-1">
-                    {emailPreview.attachments.map((att, i) => (
-                      <div
-                        key={i}
-                        className={cn(
-                          "flex items-center justify-between rounded-lg border px-3 py-2",
-                          att.error
-                            ? "border-red-200 bg-red-50"
-                            : "border-gray-200 bg-gray-50"
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          <svg
-                            className={cn("h-4 w-4", att.error ? "text-red-500" : "text-red-500")}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          <span className={cn("text-sm", att.error ? "text-red-700" : "text-gray-700")}>
-                            {att.name}
-                          </span>
-                          {att.error && (
-                            <span className="text-xs text-red-500">— {att.error}</span>
-                          )}
-                        </div>
-                        {att.type === "candidate" && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              // Find and remove the candidate matching this attachment
-                              const candidateName = att.name.replace("KP - ", "").replace(".pdf", "");
-                              const candidate = emailCandidates.find(
-                                (c) => `${c.first_name} ${c.last_name}` === candidateName
-                              );
-                              if (candidate) {
-                                handleRemoveCandidate(candidate.id);
-                              }
-                            }}
-                            className="ml-2 rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
-                            title={tCommon("remove")}
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    {emailPreview.attachments.length === 0 && (
-                      <p className="text-sm text-gray-400 italic">{tEmail("noAttachments")}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Error/Success Messages */}
-            {emailSent && (
-              <div
-                className={cn(
-                  "rounded-lg px-3 py-2 text-sm",
-                  emailSent.status === "success"
-                    ? "bg-green-50 text-green-700 border border-green-200"
-                    : emailSent.status === "warning"
-                    ? "bg-amber-50 text-amber-700 border border-amber-200"
-                    : "bg-red-50 text-red-600 border border-red-200"
-                )}
-              >
-                {emailSent.message}
-              </div>
-            )}
-
-              {emailPreview.candidateErrors && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                  {tEmail("missingProfilesWarning")}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex justify-end gap-2">
-                <Button variant="ghost" onClick={() => setEmailPreview(null)} disabled={sendingEmail}>
-                  {tCommon("cancel")}
-                </Button>
-                <Button
-                  onClick={handleSendEmail}
-                  disabled={sendingEmail || emailSent?.status === "success" || !emailPreview.canSend}
-                >
-                  {sendingEmail ? tEmail("sending") : emailSent?.status === "success" ? tEmail("sent") : tEmail("send")}
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
-      </Modal>
-
-      {/* Candidate Picker Modal for adding to email */}
-      <CandidatePickerModal
-        open={showCandidatePicker}
-        onClose={() => setShowCandidatePicker(false)}
-        onSelect={handleAddCandidate}
-      />
-
-      {/* Vacancy Quick View Popup */}
-      <VacancyQuickView
-        vacancy={selectedVacancy}
-        isOpen={!!selectedVacancy}
-        onClose={() => setSelectedVacancy(null)}
-      />
+      {/* Modals and Drawers */}
+      {renderModalsAndDrawers()}
     </>
   );
+
+  // Helper function to render all modals/drawers (shared between layouts)
+  function renderModalsAndDrawers() {
+    return (
+      <>
+        {/* Contact Persons Drawer */}
+        <Sheet open={contactPersonsOpen} onOpenChange={setContactPersonsOpen}>
+          <SheetContent className="w-full sm:max-w-lg">
+            <SheetHeader>
+              <SheetTitle>Ansprechpersonen</SheetTitle>
+              <SheetDescription>
+                Kontaktpersonen bei {contact?.company_name}
+              </SheetDescription>
+            </SheetHeader>
+            <div className="flex-1 overflow-y-auto">
+              {contact && <ContactPersonsPanel contactId={contact.id} />}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Follow-up Modal */}
+        <Modal open={isFollowUpModalOpen} onClose={() => setIsFollowUpModalOpen(false)}>
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">{tTma("scheduleFollowUp")}</h3>
+              <p className="text-sm text-gray-500">
+                Pick when this company should reappear in your follow-up list.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="text-xs uppercase text-gray-400">Date</label>
+                <Input type="date" value={customDate} onChange={(event) => setCustomDate(event.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs uppercase text-gray-400">Time</label>
+                <Input type="time" value={customTime} onChange={(event) => setCustomTime(event.target.value)} />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-gray-400">Note</label>
+              <Textarea value={customNote} onChange={(event) => setCustomNote(event.target.value)} placeholder="Optional context" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setIsFollowUpModalOpen(false)}>
+                {tCommon("cancel")}
+              </Button>
+              <Button onClick={handleCustomFollowUp}>{tTma("saveFollowUp")}</Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Email Preview Modal */}
+        <Modal open={emailPreview !== null} onClose={() => setEmailPreview(null)} size="lg">
+          <div className="space-y-4 max-w-2xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{tEmail("preview")}</h3>
+                <p className="text-sm text-gray-500">{tEmail("previewDescription")}</p>
+              </div>
+              {/* AI Generate Buttons - Standard & Best (with research) */}
+              {emailCandidates.length > 0 && (
+                <div className="flex gap-2">
+                  {/* Standard Draft Button */}
+                  <button
+                    type="button"
+                    onClick={handleGenerateStandard}
+                    disabled={!!generatingAi}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                      generatingAi === "standard"
+                        ? "bg-gray-200 text-gray-500 cursor-wait border border-gray-300"
+                        : generatingAi
+                        ? "bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-100"
+                        : activeDraftType === "standard"
+                        ? "bg-gray-200 text-gray-800 border border-gray-300"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
+                    )}
+                  >
+                    {generatingAi === "standard" ? (
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                      </svg>
+                    )}
+                    {tEmail("draftStandard")}
+                  </button>
+                  
+                  {/* Best Draft Button (with research) */}
+                  <button
+                    type="button"
+                    onClick={handleGenerateBest}
+                    disabled={!!generatingAi}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                      generatingAi === "best"
+                        ? "bg-purple-200 text-purple-500 cursor-wait"
+                        : generatingAi
+                        ? "bg-purple-50 text-purple-200 cursor-not-allowed"
+                        : activeDraftType === "best"
+                        ? "bg-purple-600 text-white shadow-md"
+                        : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:from-purple-600 hover:to-indigo-600 shadow-sm hover:shadow-md"
+                    )}
+                  >
+                    {generatingAi === "best" ? (
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    )}
+                    {tEmail("draftBest")}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* AI Error Message */}
+            {aiError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                {aiError}
+              </div>
+            )}
+
+            {/* Research Confidence Indicator (for Best drafts) */}
+            {activeDraftType === "best" && researchConfidence && (
+              <div className={cn(
+                "rounded-lg border px-3 py-2 text-sm flex items-center gap-2",
+                researchConfidence === "high" 
+                  ? "border-green-200 bg-green-50 text-green-700"
+                  : researchConfidence === "medium"
+                  ? "border-amber-200 bg-amber-50 text-amber-700"
+                  : "border-gray-200 bg-gray-50 text-gray-600"
+              )}>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                {tEmail("researchConfidence")}: {tEmail(`confidence${researchConfidence.charAt(0).toUpperCase() + researchConfidence.slice(1)}`)}
+              </div>
+            )}
+            
+            {emailPreview && (
+              <>
+                <div className="space-y-3">
+                  {/* Recipients */}
+                  <div>
+                    <label className="text-xs uppercase text-gray-400">{tEmail("recipients")}</label>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {emailPreview.recipients.map((email, i) => (
+                        <span key={i} className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                          {email}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Editable Subject */}
+                  <div>
+                    <label className="text-xs uppercase text-gray-400">{tEmail("subject")}</label>
+                    <Input
+                      className="mt-1"
+                      value={editableSubject}
+                      onChange={(e) => setEditableSubject(e.target.value)}
+                      placeholder={tEmail("subjectPlaceholder")}
+                    />
+                  </div>
+
+                  {/* Editable Body */}
+                  <div>
+                    <label className="text-xs uppercase text-gray-400">{tEmail("message")}</label>
+                    <div className="relative mt-1">
+                      <Textarea
+                        className={cn(
+                          "min-h-[150px] font-mono text-xs transition-opacity",
+                          generatingAi && "opacity-30"
+                        )}
+                        value={editableBody}
+                        onChange={(e) => setEditableBody(e.target.value)}
+                        placeholder={tEmail("messagePlaceholder")}
+                        disabled={!!generatingAi}
+                      />
+                      {/* Shimmer overlay while generating */}
+                      {generatingAi && (
+                        <div className="absolute inset-0 pointer-events-none rounded-md bg-white/80 backdrop-blur-[1px] flex items-start justify-start p-4">
+                          <div>
+                            <TextShimmer className="text-sm font-medium" duration={1.5}>
+                              {generatingAi === "best" ? tEmail("generatingBest") : tEmail("generatingStandard")}
+                            </TextShimmer>
+                            <p className="mt-2 text-xs text-gray-400">
+                              {generatingAi === "best" ? tEmail("generatingBestHint") : tEmail("generatingStandardHint")}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-gray-400">{tEmail("signatureNote")}</p>
+                  </div>
+
+                  {/* Attachments */}
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs uppercase text-gray-400">{tEmail("attachments")}</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowCandidatePicker(true)}
+                        className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                      >
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        {tEmail("addCandidate")}
+                      </button>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      {emailPreview.attachments.map((att, i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            "flex items-center justify-between rounded-lg border px-3 py-2",
+                            att.error
+                              ? "border-red-200 bg-red-50"
+                              : "border-gray-200 bg-gray-50"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <svg
+                              className={cn("h-4 w-4", att.error ? "text-red-500" : "text-red-500")}
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            <span className={cn("text-sm", att.error ? "text-red-700" : "text-gray-700")}>
+                              {att.name}
+                            </span>
+                            {att.error && (
+                              <span className="text-xs text-red-500">— {att.error}</span>
+                            )}
+                          </div>
+                          {att.type === "candidate" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Find and remove the candidate matching this attachment
+                                const candidateName = att.name.replace("KP - ", "").replace(".pdf", "");
+                                const candidate = emailCandidates.find(
+                                  (c) => `${c.first_name} ${c.last_name}` === candidateName
+                                );
+                                if (candidate) {
+                                  handleRemoveCandidate(candidate.id);
+                                }
+                              }}
+                              className="ml-2 rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                              title={tCommon("remove")}
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {emailPreview.attachments.length === 0 && (
+                        <p className="text-sm text-gray-400 italic">{tEmail("noAttachments")}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Error/Success Messages */}
+                {emailSent && (
+                  <div
+                    className={cn(
+                      "rounded-lg px-3 py-2 text-sm",
+                      emailSent.status === "success"
+                        ? "bg-green-50 text-green-700 border border-green-200"
+                        : emailSent.status === "warning"
+                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                        : "bg-red-50 text-red-600 border border-red-200"
+                    )}
+                  >
+                    {emailSent.message}
+                  </div>
+                )}
+
+                {emailPreview.candidateErrors && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                    {tEmail("missingProfilesWarning")}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setEmailPreview(null)} disabled={sendingEmail}>
+                    {tCommon("cancel")}
+                  </Button>
+                  <Button
+                    onClick={handleSendEmail}
+                    disabled={sendingEmail || emailSent?.status === "success" || !emailPreview.canSend}
+                  >
+                    {sendingEmail ? tEmail("sending") : emailSent?.status === "success" ? tEmail("sent") : tEmail("send")}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </Modal>
+
+        {/* Candidate Picker Modal for adding to email */}
+        <CandidatePickerModal
+          open={showCandidatePicker}
+          onClose={() => setShowCandidatePicker(false)}
+          onSelect={handleAddCandidate}
+        />
+
+        {/* Vacancy Quick View Popup */}
+        <VacancyQuickView
+          vacancy={selectedVacancy}
+          isOpen={!!selectedVacancy}
+          onClose={() => setSelectedVacancy(null)}
+        />
+      </>
+    );
+  }
 });
 
-// Vacancy Indicator component
-const VacancyIndicator = memo(function VacancyIndicator({
+// ========== HELPER COMPONENTS ==========
+
+function InfoChip({ 
+  icon, 
+  label, 
+  href 
+}: { 
+  icon: React.ReactNode; 
+  label: string; 
+  href?: string;
+}) {
+  const baseClasses = cn(
+    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs",
+    "bg-gray-100/80 text-gray-600",
+    href && "hover:bg-gray-200/80 transition-colors cursor-pointer"
+  );
+
+  if (href) {
+    return (
+      <a href={href} className={baseClasses}>
+        {icon}
+        <span className="max-w-[140px] truncate">{label}</span>
+      </a>
+    );
+  }
+
+  return (
+    <div className={baseClasses}>
+      {icon}
+      <span className="max-w-[180px] truncate">{label}</span>
+    </div>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+    </svg>
+  );
+}
+
+function EmailIcon() {
+  return (
+    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
+function LocationIcon() {
+  return (
+    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+    </svg>
+  );
+}
+
+// Vacancy Banner - compact header indicator
+const VacancyBanner = memo(function VacancyBanner({
   vacancies,
   onViewDetails,
 }: {
   vacancies: Vacancy[];
   onViewDetails: (vacancy: Vacancy) => void;
 }) {
-  // Sort by urgency (highest first)
   const sortedVacancies = [...vacancies].sort((a, b) => (b.urgency || 1) - (a.urgency || 1));
   const mostUrgent = sortedVacancies[0];
 
   return (
     <button
       onClick={() => onViewDetails(mostUrgent)}
-      className="w-full rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-left transition-colors hover:bg-purple-100 hover:border-purple-300 group"
+      className="w-full px-6 py-2 border-t border-purple-100 bg-purple-50/50 hover:bg-purple-100/50 transition-colors text-left group"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 text-purple-600 group-hover:bg-purple-200">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
-              <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" />
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-purple-100 text-purple-600">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5z" clipRule="evenodd" />
             </svg>
           </div>
-          <div>
-            <p className="text-sm font-medium text-purple-900">
-              {vacancies.length === 1 ? "Offene Vakanz" : `${vacancies.length} Offene Vakanzen`}
-            </p>
-            <p className="text-xs text-purple-600">{mostUrgent.title}</p>
-          </div>
+          <span className="text-sm font-medium text-purple-900">
+            {vacancies.length === 1 ? "Offene Vakanz" : `${vacancies.length} Offene Vakanzen`}
+          </span>
+          <span className="text-xs text-purple-600">{mostUrgent.title}</span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Urgency flames */}
           <div className="flex gap-0.5">
             {Array.from({ length: mostUrgent.urgency || 1 }).map((_, i) => (
-              <svg key={i} className="w-3.5 h-3.5 text-orange-500" viewBox="0 0 24 24" fill="currentColor">
+              <svg key={i} className="w-3 h-3 text-orange-500" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 23c-4.97 0-9-3.58-9-8 0-2.52 1.17-4.83 3.15-6.42.9-.73 1.85-1.27 2.85-1.58.39-.12.8.16.8.57v.44c0 1.08.22 2.14.65 3.12.15.36.55.48.87.27.17-.11.32-.24.45-.39.72-.8 1.14-1.82 1.23-2.9.09-1.08-.12-2.17-.63-3.14-.25-.47.18-1.02.7-.89 1.76.45 3.38 1.38 4.72 2.73C19.32 8.92 21 11.87 21 15c0 4.42-4.03 8-9 8z"/>
               </svg>
             ))}
@@ -1019,42 +1319,8 @@ const VacancyIndicator = memo(function VacancyIndicator({
   );
 });
 
-const InfoBlock = memo(function InfoBlock({
-  label,
-  value,
-  children,
-  isMobile = false,
-}: {
-  label: string;
-  value?: string;
-  children?: React.ReactNode;
-  isMobile?: boolean;
-}) {
-  // Make phone and email tappable on mobile
-  const isPhone = label.toLowerCase() === "phone" && value && !value.includes("No ");
-  const isEmail = label.toLowerCase() === "email" && value && !value.includes("No ");
-  
-  return (
-    <div className={isMobile ? "flex items-center justify-between py-2 border-b border-gray-100" : ""}>
-      <p className="text-xs uppercase tracking-wide text-gray-400">{label}</p>
-      {children ? (
-        <div className={isMobile ? "" : "mt-1"}>{children}</div>
-      ) : isPhone && isMobile ? (
-        <a href={`tel:${value?.replace(/\s+/g, "")}`} className="text-sm text-blue-600 font-medium">
-          {value}
-        </a>
-      ) : isEmail && isMobile ? (
-        <a href={`mailto:${value}`} className="text-sm text-blue-600 font-medium truncate max-w-[200px]">
-          {value}
-        </a>
-      ) : (
-        <p className={cn("text-sm text-gray-900", isMobile ? "" : "mt-1")}>{value}</p>
-      )}
-    </div>
-  );
-});
-
-function FollowUpDropdown({
+// Follow-up chip/dropdown
+function FollowUpChip({
   currentDate,
   onSelect,
   onClear,
@@ -1067,14 +1333,23 @@ function FollowUpDropdown({
 
   return (
     <div className="relative">
-      <Button
-        size="sm"
-        variant="ghost"
-        className="text-xs"
+      <button
         onClick={() => setOpen((prev) => !prev)}
+        className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors",
+          currentDate 
+            ? "bg-amber-100 text-amber-700 hover:bg-amber-200" 
+            : "bg-gray-100/80 text-gray-500 hover:bg-gray-200/80"
+        )}
       >
-        {currentDate ? formatFollowUpDate(currentDate) : "Set"} ▾
-      </Button>
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        {currentDate ? formatFollowUpDate(currentDate) : "Follow-up"}
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
@@ -1126,6 +1401,8 @@ function FollowUpDropdown({
     </div>
   );
 }
+
+// ========== UTILITY FUNCTIONS ==========
 
 function getTomorrowNine() {
   const date = new Date();
