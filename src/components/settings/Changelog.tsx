@@ -14,6 +14,15 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.31.1",
+    date: "2025-12-14",
+    type: "patch",
+    changes: [
+      "TMA CSV import now captures ALL phone numbers from multiple fields",
+      "Phone numbers from Telefon privat, Mobiltelefon, Handy, etc. are combined",
+    ],
+  },
+  {
     version: "1.31.0",
     date: "2025-12-14",
     type: "minor",

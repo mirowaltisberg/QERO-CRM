@@ -157,26 +157,40 @@ function mapRowToCandidate(row: CsvRow): TmaCreateInput | null {
     row["Zip"] ||
     row["Postal Code"];
 
-  const phone =
-    row["Telefon geschäftlich"] ||
-    row["Telefon geschaeftlich"] ||
-    row["Telefon privat"] ||
-    row["Mobiltelefon"] ||
-    row["Handy"] ||
-    row["Mobile"] ||
-    row["Telefon"] ||
-    row["Phone"] ||
-    row["Tel"] ||
-    row["Tel."] ||
-    row["Telefonnummer"] ||
-    row["Phone Number"] ||
-    row["Mobile Phone"] ||
-    row["Cell Phone"];
+  // Collect ALL phone numbers from various fields and combine them
+  const phoneFields = [
+    row["Telefon geschäftlich"],
+    row["Telefon geschaeftlich"],
+    row["Telefon privat"],
+    row["Mobiltelefon"],
+    row["Handy"],
+    row["Mobile"],
+    row["Telefon"],
+    row["Phone"],
+    row["Tel"],
+    row["Tel."],
+    row["Telefonnummer"],
+    row["Phone Number"],
+    row["Mobile Phone"],
+    row["Cell Phone"],
+  ];
+  
+  // Filter out empty values, trim, and dedupe
+  const uniquePhones = Array.from(
+    new Set(
+      phoneFields
+        .filter((p): p is string => Boolean(p?.trim()))
+        .map((p) => p.trim())
+    )
+  );
+  
+  // Join multiple phones with " / " separator
+  const phone = uniquePhones.length > 0 ? uniquePhones.join(" / ") : null;
 
   return {
     first_name: firstName,
     last_name: lastName,
-    phone: phone?.trim() || null,
+    phone,
     email: (row["Email"] || row["E-Mail"] || row["E-Mail-Adresse"] || "").trim() || null,
     canton: formatCanton(cantonSource),
     city: city?.trim() || null,
