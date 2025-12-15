@@ -161,9 +161,9 @@ export function TravelTimeWidget({
           )}
           title={transitResult && !transitResult.error ? t("openInMaps") : t("calculateTransit")}
         >
-          {/* Train icon */}
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" />
+          {/* SBB Swiss Railway logo */}
+          <svg className="h-4 w-4" viewBox="0 0 298 186" fill="none">
+            <path fill="#D82E20" d="M 204.0 154.5 L 169.5 154.0 L 217.0 106.5 L 157.0 106.5 L 156.0 154.5 L 128.5 154.0 L 128.0 106.5 L 68.0 106.5 L 115.5 154.0 L 81.0 154.5 L 18.5 92.0 L 80.0 30.5 L 115.5 31.0 L 68.0 78.5 L 128.0 78.5 L 129.0 30.5 L 156.5 31.0 L 157.0 78.5 L 217.0 78.5 L 169.5 31.0 L 205.0 30.5 L 265.5 93.0 Z"/>
           </svg>
           {loadingTransit ? (
             <span className="animate-pulse">{t("calculating")}</span>
