@@ -6,7 +6,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { AnnotationCanvas, type Annotation, type AnnotationTool } from "./AnnotationCanvas";
+import { AnnotationCanvas, migrateAnnotations, type Annotation, type AnnotationTool } from "./AnnotationCanvas";
 import { cn } from "@/lib/utils/cn";
 
 // Configure PDF.js worker from CDN
@@ -14,6 +14,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 const COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#8b5cf6", "#000000"];
 const STROKE_WIDTHS = [2, 4, 6, 8];
+const HIGHLIGHTER_WIDTHS = [8, 12, 16, 20];
 const FONT_SIZES = [14, 18, 24, 32];
 
 type ViewSize = "normal" | "large" | "fullscreen";
@@ -35,8 +36,15 @@ export function PdfPreviewModal({
 }: PdfPreviewModalProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState(1);
-  const [pageWidth, setPageWidth] = useState(600);
-  const [pageHeight, setPageHeight] = useState(800);
+  
+  // Original PDF page dimensions (intrinsic size)
+  const [pdfWidth, setPdfWidth] = useState(0);
+  const [pdfHeight, setPdfHeight] = useState(0);
+  
+  // Rendered dimensions (scaled to fit viewport)
+  const [renderWidth, setRenderWidth] = useState(600);
+  const [renderHeight, setRenderHeight] = useState(800);
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,13 +56,18 @@ export function PdfPreviewModal({
   const [tool, setTool] = useState<AnnotationTool>("pen");
   const [color, setColor] = useState("#ef4444");
   const [strokeWidth, setStrokeWidth] = useState(4);
+  const [highlighterWidth, setHighlighterWidth] = useState(12);
   const [fontSize, setFontSize] = useState(18);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [annotationsMigrated, setAnnotationsMigrated] = useState(false);
   
   // Auto-save refs
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const annotationsRef = useRef<Annotation[]>(annotations);
+  
+  // Container ref for measuring available space
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Keep ref in sync
   useEffect(() => {
@@ -65,6 +78,7 @@ export function PdfPreviewModal({
   useEffect(() => {
     if (open && candidateId) {
       loadAnnotations();
+      setAnnotationsMigrated(false);
     }
   }, [open, candidateId]);
 
@@ -79,6 +93,21 @@ export function PdfPreviewModal({
       console.error("Failed to load annotations:", err);
     }
   };
+
+  // Migrate legacy annotations when PDF dimensions are known
+  useEffect(() => {
+    if (pdfWidth > 0 && pdfHeight > 0 && annotations.length > 0 && !annotationsMigrated) {
+      // Check if migration is needed (any annotation without 'id' or 'page')
+      const needsMigration = annotations.some((a) => !("id" in a) || !("page" in a));
+      if (needsMigration) {
+        const migrated = migrateAnnotations(annotations, pdfWidth, pdfHeight, pageNumber);
+        setAnnotations(migrated);
+        // Trigger save after migration
+        setTimeout(() => performSave(migrated), 500);
+      }
+      setAnnotationsMigrated(true);
+    }
+  }, [pdfWidth, pdfHeight, annotations, annotationsMigrated, pageNumber]);
 
   // Perform save
   const performSave = useCallback(async (annotationsToSave: Annotation[]) => {
@@ -133,14 +162,50 @@ export function PdfPreviewModal({
     triggerAutoSave();
   }, [triggerAutoSave]);
 
-  // Get max width based on view size
-  const getMaxWidth = useCallback(() => {
+  // Calculate viewport dimensions based on view size
+  const getViewportDimensions = useCallback(() => {
+    if (typeof window === "undefined") {
+      return { maxWidth: 700, maxHeight: 600 };
+    }
+    
     switch (viewSize) {
-      case "fullscreen": return typeof window !== "undefined" ? window.innerWidth - 80 : 1200;
-      case "large": return 1000;
-      default: return 700;
+      case "fullscreen":
+        return {
+          maxWidth: window.innerWidth - 100,
+          maxHeight: window.innerHeight - 200, // Account for header/footer
+        };
+      case "large":
+        return {
+          maxWidth: 1000,
+          maxHeight: window.innerHeight - 280,
+        };
+      default:
+        return {
+          maxWidth: 700,
+          maxHeight: 600,
+        };
     }
   }, [viewSize]);
+
+  // Recalculate render dimensions when view size or PDF dimensions change
+  const calculateRenderSize = useCallback(() => {
+    if (pdfWidth === 0 || pdfHeight === 0) return;
+    
+    const { maxWidth, maxHeight } = getViewportDimensions();
+    
+    // Fit-to-page: scale to fit both width AND height
+    const scaleW = maxWidth / pdfWidth;
+    const scaleH = maxHeight / pdfHeight;
+    const scale = Math.min(scaleW, scaleH, 2); // Cap at 2x zoom
+    
+    setRenderWidth(Math.round(pdfWidth * scale));
+    setRenderHeight(Math.round(pdfHeight * scale));
+  }, [pdfWidth, pdfHeight, getViewportDimensions]);
+
+  // Recalculate when view size changes
+  useEffect(() => {
+    calculateRenderSize();
+  }, [viewSize, calculateRenderSize]);
 
   const handleClearAll = useCallback(() => {
     if (confirm("Alle Notizen löschen?")) {
@@ -161,27 +226,26 @@ export function PdfPreviewModal({
   };
 
   const onPageLoadSuccess = useCallback(({ width, height }: { width: number; height: number }) => {
-    const maxW = getMaxWidth();
-    const scale = Math.min(maxW / width, 1);
-    setPageWidth(width * scale);
-    setPageHeight(height * scale);
-  }, [getMaxWidth]);
-
-  // Recalculate size when view size changes
-  useEffect(() => {
-    if (!loading && pageWidth > 0) {
-      // Trigger a re-render with new size
-      const maxW = getMaxWidth();
-      const originalWidth = pageWidth / (pageWidth / 700); // Approximate original
-      const scale = Math.min(maxW / 700, 1.5); // Scale up from current
-      setPageWidth(Math.min(pageWidth * scale, maxW));
-      setPageHeight(Math.min(pageHeight * scale, maxW * 1.4));
-    }
-  }, [viewSize]);
+    // Store original PDF dimensions
+    setPdfWidth(width);
+    setPdfHeight(height);
+    
+    // Calculate initial render size
+    const { maxWidth, maxHeight } = getViewportDimensions();
+    const scaleW = maxWidth / width;
+    const scaleH = maxHeight / height;
+    const scale = Math.min(scaleW, scaleH, 2);
+    
+    setRenderWidth(Math.round(width * scale));
+    setRenderHeight(Math.round(height * scale));
+  }, [getViewportDimensions]);
 
   // Determine modal size
   const modalSize = viewSize === "fullscreen" ? "full" : viewSize === "large" ? "xl" : "lg";
   const heightClass = viewSize === "fullscreen" ? "h-[95vh]" : viewSize === "large" ? "h-[90vh]" : "h-[85vh]";
+
+  // Current stroke width based on tool
+  const currentStrokeWidth = tool === "highlighter" ? highlighterWidth : strokeWidth;
 
   return (
     <Modal open={open} onClose={handleClose} size={modalSize}>
@@ -225,7 +289,7 @@ export function PdfPreviewModal({
                   "rounded-md px-2 py-1 text-xs transition-colors",
                   viewSize === "fullscreen" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
                 )}
-                title="Vollbild"
+                title="Vollbild (ganze Seite)"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 3.75H6A2.25 2.25 0 003.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0120.25 6v1.5m0 9V18A2.25 2.25 0 0118 20.25h-1.5m-9 0H6A2.25 2.25 0 013.75 18v-1.5" />
@@ -259,6 +323,20 @@ export function PdfPreviewModal({
         <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 pb-3 mb-3">
           {/* Tools */}
           <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1">
+            {/* Select/Move tool */}
+            <button
+              onClick={() => setTool("select")}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                tool === "select" ? "bg-white shadow text-gray-900" : "text-gray-600 hover:text-gray-900"
+              )}
+              title="Auswählen & Verschieben"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
+              </svg>
+            </button>
+            {/* Pen tool */}
             <button
               onClick={() => setTool("pen")}
               className={cn(
@@ -271,6 +349,20 @@ export function PdfPreviewModal({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
               </svg>
             </button>
+            {/* Highlighter tool */}
+            <button
+              onClick={() => setTool("highlighter")}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                tool === "highlighter" ? "bg-white shadow text-gray-900" : "text-gray-600 hover:text-gray-900"
+              )}
+              title="Textmarker"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+              </svg>
+            </button>
+            {/* Text tool */}
             <button
               onClick={() => setTool("text")}
               className={cn(
@@ -283,6 +375,7 @@ export function PdfPreviewModal({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
               </svg>
             </button>
+            {/* Eraser tool */}
             <button
               onClick={() => setTool("eraser")}
               className={cn(
@@ -327,6 +420,21 @@ export function PdfPreviewModal({
             </select>
           )}
 
+          {/* Highlighter width */}
+          {tool === "highlighter" && (
+            <select
+              value={highlighterWidth}
+              onChange={(e) => setHighlighterWidth(Number(e.target.value))}
+              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs"
+            >
+              {HIGHLIGHTER_WIDTHS.map((w) => (
+                <option key={w} value={w}>
+                  {w}px
+                </option>
+              ))}
+            </select>
+          )}
+
           {/* Font size (for text) */}
           {tool === "text" && (
             <select
@@ -352,7 +460,7 @@ export function PdfPreviewModal({
         </div>
 
         {/* PDF Viewer */}
-        <div className="flex-1 overflow-auto bg-gray-100 rounded-lg">
+        <div ref={containerRef} className="flex-1 overflow-auto bg-gray-100 rounded-lg flex items-center justify-center">
           {loading && (
             <div className="flex items-center justify-center h-full">
               <div className="text-sm text-gray-500">PDF wird geladen...</div>
@@ -365,8 +473,8 @@ export function PdfPreviewModal({
             </div>
           )}
 
-          <div className="flex justify-center p-4">
-            <div className="relative" style={{ width: pageWidth, height: pageHeight }}>
+          <div className="p-4">
+            <div className="relative" style={{ width: renderWidth, height: renderHeight }}>
               <Document
                 file={pdfUrl}
                 onLoadSuccess={onDocumentLoadSuccess}
@@ -375,7 +483,7 @@ export function PdfPreviewModal({
               >
                 <Page
                   pageNumber={pageNumber}
-                  width={pageWidth}
+                  width={renderWidth}
                   onLoadSuccess={onPageLoadSuccess}
                   renderTextLayer={false}
                   renderAnnotationLayer={false}
@@ -383,16 +491,19 @@ export function PdfPreviewModal({
               </Document>
 
               {/* Annotation overlay */}
-              {!loading && !error && (
+              {!loading && !error && pdfWidth > 0 && (
                 <div className="absolute inset-0">
                   <AnnotationCanvas
-                    width={pageWidth}
-                    height={pageHeight}
+                    width={renderWidth}
+                    height={renderHeight}
+                    baseWidth={pdfWidth}
+                    baseHeight={pdfHeight}
+                    currentPage={pageNumber}
                     annotations={annotations}
                     onChange={handleAnnotationsChange}
                     tool={tool}
                     color={color}
-                    strokeWidth={strokeWidth}
+                    strokeWidth={currentStrokeWidth}
                     fontSize={fontSize}
                   />
                 </div>

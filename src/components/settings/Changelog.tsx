@@ -14,6 +14,19 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.33.0",
+    date: "2025-12-14",
+    type: "minor",
+    changes: [
+      "PDF Preview: Fullscreen now shows entire page (fit-to-page)",
+      "Highlighter tool: semi-transparent marker for highlighting",
+      "Select/Move tool: click and drag to reposition annotations",
+      "Fixed: annotations no longer drift when changing view sizes",
+      "Annotations now use normalized coordinates for stability",
+      "Legacy annotations are automatically migrated",
+    ],
+  },
+  {
     version: "1.32.1",
     date: "2025-12-14",
     type: "patch",
