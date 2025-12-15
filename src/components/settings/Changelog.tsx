@@ -14,6 +14,16 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.32.1",
+    date: "2025-12-14",
+    type: "patch",
+    changes: [
+      "PDF Preview: resizable window (normal, large, fullscreen)",
+      "Auto-save: annotations save automatically after each edit",
+      "Save status indicator shows when annotations are saved",
+    ],
+  },
+  {
     version: "1.32.0",
     date: "2025-12-14",
     type: "minor",

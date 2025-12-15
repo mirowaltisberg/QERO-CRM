@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -15,6 +15,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 const COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#8b5cf6", "#000000"];
 const STROKE_WIDTHS = [2, 4, 6, 8];
 const FONT_SIZES = [14, 18, 24, 32];
+
+type ViewSize = "normal" | "large" | "fullscreen";
 
 interface PdfPreviewModalProps {
   open: boolean;
@@ -38,6 +40,9 @@ export function PdfPreviewModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // View size state
+  const [viewSize, setViewSize] = useState<ViewSize>("normal");
+
   // Annotation state
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [tool, setTool] = useState<AnnotationTool>("pen");
@@ -45,7 +50,16 @@ export function PdfPreviewModal({
   const [strokeWidth, setStrokeWidth] = useState(4);
   const [fontSize, setFontSize] = useState(18);
   const [saving, setSaving] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  
+  // Auto-save refs
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const annotationsRef = useRef<Annotation[]>(annotations);
+  
+  // Keep ref in sync
+  useEffect(() => {
+    annotationsRef.current = annotations;
+  }, [annotations]);
 
   // Load annotations on open
   useEffect(() => {
@@ -66,9 +80,8 @@ export function PdfPreviewModal({
     }
   };
 
-  const saveAnnotations = useCallback(async () => {
-    if (!hasChanges) return;
-    
+  // Perform save
+  const performSave = useCallback(async (annotationsToSave: Annotation[]) => {
     setSaving(true);
     try {
       await fetch(`/api/tma/${candidateId}/annotations`, {
@@ -76,36 +89,65 @@ export function PdfPreviewModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           document_type: "short_profile",
-          annotations,
+          annotations: annotationsToSave,
         }),
       });
-      setHasChanges(false);
+      setLastSaved(new Date());
     } catch (err) {
       console.error("Failed to save annotations:", err);
     } finally {
       setSaving(false);
     }
-  }, [candidateId, annotations, hasChanges]);
+  }, [candidateId]);
 
-  // Auto-save on close
+  // Auto-save after each edit (debounced 1 second)
+  const triggerAutoSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      performSave(annotationsRef.current);
+    }, 1000);
+  }, [performSave]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Save immediately on close
   const handleClose = useCallback(async () => {
-    if (hasChanges) {
-      await saveAnnotations();
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      await performSave(annotationsRef.current);
     }
     onClose();
-  }, [hasChanges, saveAnnotations, onClose]);
+  }, [performSave, onClose]);
 
   const handleAnnotationsChange = useCallback((newAnnotations: Annotation[]) => {
     setAnnotations(newAnnotations);
-    setHasChanges(true);
-  }, []);
+    triggerAutoSave();
+  }, [triggerAutoSave]);
+
+  // Get max width based on view size
+  const getMaxWidth = useCallback(() => {
+    switch (viewSize) {
+      case "fullscreen": return typeof window !== "undefined" ? window.innerWidth - 80 : 1200;
+      case "large": return 1000;
+      default: return 700;
+    }
+  }, [viewSize]);
 
   const handleClearAll = useCallback(() => {
     if (confirm("Alle Notizen löschen?")) {
       setAnnotations([]);
-      setHasChanges(true);
+      triggerAutoSave();
     }
-  }, []);
+  }, [triggerAutoSave]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -118,34 +160,98 @@ export function PdfPreviewModal({
     setLoading(false);
   };
 
-  const onPageLoadSuccess = ({ width, height }: { width: number; height: number }) => {
-    // Scale to fit modal width (max ~700px)
-    const scale = Math.min(700 / width, 1);
+  const onPageLoadSuccess = useCallback(({ width, height }: { width: number; height: number }) => {
+    const maxW = getMaxWidth();
+    const scale = Math.min(maxW / width, 1);
     setPageWidth(width * scale);
     setPageHeight(height * scale);
-  };
+  }, [getMaxWidth]);
+
+  // Recalculate size when view size changes
+  useEffect(() => {
+    if (!loading && pageWidth > 0) {
+      // Trigger a re-render with new size
+      const maxW = getMaxWidth();
+      const originalWidth = pageWidth / (pageWidth / 700); // Approximate original
+      const scale = Math.min(maxW / 700, 1.5); // Scale up from current
+      setPageWidth(Math.min(pageWidth * scale, maxW));
+      setPageHeight(Math.min(pageHeight * scale, maxW * 1.4));
+    }
+  }, [viewSize]);
+
+  // Determine modal size
+  const modalSize = viewSize === "fullscreen" ? "full" : viewSize === "large" ? "xl" : "lg";
+  const heightClass = viewSize === "fullscreen" ? "h-[95vh]" : viewSize === "large" ? "h-[90vh]" : "h-[85vh]";
 
   return (
-    <Modal open={open} onClose={handleClose} size="lg">
-      <div className="flex flex-col h-[85vh]">
+    <Modal open={open} onClose={handleClose} size={modalSize}>
+      <div className={cn("flex flex-col", heightClass)}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 pb-3 mb-3">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Kurzprofil Vorschau</h2>
             <p className="text-sm text-gray-500">{candidateName}</p>
           </div>
-          <div className="flex items-center gap-2">
-            {hasChanges && (
-              <span className="text-xs text-orange-600">Ungespeichert</span>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={saveAnnotations}
-              disabled={!hasChanges || saving}
-            >
-              {saving ? "Speichern..." : "Speichern"}
-            </Button>
+          <div className="flex items-center gap-3">
+            {/* Size toggle */}
+            <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-0.5">
+              <button
+                onClick={() => setViewSize("normal")}
+                className={cn(
+                  "rounded-md px-2 py-1 text-xs transition-colors",
+                  viewSize === "normal" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
+                )}
+                title="Normal"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewSize("large")}
+                className={cn(
+                  "rounded-md px-2 py-1 text-xs transition-colors",
+                  viewSize === "large" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
+                )}
+                title="Gross"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewSize("fullscreen")}
+                className={cn(
+                  "rounded-md px-2 py-1 text-xs transition-colors",
+                  viewSize === "fullscreen" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
+                )}
+                title="Vollbild"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 3.75H6A2.25 2.25 0 003.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0120.25 6v1.5m0 9V18A2.25 2.25 0 0118 20.25h-1.5m-9 0H6A2.25 2.25 0 013.75 18v-1.5" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Auto-save status */}
+            <div className="flex items-center gap-1.5 text-xs">
+              {saving ? (
+                <span className="text-blue-600 flex items-center gap-1">
+                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Speichern...
+                </span>
+              ) : lastSaved ? (
+                <span className="text-green-600 flex items-center gap-1">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                  Gespeichert
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
 

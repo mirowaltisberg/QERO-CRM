@@ -11,12 +11,14 @@ import {
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils/cn';
 
-type ModalSize = 'sm' | 'md' | 'lg';
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
 
 const sizeMap: Record<ModalSize, string> = {
   sm: 'max-w-md',
   md: 'max-w-lg',
   lg: 'max-w-3xl',
+  xl: 'max-w-5xl',
+  full: 'max-w-[95vw]',
 };
 
 export interface ModalProps {
