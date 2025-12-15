@@ -10,6 +10,7 @@ import type { ContactPerson } from "@/lib/types";
 
 interface ContactPersonsPanelProps {
   contactId: string;
+  compact?: boolean;
 }
 
 interface FormState {
@@ -32,7 +33,7 @@ const emptyForm: FormState = {
   gender: "",
 };
 
-export function ContactPersonsPanel({ contactId }: ContactPersonsPanelProps) {
+export function ContactPersonsPanel({ contactId, compact = false }: ContactPersonsPanelProps) {
   const [persons, setPersons] = useState<ContactPerson[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -184,6 +185,87 @@ export function ContactPersonsPanel({ contactId }: ContactPersonsPanelProps) {
     if (persons.length === 0) return "Noch keine Ansprechpersonen hinterlegt";
     return `${persons.length} Ansprechperson${persons.length === 1 ? "" : "en"}`;
   }, [loading, loadError, persons.length]);
+
+  // Compact mode for Inspector
+  if (compact) {
+    return (
+      <>
+        <div className="space-y-1">
+          {loading && <div className="text-xs text-gray-400">Lädt...</div>}
+          {loadError && <div className="text-xs text-red-500">{loadError}</div>}
+          {!loading && !loadError && persons.length === 0 && (
+            <button
+              onClick={() => openModal()}
+              className="w-full text-left px-2 py-1.5 rounded-md hover:bg-white text-sm text-gray-500"
+            >
+              + Hinzufügen
+            </button>
+          )}
+          {!loading && !loadError && persons.map((person) => (
+            <button
+              key={person.id}
+              onClick={() => openModal(person)}
+              className="w-full text-left px-2 py-1.5 rounded-md hover:bg-white"
+            >
+              <div className="text-sm text-gray-700">
+                {person.first_name} {person.last_name}
+              </div>
+              {person.role && <div className="text-xs text-gray-400">{person.role}</div>}
+            </button>
+          ))}
+          {!loading && !loadError && persons.length > 0 && (
+            <button
+              onClick={() => openModal()}
+              className="w-full text-left px-2 py-1 rounded-md text-xs text-blue-600 hover:bg-blue-50"
+            >
+              + Hinzufügen
+            </button>
+          )}
+        </div>
+        <Modal open={isModalOpen} onClose={closeModal}>
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {editingPerson ? "Ansprechperson bearbeiten" : "Neue Ansprechperson"}
+              </h3>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <InputField label="Vorname" value={form.first_name} onChange={handleChange("first_name")} required />
+              <InputField label="Nachname" value={form.last_name} onChange={handleChange("last_name")} required />
+              <InputField label="Rolle" value={form.role} onChange={handleChange("role")} />
+              <label className="text-xs font-medium uppercase text-gray-400">
+                Geschlecht
+                <select
+                  value={form.gender}
+                  onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value as "male" | "female" | "" }))}
+                  className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">Keine Angabe</option>
+                  <option value="male">Männlich (Herr)</option>
+                  <option value="female">Weiblich (Frau)</option>
+                </select>
+              </label>
+              <InputField label="E-Mail" value={form.email} onChange={handleChange("email")} type="email" />
+              <InputField label="Mobile" value={form.mobile} onChange={handleChange("mobile")} />
+              <InputField label="Direktnummer" value={form.direct_phone} onChange={handleChange("direct_phone")} />
+            </div>
+            {formError && <p className="text-sm text-red-500">{formError}</p>}
+            <div className="flex justify-between">
+              {editingPerson && (
+                <Button variant="ghost" className="text-red-500" onClick={() => handleDelete(editingPerson)} disabled={saving}>
+                  Löschen
+                </Button>
+              )}
+              <div className="flex gap-2 ml-auto">
+                <Button variant="ghost" onClick={closeModal} disabled={saving}>Abbrechen</Button>
+                <Button onClick={handleSubmit} disabled={saving}>{saving ? "Speichern..." : "Speichern"}</Button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      </>
+    );
+  }
 
   return (
     <>

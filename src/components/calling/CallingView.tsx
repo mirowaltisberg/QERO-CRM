@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { ContactList } from "./ContactList";
-import { ContactDetail } from "./ContactDetail";
+import { ContactDetail } from "./ContactDetailRedesign";
 import { CandidatePickerModal } from "./CandidatePickerModal";
 import { CandidateModeBanner } from "./CandidateModeBanner";
 import { SelectCandidateButton } from "./SelectCandidateButton";

@@ -14,6 +14,20 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.34.0",
+    date: "2025-12-14",
+    type: "major",
+    changes: [
+      "Complete Calling tab UI redesign — Notes-first Apple-native workspace",
+      "Notes now dominate the visual hierarchy with typographic timeline",
+      "Date-grouped notes (Today, Yesterday, dates) with minimal chrome",
+      "New Inspector drawer: status, follow-up, people, vacancies, travel in one panel",
+      "Focus mode (F key): hide everything except notes and minimal header",
+      "Keyboard shortcuts: I for Inspector, F for Focus, N for notes composer",
+      "Radically minimalist, calm, distraction-free interface",
+    ],
+  },
+  {
     version: "1.33.0",
     date: "2025-12-14",
     type: "minor",

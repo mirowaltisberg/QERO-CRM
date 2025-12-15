@@ -132,6 +132,7 @@ export const KEYBOARD_SHORTCUTS = {
   LOG: "l",
   COMMAND_PALETTE: "q",
   FOCUS_NOTES: "n",
+  INSPECTOR: "i",
   CONFIRM: "Enter",
   // Outcome shortcuts (1-5)
   OUTCOME_1: "1", // No Answer
