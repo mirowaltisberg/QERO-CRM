@@ -241,7 +241,15 @@
     "qualityScore": "Quality",
     "activeBonus": "Active",
     "roleMatch": "Role match",
-    "total": "Total"
+    "total": "Total",
+    "dropToUpload": "Drop file to upload",
+    "dropToReplace": "Drop to replace",
+    "replaceTitle": "Replace document?",
+    "replaceDescription": "A file already exists. Do you want to replace it?",
+    "newFile": "New file",
+    "replace": "Replace",
+    "invalidFileType": "Invalid file type. Please use PDF or DOCX.",
+    "fileTooLarge": "File too large. Maximum size is 5 MB."
   },
   "contact": {
     "title": "Contact",

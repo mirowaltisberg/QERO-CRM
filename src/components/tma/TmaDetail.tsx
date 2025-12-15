@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { NotesPanel } from "@/components/calling/NotesPanel";
 import { RoleDropdown } from "./RoleDropdown";
+import { DocumentDropCard } from "./DocumentDropCard";
 import { HoldToConfirmButton } from "@/components/ui/HoldToConfirmButton";
 import type { TmaCandidate, TmaRole } from "@/lib/types";
 import { 
@@ -220,6 +221,23 @@ export function TmaDetail({
   );
 
   const phoneLink = useMemo(() => candidate?.phone?.replace(/\s+/g, ""), [candidate?.phone]);
+  
+  // Document drop card labels for i18n
+  const documentLabels = useMemo(() => ({
+    formats: t("pdfDocx"),
+    viewDocument: t("viewDocument"),
+    noFile: t("noFileUploaded"),
+    dropToUpload: t("dropToUpload"),
+    dropToReplace: t("dropToReplace"),
+    uploading: tCommon("uploading"),
+    upload: tCommon("upload"),
+    replaceTitle: t("replaceTitle"),
+    replaceDescription: t("replaceDescription"),
+    cancel: tCommon("cancel"),
+    replace: t("replace"),
+    invalidType: t("invalidFileType"),
+    fileTooLarge: t("fileTooLarge"),
+  }), [t, tCommon]);
   const statusTags = useMemo(() => getStatusTags(candidate), [candidate]);
   const activeRole = useMemo(() => {
     if (!candidate?.position_title) return null;
@@ -603,46 +621,52 @@ export function TmaDetail({
 
           <Panel title={t("documents")} description={t("documentsDescription")}>
             <div className="space-y-4">
-              <DocumentCard
-                title="CV"
+              <DocumentDropCard
+                title={t("cv")}
                 url={candidate.cv_url}
                 uploading={uploading === "cv"}
                 onUpload={(file) => handleUpload(file, "cv")}
+                labels={documentLabels}
               />
-              <DocumentCard
-                title="Zeugnisse"
+              <DocumentDropCard
+                title={t("references")}
                 url={candidate.references_url}
                 uploading={uploading === "references"}
                 onUpload={(file) => handleUpload(file, "references")}
+                labels={documentLabels}
               />
-              <DocumentCard
-                title="Short Profile"
+              <DocumentDropCard
+                title={t("shortProfile")}
                 url={candidate.short_profile_url}
                 uploading={uploading === "short_profile"}
                 onUpload={(file) => handleUpload(file, "short_profile")}
+                labels={documentLabels}
               />
             </div>
           </Panel>
 
           <Panel title="Vertragsunterlagen" description="Dokumente für Verträge">
             <div className="space-y-4">
-              <DocumentCard
+              <DocumentDropCard
                 title="AHV-Ausweis"
                 url={candidate.ahv_url}
                 uploading={uploading === "ahv"}
                 onUpload={(file) => handleUpload(file, "ahv")}
+                labels={documentLabels}
               />
-              <DocumentCard
+              <DocumentDropCard
                 title="ID / Pass"
                 url={candidate.id_url}
                 uploading={uploading === "id"}
                 onUpload={(file) => handleUpload(file, "id")}
+                labels={documentLabels}
               />
-              <DocumentCard
+              <DocumentDropCard
                 title="Bankkarte"
                 url={candidate.bank_url}
                 uploading={uploading === "bank"}
                 onUpload={(file) => handleUpload(file, "bank")}
+                labels={documentLabels}
               />
             </div>
           </Panel>
@@ -679,44 +703,6 @@ export function TmaDetail({
         </div>
       </Modal>
     </section>
-  );
-}
-
-function DocumentCard({
-  title,
-  url,
-  uploading,
-  onUpload,
-}: {
-  title: string;
-  url: string | null;
-  uploading: boolean;
-  onUpload: (file: File) => void;
-}) {
-  return (
-    <div className="rounded-2xl border border-gray-200 p-4">
-      <p className="text-sm font-medium text-gray-900">{title}</p>
-      <p className="text-xs text-gray-500">PDF, DOCX up to 5 MB</p>
-      {url ? (
-        <a href={url} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-sm text-blue-600">
-          View document →
-        </a>
-      ) : (
-        <p className="mt-2 text-xs text-gray-400">No file uploaded</p>
-      )}
-      <label className="mt-3 flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 hover:border-gray-500 hover:text-gray-900">
-        <input
-          type="file"
-          accept=".pdf,.doc,.docx"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) onUpload(file);
-          }}
-        />
-        {uploading ? "Uploading…" : "Upload"}
-      </label>
-    </div>
   );
 }
 

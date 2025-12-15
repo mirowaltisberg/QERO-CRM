@@ -241,7 +241,15 @@
     "qualityScore": "Qualität",
     "activeBonus": "Aktiv",
     "roleMatch": "Rolle passt",
-    "total": "Gesamt"
+    "total": "Gesamt",
+    "dropToUpload": "Datei ablegen zum Hochladen",
+    "dropToReplace": "Ablegen zum Ersetzen",
+    "replaceTitle": "Dokument ersetzen?",
+    "replaceDescription": "Es existiert bereits eine Datei. Möchtest du sie ersetzen?",
+    "newFile": "Neue Datei",
+    "replace": "Ersetzen",
+    "invalidFileType": "Ungültiger Dateityp. Bitte PDF oder DOCX verwenden.",
+    "fileTooLarge": "Datei zu gross. Maximale Grösse ist 5 MB."
   },
   "contact": {
     "title": "Kontakt",

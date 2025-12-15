@@ -14,6 +14,17 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.31.0",
+    date: "2025-12-14",
+    type: "minor",
+    changes: [
+      "Drag & drop file upload for TMA documents (CV, Zeugnisse, Short Profile, etc.)",
+      "Smooth animations when dragging files over document slots",
+      "Confirmation modal before replacing existing documents",
+      "Improved validation with inline error messages for file type/size",
+    ],
+  },
+  {
     version: "1.30.1",
     date: "2025-12-14",
     type: "patch",
