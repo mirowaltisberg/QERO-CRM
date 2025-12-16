@@ -179,17 +179,17 @@ export async function convertDocxToPdfConvertApi(docxBuffer: Buffer): Promise<Bu
  * Main conversion function - tries available providers
  */
 export async function convertToPdf(docxBuffer: Buffer): Promise<Buffer> {
-  // Try ConvertAPI first (simpler, more reliable)
-  if (process.env.CONVERTAPI_SECRET) {
-    return convertDocxToPdfConvertApi(docxBuffer);
-  }
-
-  // Try CloudConvert as fallback
+  // Try CloudConvert first
   if (CLOUDCONVERT_API_KEY) {
     return convertDocxToPdf(docxBuffer);
   }
 
+  // Try ConvertAPI as fallback
+  if (process.env.CONVERTAPI_SECRET) {
+    return convertDocxToPdfConvertApi(docxBuffer);
+  }
+
   throw new Error(
-    "No PDF conversion service configured. Please set either CONVERTAPI_SECRET or CLOUDCONVERT_API_KEY environment variable."
+    "No PDF conversion service configured. Please set either CLOUDCONVERT_API_KEY or CONVERTAPI_SECRET environment variable."
   );
 }
