@@ -15,7 +15,6 @@ import { RoleDropdown } from "./RoleDropdown";
 import { DocumentDropCard } from "./DocumentDropCard";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 import { HoldToConfirmButton } from "@/components/ui/HoldToConfirmButton";
-import { WhatsappPanel } from "@/components/whatsapp";
 import type { TmaCandidate, TmaRole } from "@/lib/types";
 import { 
   TMA_STATUS_LIST, 
@@ -767,14 +766,6 @@ export function TmaDetail({
             </div>
           </Panel>
 
-          {/* WhatsApp Communication */}
-          <Panel title="WhatsApp" description="Nachrichten mit dem Kandidaten">
-            <WhatsappPanel
-              tmaId={candidate.id}
-              phoneNumber={candidate.phone || undefined}
-              compact
-            />
-          </Panel>
         </div>
       </div>
       </div>
