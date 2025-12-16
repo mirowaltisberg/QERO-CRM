@@ -24,7 +24,7 @@ export const KurzprofilSchema = z.object({
   // Personal info
   name_vorname: z.string().describe("Full name in 'Nachname Vorname' format"),
   alter_geschlecht: z.string().describe("Gender and age, e.g. 'Männlich / 25' or 'Weiblich / 30'"),
-  region: z.string().describe("Location as 'PLZ, Ort (Kanton)', e.g. '8408, Winterthur (ZH)'"),
+  region: z.string().describe("Location as 'PLZ Ort (Kanton)', e.g. '8623 Wetzikon (ZH)' - NO comma!"),
   
   // Documents/licenses
   fuehrerschein: z.enum(["Ja", "Nein"]).describe("Has driving license: 'Ja' or 'Nein'"),
@@ -81,7 +81,7 @@ export const OPENAI_EXTRACTION_SCHEMA = {
     },
     region: {
       type: "string",
-      description: "Location formatted as 'PLZ, Ort (Kanton)', e.g. '8408, Winterthur (ZH)'. Use Swiss canton abbreviation.",
+      description: "Location formatted as 'PLZ Ort (Kanton)', e.g. '8623 Wetzikon (ZH)'. NO comma after PLZ! Use Swiss canton abbreviation.",
     },
     fuehrerschein: {
       type: "string",
@@ -99,15 +99,15 @@ export const OPENAI_EXTRACTION_SCHEMA = {
     },
     beruf: {
       type: "string",
-      description: "Primary job title/profession with qualification if applicable, e.g. 'Elektroinstallateur EFZ'",
+      description: "Primary job title from apprenticeship (EFZ/Gesellenbrief) ONLY. Example: 'Elektroinstallateur EFZ'. Do NOT include further education (Technischer Kaufmann, HF, etc.)",
     },
     faehigkeiten_bullets: {
       type: "string",
-      description: "Skills and competencies as hyphen-prefixed bullet list. Each skill on new line starting with '- '. Include 8-12 relevant skills.",
+      description: "Skills as hyphen-prefixed bullet list. Each on new line starting with '- '. Include core job skills, tools, systems, methods. NEVER include: Windows, Microsoft Office, SAP, or Languages.",
     },
     berufliche_erfahrung_text: {
       type: "string",
-      description: "Experience level: 'Weniger als 1 Jahr Berufserfahrung', '1-2 Jahre Berufserfahrung', '3-5 Jahre Berufserfahrung', or 'Mehr als 5 Jahre Berufserfahrung'",
+      description: "Post-apprenticeship experience only. Use EXACTLY: 'Weniger als 1 Jahr Berufserfahrung', 'Mehr als 1 Jahr Berufserfahrung', 'Mehr als 2 Jahre Berufserfahrung', 'Mehr als 3 Jahre Berufserfahrung', etc.",
     },
     anstellungsart: {
       type: "string",
