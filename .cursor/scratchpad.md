@@ -708,3 +708,9 @@ await supabase.auth.mfa.unenroll({ factorId });
 - Test complete flow: enable 2FA, login with 2FA, disable 2FA
 - Verify error handling (invalid codes, expired challenges)
 - Test on mobile (iOS PWA)
+
+### Bug Fix: 2FA QR Code and Manual Code Not Displaying (Dec 16, 2025) ✅
+- **Issue**: QR code and manual secret code were not displaying in the 2FA setup modal
+- **Root Cause**: Supabase MFA enrollment returns data in nested structure (`data.totp.qr_code`, `data.totp.secret`, `data.totp.uri`), but the component expected a flat structure
+- **Fix**: Updated `/api/auth/mfa/enroll` route to transform the Supabase response to match the expected format
+- **Version**: v1.38.0

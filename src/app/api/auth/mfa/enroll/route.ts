@@ -22,7 +22,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ data });
+    // Transform the response to match the expected format
+    // Supabase returns: { id, type, totp: { qr_code, secret, uri } }
+    const transformedData = {
+      id: data.id,
+      qr_code: data.totp.qr_code,
+      secret: data.totp.secret,
+      uri: data.totp.uri,
+    };
+
+    return NextResponse.json({ data: transformedData });
   } catch (err) {
     console.error("[MFA Enroll] Unexpected error:", err);
     return NextResponse.json(
