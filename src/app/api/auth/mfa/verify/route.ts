@@ -21,10 +21,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For enrollment verification, verify directly without a challenge
-    // (challenges are only for login flow, not enrollment)
+    // For enrollment verification, we need to create a challenge first, then verify
+    const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+      factorId,
+    });
+
+    if (challengeError) {
+      console.error("[MFA Verify] Challenge creation error:", challengeError);
+      return NextResponse.json({ error: challengeError.message }, { status: 400 });
+    }
+
+    // Verify with the challenge ID
     const { data, error } = await supabase.auth.mfa.verify({
       factorId,
+      challengeId: challengeData.id,
       code,
     });
 
