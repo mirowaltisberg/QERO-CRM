@@ -6,12 +6,8 @@
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import ImageModule from "docxtemplater-image-module-free";
-import * as fs from "fs";
-import * as path from "path";
 import type { KurzprofilData } from "./schema";
-
-// Path to the template file
-const TEMPLATE_PATH = path.join(process.cwd(), "src/lib/short-profile/template.docx");
+import { TEMPLATE_BASE64 } from "./template-data";
 
 /**
  * Pre-process XML to merge split tokens across runs
@@ -205,11 +201,11 @@ export async function fillDocxTemplate(
   data: KurzprofilData,
   photoUrl?: string | null
 ): Promise<Buffer> {
-  console.log("[DOCX] Loading template from:", TEMPLATE_PATH);
+  console.log("[DOCX] Loading embedded template");
   
-  // Read the template file
-  const templateContent = fs.readFileSync(TEMPLATE_PATH, "binary");
-  const zip = new PizZip(templateContent);
+  // Load template from embedded base64
+  const templateBuffer = Buffer.from(TEMPLATE_BASE64, "base64");
+  const zip = new PizZip(templateBuffer);
   
   // Fix split tokens in document.xml before processing
   const documentXml = zip.file("word/document.xml")?.asText();
