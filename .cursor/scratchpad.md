@@ -714,3 +714,9 @@ await supabase.auth.mfa.unenroll({ factorId });
 - **Root Cause**: Supabase MFA enrollment returns data in nested structure (`data.totp.qr_code`, `data.totp.secret`, `data.totp.uri`), but the component expected a flat structure
 - **Fix**: Updated `/api/auth/mfa/enroll` route to transform the Supabase response to match the expected format
 - **Version**: v1.38.0
+
+### Bug Fix: 2FA Not Prompting During Login (Dec 16, 2025) ✅
+- **Issue**: After enabling 2FA, login did not prompt for the 6-digit code
+- **Root Cause**: The enrollment verification endpoint (`/api/auth/mfa/verify`) was incorrectly creating a challenge before verifying. Challenges are only for login flow, not enrollment. This prevented the factor from being properly enrolled as "verified".
+- **Fix**: Updated `/api/auth/mfa/verify` to use direct verification without challenge for enrollment
+- **Version**: v1.38.1 (in progress)
