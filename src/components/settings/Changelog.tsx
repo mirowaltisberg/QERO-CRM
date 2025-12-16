@@ -14,6 +14,18 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.37.0",
+    date: "2025-12-15",
+    type: "minor",
+    changes: [
+      "Two-Factor Authentication (2FA): Enable Google Authenticator for enhanced security",
+      "MFA setup in Settings with QR code scanning",
+      "Two-step login flow: password + 6-digit code when 2FA is enabled",
+      "Secure TOTP-based authentication compatible with all authenticator apps",
+      "Enable/disable 2FA from Account Settings",
+    ],
+  },
+  {
     version: "1.36.0",
     date: "2025-12-15",
     type: "minor",

@@ -6,8 +6,9 @@
 - **Make follow-ups and status PERSONAL per user (not shared across team)** ✅
 - New issue reported: repeated 400 errors on `POST /api/contacts/call-logs` plus realtime subscriptions flapping (SUBSCRIBED → CLOSED → SUBSCRIBED).
 - New regression: personal status still shows "Not set" after reload (Task 19 not stable).
-- **NEW: Task 25 - Complete Mobile UI Revamp** - Make the app feel native on iPhone 16 Pro/Pro Max
+- **NEW: Task 25 - Complete Mobile UI Revamp** - Make the app feel native on iPhone 16 Pro/Pro Max ✅ ✅
 - **NEW: Improve Email client** - full email bodies (no cut off), correct recipients (no \"An Unbekannt\"), and conversation-based Inbox/Sent behavior
+- **NEW: Task 26 - Two-Factor Authentication (2FA) with Google Authenticator** - Add TOTP-based 2FA for enhanced security
 
 ---
 
@@ -462,3 +463,248 @@ Redesign the Calling page to feel like an Apple-native app with:
 - **Realtime can cause race conditions** - When updating data, realtime subscription might fire and overwrite local state. Use a skip mechanism to ignore realtime updates for recently-modified records.
 - **ALWAYS update version number** on every deploy (format: v1.XX.X - major.middle.small)
 - If `npm test` fails with an esbuild platform/binary mismatch, running `npm rebuild esbuild` can fix it without reinstalling everything.
+
+---
+
+# Task 26: Two-Factor Authentication (2FA) with Google Authenticator
+
+## Goal
+Implement TOTP-based two-factor authentication using Google Authenticator (or any compatible authenticator app) to enhance account security.
+
+## Background
+- Supabase Auth has built-in MFA support with TOTP (Time-Based One-Time Password)
+- Uses standard TOTP algorithm (RFC 6238) compatible with Google Authenticator, Authy, Microsoft Authenticator, etc.
+- Requires enabling MFA in Supabase dashboard (one-time manual step)
+
+## Key Challenges and Analysis
+
+### 1. Supabase MFA Flow
+- **Enrollment**: User starts enrollment → Supabase generates QR code + secret → User scans QR → User verifies with code → Factor enrolled
+- **Login Flow**: User enters email/password → If MFA enabled, create challenge → User enters TOTP code → Verify code → Session upgraded to AAL2
+- **AAL (Authenticator Assurance Level)**: AAL1 = password only, AAL2 = password + MFA
+
+### 2. Implementation Considerations
+- Need to check if user has enrolled factors before requiring MFA during login
+- Must handle MFA challenge creation and verification in login flow
+- QR code generation happens server-side (Supabase returns QR code data URI)
+- Need UI for: setup flow, QR code display, code input, enable/disable toggle
+- Should store MFA status in user profile for quick checks
+
+### 3. User Experience
+- Setup should be optional (users can enable/disable)
+- Clear instructions for scanning QR code
+- Backup codes (Supabase provides these, but we may want to display them)
+- Graceful error handling if code is invalid/expired
+
+## High-level Task Breakdown
+
+### Phase 1: Supabase Configuration (Manual Step)
+- [ ] **1.1** Enable MFA in Supabase Dashboard
+  - Go to Authentication → Settings → Multi-Factor Authentication
+  - Enable TOTP factor type
+  - Note: This is a one-time manual configuration step
+
+### Phase 2: MFA Setup UI in Settings
+- [ ] **2.1** Create MFA API routes
+  - `POST /api/auth/mfa/enroll` - Start enrollment, return QR code
+  - `POST /api/auth/mfa/verify` - Verify enrollment code
+  - `POST /api/auth/mfa/challenge` - Create challenge for login
+  - `POST /api/auth/mfa/verify-challenge` - Verify challenge code
+  - `GET /api/auth/mfa/status` - Get user's MFA enrollment status
+  - `DELETE /api/auth/mfa/unenroll` - Remove MFA factor
+
+- [ ] **2.2** Add MFA Panel to SettingsForm
+  - Show current MFA status (enabled/disabled)
+  - "Enable 2FA" button if not enabled
+  - "Disable 2FA" button if enabled
+  - Display enrolled factor name (e.g., "Google Authenticator")
+
+- [ ] **2.3** Create MFA Setup Modal/Flow
+  - Step 1: Show QR code (from enrollment API)
+  - Step 2: Instructions ("Scan with Google Authenticator app")
+  - Step 3: Code verification input
+  - Step 4: Success confirmation
+  - Handle errors (invalid code, expired, etc.)
+
+- [ ] **2.4** QR Code Display Component
+  - Display QR code image (data URI from Supabase)
+  - Show manual entry code as fallback
+  - Copy-to-clipboard for manual code
+
+### Phase 3: Login Flow Integration
+- [ ] **3.1** Update `signIn` action in `src/lib/auth/actions.ts`
+  - After successful password auth, check if user has MFA factors
+  - If yes, return special response indicating MFA required (don't redirect)
+  - Store session temporarily (Supabase handles this)
+
+- [ ] **3.2** Create MFA Challenge API Route
+  - `POST /api/auth/mfa/challenge` - Create challenge for current session
+  - Returns challenge ID
+
+- [ ] **3.3** Update Login Page UI
+  - Add MFA code input step (conditional, shown after password)
+  - Handle MFA challenge creation and verification
+  - Show loading states during verification
+  - Error handling for invalid/expired codes
+
+- [ ] **3.4** Update Middleware (if needed)
+  - Check AAL level for sensitive routes (optional enhancement)
+  - Currently middleware only checks if user exists, which is sufficient
+
+### Phase 4: MFA Management
+- [ ] **4.1** Add MFA Status to Profile Query
+  - Check enrolled factors via `supabase.auth.mfa.listFactors()`
+  - Store in profile or check on-demand
+
+- [ ] **4.2** Disable MFA Flow
+  - Confirm dialog before disabling
+  - Call unenroll API
+  - Update UI state
+
+- [ ] **4.3** Backup Codes (Optional Enhancement)
+  - Supabase may provide backup codes during enrollment
+  - Display them once (with warning to save securely)
+  - Allow regeneration
+
+### Phase 5: Testing & Edge Cases
+- [ ] **5.1** Test Complete Flow
+  - New user enables 2FA
+  - User logs in with 2FA
+  - User disables 2FA
+  - User logs in without 2FA after disabling
+
+- [ ] **5.2** Error Handling
+  - Invalid TOTP code
+  - Expired challenge
+  - Network errors during enrollment/verification
+  - User already has MFA enabled (prevent duplicate enrollment)
+
+- [ ] **5.3** Mobile Optimization
+  - QR code displays well on mobile
+  - Code input is mobile-friendly
+  - Instructions are clear on small screens
+
+## Technical Implementation Details
+
+### API Route Structure
+```
+/api/auth/mfa/
+  ├── enroll (POST) - Start enrollment
+  ├── verify (POST) - Verify enrollment code
+  ├── challenge (POST) - Create login challenge
+  ├── verify-challenge (POST) - Verify challenge code
+  ├── status (GET) - Get enrollment status
+  └── unenroll (DELETE) - Remove factor
+```
+
+### Supabase MFA Methods
+```typescript
+// Enrollment
+const { data, error } = await supabase.auth.mfa.enroll({
+  factorType: 'totp',
+  friendlyName: 'Google Authenticator'
+});
+// Returns: { id, secret, qr_code, uri }
+
+// Verify enrollment
+await supabase.auth.mfa.verify({
+  factorId: data.id,
+  code: userCode
+});
+
+// List factors
+const { data } = await supabase.auth.mfa.listFactors();
+
+// Create challenge (during login)
+const { data } = await supabase.auth.mfa.challenge({ factorId });
+
+// Verify challenge
+await supabase.auth.mfa.verify({
+  factorId,
+  challengeId: data.id,
+  code: userCode
+});
+
+// Unenroll
+await supabase.auth.mfa.unenroll({ factorId });
+```
+
+### Database Schema Changes
+- No schema changes needed (Supabase handles MFA factors internally)
+- Optional: Add `mfa_enabled` boolean to profiles table for quick checks (can also query factors on-demand)
+
+## Success Criteria
+- ✅ Users can enable 2FA from Settings page
+- ✅ QR code displays correctly and can be scanned with Google Authenticator
+- ✅ Users can verify enrollment with TOTP code
+- ✅ Login flow prompts for 2FA code when enabled
+- ✅ Users can disable 2FA from Settings
+- ✅ Error messages are clear and helpful
+- ✅ Works on both desktop and mobile (iOS PWA)
+- ✅ No breaking changes to existing auth flow
+
+## Notes
+- Supabase MFA is optional - users without MFA can still log in normally
+- AAL2 sessions are automatically maintained by Supabase
+- QR codes are one-time use (for enrollment only)
+- TOTP codes are time-based (30-second windows)
+- Consider rate limiting on verification attempts to prevent brute force
+
+## Project Status Board
+- [x] Phase 1: Supabase Configuration (Manual step - user needs to enable in dashboard)
+- [x] Phase 2: MFA Setup UI ✅
+- [x] Phase 3: Login Flow Integration ✅
+- [x] Phase 4: MFA Management ✅
+- [ ] Phase 5: Testing & Edge Cases (Ready for testing)
+
+## Executor's Feedback or Assistance Requests
+
+### Implementation Completed (Dec 15, 2025)
+
+**Phase 2: MFA Setup UI** ✅
+- Created all 6 MFA API routes:
+  - `POST /api/auth/mfa/enroll` - Start enrollment
+  - `POST /api/auth/mfa/verify` - Verify enrollment code
+  - `POST /api/auth/mfa/challenge` - Create login challenge
+  - `POST /api/auth/mfa/verify-challenge` - Verify challenge code
+  - `GET /api/auth/mfa/status` - Get enrollment status
+  - `DELETE /api/auth/mfa/unenroll` - Remove factor
+- Created `MfaSetupModal.tsx` component with:
+  - QR code display (from Supabase data URI)
+  - Manual entry code with copy button
+  - Two-step flow: QR display → Code verification
+  - Error handling
+- Added MFA Panel to `SettingsForm.tsx`:
+  - Shows current MFA status (enabled/disabled)
+  - Enable button if disabled
+  - Disable button with confirmation if enabled
+  - Status indicator with shield icon
+
+**Phase 3: Login Flow Integration** ✅
+- Updated `signIn` action in `src/lib/auth/actions.ts`:
+  - Checks for enrolled TOTP factors after password auth
+  - Returns `requiresMfa: true` and `factorId` if MFA is enabled
+  - Only redirects if no MFA required
+- Updated `LoginPage` component:
+  - Two-step login flow: password → MFA code
+  - Creates MFA challenge automatically when needed
+  - MFA code input with 6-digit validation
+  - Back button to return to password step
+  - Error handling for invalid/expired codes
+
+**Phase 4: MFA Management** ✅
+- MFA status fetched on Settings page load
+- Disable MFA flow with confirmation dialog
+- Success/error messages integrated with existing message system
+
+### Manual Step Required
+**Phase 1: Supabase Configuration**
+- User must manually enable MFA in Supabase Dashboard:
+  1. Go to Authentication → Settings → Multi-Factor Authentication
+  2. Enable TOTP factor type
+  3. Save changes
+
+### Next Steps
+- Test complete flow: enable 2FA, login with 2FA, disable 2FA
+- Verify error handling (invalid codes, expired challenges)
+- Test on mobile (iOS PWA)

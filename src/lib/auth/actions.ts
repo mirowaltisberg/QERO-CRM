@@ -40,6 +40,8 @@ const LoginSchema = z.object({
 export type AuthResult = {
   success: boolean;
   error?: string;
+  requiresMfa?: boolean;
+  factorId?: string;
 };
 
 export async function signUp(formData: FormData): Promise<AuthResult> {
@@ -117,7 +119,7 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
@@ -129,6 +131,22 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
     };
   }
 
+  // Check if user has MFA factors enrolled
+  if (data.user) {
+    const { data: factorsData } = await supabase.auth.mfa.listFactors();
+    const totpFactor = factorsData?.totp?.find((factor) => factor.status === "verified");
+    
+    if (totpFactor) {
+      // User has MFA enabled, return factor ID for challenge (don't redirect)
+      return {
+        success: true,
+        requiresMfa: true,
+        factorId: totpFactor.id,
+      };
+    }
+  }
+
+  // No MFA required, redirect to app
   redirect("/calling");
 }
 

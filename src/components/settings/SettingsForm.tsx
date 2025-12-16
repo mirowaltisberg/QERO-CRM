@@ -16,6 +16,7 @@ import { Modal } from "@/components/ui/modal";
 import type { EmailAccount } from "@/lib/types";
 import type { Locale } from "@/i18n/config";
 import { Changelog } from "./Changelog";
+import { MfaSetupModal } from "./MfaSetupModal";
 
 interface Profile {
   id: string;
@@ -64,6 +65,13 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
   const [savingSignature, setSavingSignature] = useState(false);
   const [isDefaultSignature, setIsDefaultSignature] = useState(true);
 
+  // MFA state
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaLoading, setMfaLoading] = useState(true);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaSetupOpen, setMfaSetupOpen] = useState(false);
+  const [disablingMfa, setDisablingMfa] = useState(false);
+
   const supabase = createClient();
 
   // Fetch email account status on mount
@@ -102,6 +110,25 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
       }
     }
     fetchSignature();
+  }, []);
+
+  // Fetch MFA status on mount
+  useEffect(() => {
+    async function fetchMfaStatus() {
+      try {
+        const response = await fetch("/api/auth/mfa/status");
+        const json = await response.json();
+        if (response.ok && json.data) {
+          setMfaEnabled(json.data.enabled);
+          setMfaFactorId(json.data.factor?.id || null);
+        }
+      } catch (err) {
+        console.error("Failed to fetch MFA status:", err);
+      } finally {
+        setMfaLoading(false);
+      }
+    }
+    fetchMfaStatus();
   }, []);
 
   // Handle OAuth callback messages
@@ -201,6 +228,48 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
     } finally {
       setDisconnecting(false);
     }
+  }
+
+  async function handleDisableMfa() {
+    if (!confirm("Disable two-factor authentication? Your account will be less secure.")) return;
+    if (!mfaFactorId) return;
+
+    setDisablingMfa(true);
+    try {
+      const response = await fetch(`/api/auth/mfa/unenroll?factorId=${mfaFactorId}`, {
+        method: "DELETE",
+      });
+      const json = await response.json();
+
+      if (response.ok) {
+        setMfaEnabled(false);
+        setMfaFactorId(null);
+        setMessage({ type: "success", text: "Two-factor authentication disabled." });
+      } else {
+        throw new Error(json.error || "Failed to disable MFA");
+      }
+    } catch (err) {
+      console.error("Disable MFA error:", err);
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to disable two-factor authentication.",
+      });
+    } finally {
+      setDisablingMfa(false);
+    }
+  }
+
+  function handleMfaSetupSuccess() {
+    setMfaEnabled(true);
+    // Refetch MFA status to get the factor ID
+    fetch("/api/auth/mfa/status")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.data) {
+          setMfaFactorId(json.data.factor?.id || null);
+        }
+      });
+    setMessage({ type: "success", text: "Two-factor authentication enabled successfully!" });
   }
 
   const openCropper = useCallback((file: File) => {
@@ -623,6 +692,56 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
         </Panel>
       )}
 
+      {/* Two-Factor Authentication */}
+      <Panel title="Two-Factor Authentication" description="Add an extra layer of security to your account">
+        {mfaLoading ? (
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+            Loading...
+          </div>
+        ) : mfaEnabled ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                <ShieldCheckIcon className="h-5 w-5 text-green-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900">Two-Factor Authentication Enabled</p>
+                <p className="text-xs text-gray-500">
+                  Your account is protected with an authenticator app
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                Active
+              </span>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleDisableMfa}
+                disabled={disablingMfa}
+              >
+                {disablingMfa ? "Disabling..." : "Disable 2FA"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              <p className="font-medium">Protect your account</p>
+              <p className="mt-1 text-blue-600">
+                Enable two-factor authentication to require a code from your phone in addition to your password when signing in.
+              </p>
+            </div>
+            <Button onClick={() => setMfaSetupOpen(true)} className="w-full sm:w-auto">
+              Enable Two-Factor Authentication
+            </Button>
+          </div>
+        )}
+      </Panel>
+
       {/* Language */}
       <Panel title={t("language")} description={t("languageDescription")}>
         <div className="flex items-center justify-between">
@@ -654,7 +773,21 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
           loading={uploadingAvatar}
         />
       )}
+
+      <MfaSetupModal
+        open={mfaSetupOpen}
+        onClose={() => setMfaSetupOpen(false)}
+        onSuccess={handleMfaSetupSuccess}
+      />
     </div>
+  );
+}
+
+function ShieldCheckIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+    </svg>
   );
 }
 
