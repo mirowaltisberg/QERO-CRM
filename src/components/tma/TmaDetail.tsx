@@ -15,6 +15,7 @@ import { RoleDropdown } from "./RoleDropdown";
 import { DocumentDropCard } from "./DocumentDropCard";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 import { HoldToConfirmButton } from "@/components/ui/HoldToConfirmButton";
+import { WhatsappPanel } from "@/components/whatsapp";
 import type { TmaCandidate, TmaRole } from "@/lib/types";
 import { 
   TMA_STATUS_LIST, 
@@ -48,7 +49,7 @@ interface Props {
   onUpdateNotes: (value: string | null) => Promise<void>;
   onNoteAdded?: () => void;
   onUpdateDocuments: (
-    payload: { cv_url?: string | null; references_url?: string | null; short_profile_url?: string | null; ahv_url?: string | null; id_url?: string | null; bank_url?: string | null }
+    payload: { cv_url?: string | null; references_url?: string | null; short_profile_url?: string | null; photo_url?: string | null; ahv_url?: string | null; id_url?: string | null; bank_url?: string | null }
   ) => Promise<void>;
   onUpdatePosition: (value: string | null) => Promise<void> | void;
   onUpdateAddress: (payload: { city: string | null; street: string | null; postal_code: string | null }) => Promise<void> | void;
@@ -115,7 +116,8 @@ export function TmaDetail({
   const [followUpNote, setFollowUpNote] = useState(candidate?.follow_up_note ?? "");
   const [qualityNote, setQualityNote] = useState(candidate?.quality_note ?? "");
   const qualityNoteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [uploading, setUploading] = useState<"cv" | "references" | "short_profile" | "ahv" | "id" | "bank" | null>(null);
+  const [uploading, setUploading] = useState<"cv" | "references" | "short_profile" | "photo" | "ahv" | "id" | "bank" | null>(null);
+  const [generating, setGenerating] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   // Sync quality note when candidate changes
@@ -186,7 +188,7 @@ export function TmaDetail({
   };
 
   const handleUpload = useCallback(
-    async (file: File, type: "cv" | "references" | "short_profile" | "ahv" | "id" | "bank") => {
+    async (file: File, type: "cv" | "references" | "short_profile" | "photo" | "ahv" | "id" | "bank") => {
       if (!candidate) return;
       const supabase = createClient();
       const bucket = "tma-docs";
@@ -208,6 +210,7 @@ export function TmaDetail({
           cv_url: type === "cv" ? data.publicUrl : candidate.cv_url,
           references_url: type === "references" ? data.publicUrl : candidate.references_url,
           short_profile_url: type === "short_profile" ? data.publicUrl : candidate.short_profile_url,
+          photo_url: type === "photo" ? data.publicUrl : candidate.photo_url,
           ahv_url: type === "ahv" ? data.publicUrl : candidate.ahv_url,
           id_url: type === "id" ? data.publicUrl : candidate.id_url,
           bank_url: type === "bank" ? data.publicUrl : candidate.bank_url,
@@ -221,6 +224,46 @@ export function TmaDetail({
     },
     [candidate, onUpdateDocuments]
   );
+
+  const handleGenerateKurzprofil = useCallback(async () => {
+    if (!candidate) return;
+    if (!candidate.cv_url) {
+      alert("Bitte laden Sie zuerst einen Lebenslauf (CV) hoch.");
+      return;
+    }
+    
+    setGenerating(true);
+    try {
+      const response = await fetch(`/api/tma/${candidate.id}/short-profile/generate`, {
+        method: "POST",
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Generation failed");
+      }
+      
+      const result = await response.json();
+      
+      // Update candidate with new short_profile_url
+      await onUpdateDocuments({
+        cv_url: candidate.cv_url,
+        references_url: candidate.references_url,
+        short_profile_url: result.data.short_profile_url,
+        photo_url: candidate.photo_url,
+        ahv_url: candidate.ahv_url,
+        id_url: candidate.id_url,
+        bank_url: candidate.bank_url,
+      });
+      
+      alert("Kurzprofil erfolgreich generiert!");
+    } catch (err) {
+      console.error("Kurzprofil generation failed:", err);
+      alert(`Fehler: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setGenerating(false);
+    }
+  }, [candidate, onUpdateDocuments]);
 
   const phoneLink = useMemo(() => candidate?.phone?.replace(/\s+/g, ""), [candidate?.phone]);
   
@@ -632,20 +675,69 @@ export function TmaDetail({
                 labels={documentLabels}
               />
               <DocumentDropCard
+                title="Foto"
+                url={candidate.photo_url}
+                uploading={uploading === "photo"}
+                onUpload={(file) => handleUpload(file, "photo")}
+                labels={{
+                  ...documentLabels,
+                  formats: "JPG, PNG",
+                }}
+              />
+              <DocumentDropCard
                 title={t("references")}
                 url={candidate.references_url}
                 uploading={uploading === "references"}
                 onUpload={(file) => handleUpload(file, "references")}
                 labels={documentLabels}
               />
-              <DocumentDropCard
-                title={t("shortProfile")}
-                url={candidate.short_profile_url}
-                uploading={uploading === "short_profile"}
-                onUpload={(file) => handleUpload(file, "short_profile")}
-                onPreview={candidate.short_profile_url ? () => setPreviewOpen(true) : undefined}
-                labels={documentLabels}
-              />
+              
+              {/* Kurzprofil Section with Generate Button */}
+              <div className="space-y-2">
+                <DocumentDropCard
+                  title={t("shortProfile")}
+                  url={candidate.short_profile_url}
+                  uploading={uploading === "short_profile"}
+                  onUpload={(file) => handleUpload(file, "short_profile")}
+                  onPreview={candidate.short_profile_url ? () => setPreviewOpen(true) : undefined}
+                  labels={documentLabels}
+                />
+                <button
+                  type="button"
+                  onClick={handleGenerateKurzprofil}
+                  disabled={generating || !candidate.cv_url}
+                  className={cn(
+                    "w-full rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors",
+                    generating
+                      ? "border-blue-200 bg-blue-50 text-blue-600 cursor-wait"
+                      : candidate.cv_url
+                      ? "border-blue-500 bg-blue-500 text-white hover:bg-blue-600"
+                      : "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+                  )}
+                >
+                  {generating ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Kurzprofil wird generiert...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+                      </svg>
+                      KP mit AI generieren
+                    </span>
+                  )}
+                </button>
+                {!candidate.cv_url && (
+                  <p className="text-xs text-gray-400 text-center">
+                    Laden Sie zuerst einen CV hoch, um ein Kurzprofil zu generieren.
+                  </p>
+                )}
+              </div>
             </div>
           </Panel>
 
@@ -673,6 +765,15 @@ export function TmaDetail({
                 labels={documentLabels}
               />
             </div>
+          </Panel>
+
+          {/* WhatsApp Communication */}
+          <Panel title="WhatsApp" description="Nachrichten mit dem Kandidaten">
+            <WhatsappPanel
+              tmaId={candidate.id}
+              phoneNumber={candidate.phone || undefined}
+              compact
+            />
           </Panel>
         </div>
       </div>

@@ -99,6 +99,7 @@ export interface TmaCandidate {
   cv_url: string | null;
   references_url: string | null;
   short_profile_url: string | null;
+  photo_url: string | null; // Profile photo for Kurzprofil
   // Personal documents for contracts
   ahv_url: string | null;
   id_url: string | null;
@@ -517,4 +518,133 @@ export interface VacancyFilters {
   role?: string;
   search?: string;
   contact_id?: string;
+}
+
+// ============================================
+// WHATSAPP INTEGRATION TYPES
+// ============================================
+
+export type WhatsAppMessageDirection = "inbound" | "outbound";
+export type WhatsAppMessageStatus = "pending" | "sent" | "delivered" | "read" | "failed";
+export type WhatsAppMessageType = "text" | "template" | "image" | "document" | "audio" | "video" | "sticker" | "location" | "contacts" | "interactive" | "reaction" | "unknown";
+
+/**
+ * WhatsApp Business Account configuration
+ */
+export interface WhatsAppAccount {
+  id: string;
+  name: string;
+  waba_id: string;
+  phone_number_id: string;
+  phone_number: string;
+  is_active: boolean;
+  webhook_verify_token: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * WhatsApp Conversation - one per phone number + CRM entity
+ */
+export interface WhatsAppConversation {
+  id: string;
+  account_id: string;
+  wa_id: string;
+  phone_number: string;
+  profile_name: string | null;
+  linked_tma_id: string | null;
+  linked_contact_id: string | null;
+  assigned_to: string | null;
+  is_unread: boolean;
+  unread_count: number;
+  last_message_at: string | null;
+  last_message_preview: string | null;
+  last_customer_message_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  linked_tma?: TmaCandidate | null;
+  linked_contact?: Contact | null;
+  assignee?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
+  messages?: WhatsAppMessage[];
+}
+
+/**
+ * WhatsApp Message
+ */
+export interface WhatsAppMessage {
+  id: string;
+  conversation_id: string;
+  wamid: string | null;
+  direction: WhatsAppMessageDirection;
+  message_type: WhatsAppMessageType;
+  status: WhatsAppMessageStatus;
+  body: string | null;
+  template_name: string | null;
+  template_params: Record<string, string> | null;
+  sender_id: string | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+  read_at: string | null;
+  failed_at: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  sender?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
+  media?: WhatsAppMedia[];
+}
+
+/**
+ * WhatsApp Media attachment
+ */
+export interface WhatsAppMedia {
+  id: string;
+  message_id: string;
+  wa_media_id: string | null;
+  mime_type: string;
+  file_name: string | null;
+  file_size: number | null;
+  sha256: string | null;
+  storage_path: string | null;
+  storage_url: string | null;
+  caption: string | null;
+  created_at: string;
+}
+
+/**
+ * WhatsApp Opt-in record
+ */
+export interface WhatsAppOptIn {
+  id: string;
+  phone_number: string;
+  wa_id: string;
+  linked_tma_id: string | null;
+  linked_contact_id: string | null;
+  opted_in: boolean;
+  opted_in_at: string | null;
+  opted_out_at: string | null;
+  consent_source: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Filter options for WhatsApp conversations
+ */
+export interface WhatsAppConversationFilters {
+  linked_tma_id?: string;
+  linked_contact_id?: string;
+  assigned_to?: string;
+  is_unread?: boolean;
+  search?: string;
 }

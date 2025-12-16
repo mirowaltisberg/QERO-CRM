@@ -502,7 +502,7 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
 
   const updateDocuments = useCallback(
     async (
-      payload: Partial<Pick<TmaCandidate, "cv_url" | "references_url" | "short_profile_url" | "ahv_url" | "id_url" | "bank_url">>
+      payload: Partial<Pick<TmaCandidate, "cv_url" | "references_url" | "short_profile_url" | "photo_url" | "ahv_url" | "id_url" | "bank_url">>
     ) => {
       if (!activeCandidate) return;
       const response = await fetch(`/api/tma/${activeCandidate.id}`, {
