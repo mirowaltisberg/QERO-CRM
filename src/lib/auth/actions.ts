@@ -133,8 +133,18 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
 
   // Check if user has MFA factors enrolled
   if (data.user) {
-    const { data: factorsData } = await supabase.auth.mfa.listFactors();
-    const totpFactor = factorsData?.totp?.find((factor) => factor.status === "verified");
+    const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
+    
+    console.log("[MFA Debug] listFactors response:", {
+      factorsData,
+      factorsError,
+      totp: factorsData?.totp,
+      all: factorsData?.all,
+    });
+    
+    const totpFactor = factorsData?.totp?.find((factor: any) => factor.status === "verified");
+    
+    console.log("[MFA Debug] Found TOTP factor:", totpFactor);
     
     if (totpFactor) {
       // User has MFA enabled, return factor ID for challenge (don't redirect)
