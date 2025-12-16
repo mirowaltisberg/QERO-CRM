@@ -719,4 +719,19 @@ await supabase.auth.mfa.unenroll({ factorId });
 - **Issue**: After enabling 2FA, login did not prompt for the 6-digit code
 - **Root Cause**: The enrollment verification endpoint (`/api/auth/mfa/verify`) was incorrectly creating a challenge before verifying. Challenges are only for login flow, not enrollment. This prevented the factor from being properly enrolled as "verified".
 - **Fix**: Updated `/api/auth/mfa/verify` to use direct verification without challenge for enrollment
-- **Version**: v1.38.1 (in progress)
+- **Version**: v1.38.1
+
+## Legacy Notes Migration Script (Dec 16, 2025)
+Created comprehensive migration scripts to move all old single-field notes to the new multi-author notes system:
+
+**Files created:**
+- `036_migrate_all_legacy_notes.sql` - Main migration script
+- `CHECK_LEGACY_NOTES_STATUS.sql` - Pre-migration status check
+- `MIGRATE_LEGACY_NOTES_README.md` - Complete instructions
+
+**What it does:**
+- Migrates `contacts.notes` → `contact_notes` table
+- Migrates `tma_candidates.notes` → `tma_notes` table
+- Assigns oldest user as author for legacy notes
+- Clears old notes fields after migration
+- Safe, idempotent, with duplicate detection
