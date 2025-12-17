@@ -72,34 +72,22 @@ export async function fillDocxTemplate(
     console.log("[DOCX] Photo URL provided but embedding is temporarily disabled:", photoUrl);
   }
 
-  // Fix document.xml before processing
-  let documentXml = zip.file("word/document.xml")?.asText();
+  // Minimal XML fixes - only what's absolutely necessary
+  const documentXml = zip.file("word/document.xml")?.asText();
   if (documentXml) {
     let fixedXml = documentXml;
     
-    // FIRST: Remove proofErr elements - they break token merging
+    // Remove proofErr elements (spell check markers) - they break token merging
     fixedXml = fixedXml.replace(/<w:proofErr[^/]*\/>/g, "");
-    console.log("[DOCX] Removed proofErr elements");
     
-    // THEN: Fix split tokens (now that proofErr is gone)
+    // Fix split tokens (Word splits [[token]] across multiple XML runs)
     fixedXml = fixSplitTokensRobust(fixedXml);
     
-    // Remove green borders (color 70AD47) - change to black
-    fixedXml = fixedXml.replace(/w:color="70AD47"/g, 'w:color="000000"');
-    console.log("[DOCX] Fixed green border color");
-    
-    // Note: The stray "Berufliche Erfahrung" paragraph after </w:tbl> 
-    // should be removed from the template.docx file directly
-    // DO NOT use regex here as it's too risky and can delete content
-    
-    // Photo embedding is complex and currently disabled
-    // Just remove the [[photo]] placeholder for now
-    // TODO: Implement proper image embedding later
+    // Remove [[photo]] placeholder (photo embedding not yet implemented)
     fixedXml = fixedXml.replace(/\[\[photo\]\]/g, "");
-    console.log("[DOCX] Removed photo placeholder (photo embedding temporarily disabled)");
     
     zip.file("word/document.xml", fixedXml);
-    console.log("[DOCX] Fixed document.xml");
+    console.log("[DOCX] Preprocessed document.xml");
   }
   
   // Create docxtemplater instance (image is embedded directly, no module needed)
