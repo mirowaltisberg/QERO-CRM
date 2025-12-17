@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
@@ -18,8 +18,60 @@ export default function LoginPage() {
   const [mfaChallengeId, setMfaChallengeId] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState("");
   const [verifyingMfa, setVerifyingMfa] = useState(false);
+  const [resumingMfa, setResumingMfa] = useState(false);
   const searchParams = useSearchParams();
   const callbackError = searchParams.get("error");
+  const mfaRequired = searchParams.get("mfa") === "1";
+  const idleReason = searchParams.get("reason") === "idle";
+
+  // Resume MFA step if redirected back with ?mfa=1 (e.g., after page refresh during MFA)
+  const resumeMfaChallenge = useCallback(async () => {
+    setResumingMfa(true);
+    setError(null);
+    
+    try {
+      // Get MFA status to find the factor ID
+      const statusRes = await fetch("/api/auth/mfa/status");
+      const statusJson = await statusRes.json();
+      
+      if (!statusRes.ok || !statusJson.data?.factor?.id) {
+        // No MFA factor found - user may have been signed out, show password form
+        setResumingMfa(false);
+        return;
+      }
+      
+      const factorId = statusJson.data.factor.id;
+      setMfaFactorId(factorId);
+      
+      // Create a new challenge
+      const challengeRes = await fetch("/api/auth/mfa/challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ factorId }),
+      });
+      const challengeJson = await challengeRes.json();
+      
+      if (!challengeRes.ok) {
+        throw new Error(challengeJson.error || "Failed to create MFA challenge");
+      }
+      
+      setMfaChallengeId(challengeJson.data.id);
+      setMfaStep("mfa");
+    } catch (err) {
+      console.error("[Login] Failed to resume MFA:", err);
+      // If we can't resume, just show the password form
+      setError(null);
+    } finally {
+      setResumingMfa(false);
+    }
+  }, []);
+
+  // Check if we need to resume MFA on mount
+  useEffect(() => {
+    if (mfaRequired && mfaStep === "password") {
+      resumeMfaChallenge();
+    }
+  }, [mfaRequired, mfaStep, resumeMfaChallenge]);
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -108,13 +160,24 @@ export default function LoginPage() {
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          {idleReason && (
+            <div className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              Your session expired due to inactivity. Please sign in again.
+            </div>
+          )}
+          
           {(error || callbackError) && (
             <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
               {error || "Authentication failed. Please try again."}
             </div>
           )}
 
-          {mfaStep === "password" ? (
+          {resumingMfa ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+              <p className="mt-4 text-sm text-gray-500">Resuming authentication...</p>
+            </div>
+          ) : mfaStep === "password" ? (
             <>
               <form action={handleSubmit} className="space-y-4">
                 <Input

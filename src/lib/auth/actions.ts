@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { z } from "zod";
 
 // Validation schemas
@@ -147,7 +148,16 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
     console.log("[MFA Debug] Found TOTP factor:", totpFactor);
     
     if (totpFactor) {
-      // User has MFA enabled, return factor ID for challenge (don't redirect)
+      // User has MFA enabled - set pending cookie and return factor ID for challenge
+      const cookieStore = await cookies();
+      cookieStore.set("qero_mfa_pending", "1", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 600, // 10 minutes - enough time to complete MFA
+        path: "/",
+      });
+      
       return {
         success: true,
         requiresMfa: true,

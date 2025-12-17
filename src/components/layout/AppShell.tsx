@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { MobileNavBar } from "./MobileNavBar";
+import { useIdleLogout } from "@/lib/hooks/useIdleLogout";
 
 interface AppShellProps {
   user: {
@@ -24,6 +25,9 @@ export function AppShell({ user, profile, children }: AppShellProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  // Enable idle logout only when user is authenticated
+  useIdleLogout(!!user);
 
   // Detect mobile
   useEffect(() => {

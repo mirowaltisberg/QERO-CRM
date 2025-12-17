@@ -35,6 +35,9 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Check if MFA verification is pending (password accepted but MFA not yet verified)
+  const mfaPending = request.cookies.get("qero_mfa_pending")?.value === "1";
+
   // Public routes that don't require authentication
   const publicRoutes = ["/login", "/register", "/auth/callback", "/auth/confirm"];
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
@@ -46,8 +49,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // If user is logged in and trying to access auth pages, redirect to app
-  if (user && (pathname === "/login" || pathname === "/register")) {
+  // If MFA is pending, block all protected routes and redirect to login with mfa flag
+  if (user && mfaPending && !isPublicRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("mfa", "1");
+    return NextResponse.redirect(url);
+  }
+
+  // If user is logged in (and MFA not pending) and trying to access auth pages, redirect to app
+  if (user && !mfaPending && (pathname === "/login" || pathname === "/register")) {
     const url = request.nextUrl.clone();
     url.pathname = "/calling";
     return NextResponse.redirect(url);

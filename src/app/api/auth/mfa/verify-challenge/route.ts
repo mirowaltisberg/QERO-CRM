@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -32,6 +33,16 @@ export async function POST(request: NextRequest) {
       console.error("[MFA Verify Challenge] Error:", error);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    // MFA verified successfully - clear the pending cookie
+    const cookieStore = await cookies();
+    cookieStore.set("qero_mfa_pending", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0, // Expire immediately
+      path: "/",
+    });
 
     return NextResponse.json({ data, success: true });
   } catch (err) {
