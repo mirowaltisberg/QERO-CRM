@@ -678,9 +678,10 @@ export function TmaDetail({
                 url={candidate.photo_url}
                 uploading={uploading === "photo"}
                 onUpload={(file) => handleUpload(file, "photo")}
+                accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif"
                 labels={{
                   ...documentLabels,
-                  formats: "JPG, PNG",
+                  formats: "JPG, PNG, GIF, WebP, HEIC",
                 }}
               />
               <DocumentDropCard
