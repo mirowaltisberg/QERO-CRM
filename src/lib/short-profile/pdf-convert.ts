@@ -1,13 +1,13 @@
 /**
  * DOCX to PDF Conversion
- * Uses CloudConvert API for reliable conversion
- * 
- * Setup:
- * 1. Create account at https://cloudconvert.com
- * 2. Get API key from dashboard
- * 3. Set CLOUDCONVERT_API_KEY environment variable
+ * Uses Gotenberg (self-hosted) for reliable conversion
+ * Fallback to CloudConvert or ConvertAPI if configured
  */
 
+// Gotenberg instance on Railway
+const GOTENBERG_URL = process.env.GOTENBERG_URL || "https://gotenberggotenberg8-production-f07f.up.railway.app";
+
+// Legacy API keys (fallback)
 const CLOUDCONVERT_API_KEY = process.env.CLOUDCONVERT_API_KEY;
 const CLOUDCONVERT_API_URL = "https://api.cloudconvert.com/v2";
 
@@ -130,6 +130,40 @@ export async function convertDocxToPdf(docxBuffer: Buffer): Promise<Buffer> {
 }
 
 /**
+ * Convert DOCX buffer to PDF using Gotenberg (self-hosted)
+ * Gotenberg uses LibreOffice for conversion - high quality, free
+ */
+export async function convertDocxToPdfGotenberg(docxBuffer: Buffer): Promise<Buffer> {
+  console.log("[PDF Convert] Using Gotenberg at:", GOTENBERG_URL);
+
+  // Gotenberg expects multipart/form-data with the file
+  const formData = new FormData();
+  // Convert Buffer to ArrayBuffer for Blob compatibility
+  const arrayBuffer = docxBuffer.buffer.slice(
+    docxBuffer.byteOffset,
+    docxBuffer.byteOffset + docxBuffer.byteLength
+  ) as ArrayBuffer;
+  const blob = new Blob([arrayBuffer], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+  formData.append("files", blob, "document.docx");
+
+  const response = await fetch(`${GOTENBERG_URL}/forms/libreoffice/convert`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("[PDF Convert] Gotenberg error:", error);
+    throw new Error(`Gotenberg conversion failed: ${response.status} - ${error}`);
+  }
+
+  const pdfBuffer = Buffer.from(await response.arrayBuffer());
+  console.log("[PDF Convert] Gotenberg PDF generated, size:", pdfBuffer.length, "bytes");
+
+  return pdfBuffer;
+}
+
+/**
  * Alternative: ConvertAPI (simpler, pay-per-use)
  * Set CONVERTAPI_SECRET environment variable
  */
@@ -177,11 +211,12 @@ export async function convertDocxToPdfConvertApi(docxBuffer: Buffer): Promise<Bu
 
 /**
  * Main conversion function - tries available providers
+ * Priority: Gotenberg (free, self-hosted) > ConvertAPI > CloudConvert
  */
 export async function convertToPdf(docxBuffer: Buffer): Promise<Buffer> {
-  // Try CloudConvert first
-  if (CLOUDCONVERT_API_KEY) {
-    return convertDocxToPdf(docxBuffer);
+  // Try Gotenberg first (self-hosted, free, unlimited)
+  if (GOTENBERG_URL) {
+    return convertDocxToPdfGotenberg(docxBuffer);
   }
 
   // Try ConvertAPI as fallback
@@ -189,7 +224,12 @@ export async function convertToPdf(docxBuffer: Buffer): Promise<Buffer> {
     return convertDocxToPdfConvertApi(docxBuffer);
   }
 
+  // Try CloudConvert as last resort
+  if (CLOUDCONVERT_API_KEY) {
+    return convertDocxToPdf(docxBuffer);
+  }
+
   throw new Error(
-    "No PDF conversion service configured. Please set either CLOUDCONVERT_API_KEY or CONVERTAPI_SECRET environment variable."
+    "No PDF conversion service configured. Please set GOTENBERG_URL, CONVERTAPI_SECRET, or CLOUDCONVERT_API_KEY."
   );
 }
