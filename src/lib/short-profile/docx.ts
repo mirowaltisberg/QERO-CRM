@@ -88,13 +88,9 @@ export async function fillDocxTemplate(
     fixedXml = fixedXml.replace(/w:color="70AD47"/g, 'w:color="000000"');
     console.log("[DOCX] Fixed green border color");
     
-    // Remove the "Berufliche Erfahrung" paragraph that appears after the table
-    // Match: </w:tbl> followed by paragraph containing "Berufliche Erfahrung"
-    fixedXml = fixedXml.replace(
-      /(<\/w:tbl>)<w:p[^>]*>[^]*?Berufliche Erfahrung<\/w:t>[^]*?<\/w:p>/,
-      "$1"
-    );
-    console.log("[DOCX] Removed stray 'Berufliche Erfahrung' paragraph");
+    // Note: The stray "Berufliche Erfahrung" paragraph after </w:tbl> 
+    // should be removed from the template.docx file directly
+    // DO NOT use regex here as it's too risky and can delete content
     
     // Photo embedding is complex and currently disabled
     // Just remove the [[photo]] placeholder for now
