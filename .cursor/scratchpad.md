@@ -735,3 +735,41 @@ Created comprehensive migration scripts to move all old single-field notes to th
 - Assigns oldest user as author for legacy notes
 - Clears old notes fields after migration
 - Safe, idempotent, with duplicate detection
+
+---
+
+## v1.41.0 - AI Kurzprofil Generator (Dec 16, 2025)
+
+### New Feature: AI-Powered Kurzprofil Generation
+Complete implementation of automatic Kurzprofil (short profile) PDF generation from candidate CVs.
+
+**Core Features:**
+- Upload CV (PDF) → AI extracts structured data → Fills DOCX template → Converts to PDF
+- Photo upload support (JPG, PNG, GIF, WebP, HEIC)
+- Uses Gotenberg (self-hosted on Railway) for DOCX→PDF conversion (~$5/month, unlimited)
+- OpenAI GPT-4o-mini for data extraction (~$0.90 per 1000 profiles)
+
+**Template System:**
+- DOCX template with `[[placeholder]]` tokens
+- Supports: name, age/gender, region, license, vehicle, nationality, profession, skills, experience, employment type, availability, salary, contact person, photo
+- Fixed values: "Nach Vereinbarung" for salary
+
+**AI Extraction Rules:**
+- Swiss German (CH) professional tone
+- EFZ/Gesellenbrief title only (no further education)
+- Post-apprenticeship experience only ("Mehr als X Jahre Berufserfahrung")
+- Region format: "PLZ Ort (Kanton)" without comma
+- Max 5 concise skills (1-page limit)
+- Excludes: Windows, Office, SAP, languages, salary info, other agencies
+
+**Technical:**
+- Gotenberg on Railway for PDF conversion
+- Template embedded as base64 for Vercel compatibility
+- Photo upload accepts all common image formats
+- MFA verify fix for Supabase challengeId requirement
+
+**Files Added/Modified:**
+- `src/lib/short-profile/` - schema, openai, docx, extract, pdf-convert
+- `src/app/api/tma/[id]/short-profile/generate/route.ts`
+- `supabase/migrations/038_tma_photo_url.sql`
+- Updated TmaDetail with photo upload + generate button

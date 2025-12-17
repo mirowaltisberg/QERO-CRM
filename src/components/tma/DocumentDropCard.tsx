@@ -6,9 +6,29 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
-const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx"];
+const DEFAULT_ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx"];
+const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic", ".heif"];
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+/**
+ * Parse accept string into array of extensions
+ * Handles formats like "image/*,.jpg,.png" or ".pdf,.docx"
+ */
+function parseAcceptedExtensions(accept: string): string[] {
+  const parts = accept.split(",").map(p => p.trim().toLowerCase());
+  const extensions: string[] = [];
+  
+  for (const part of parts) {
+    if (part === "image/*") {
+      extensions.push(...IMAGE_EXTENSIONS);
+    } else if (part.startsWith(".")) {
+      extensions.push(part);
+    }
+  }
+  
+  return extensions.length > 0 ? extensions : DEFAULT_ALLOWED_EXTENSIONS;
+}
 
 interface DocumentDropCardProps {
   title: string;
@@ -74,14 +94,15 @@ export function DocumentDropCard({
 
   const validateFile = useCallback((file: File): string | null => {
     const ext = "." + file.name.split(".").pop()?.toLowerCase();
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    const allowedExtensions = parseAcceptedExtensions(accept);
+    if (!allowedExtensions.includes(ext)) {
       return labels.invalidType;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
       return labels.fileTooLarge;
     }
     return null;
-  }, [labels.invalidType, labels.fileTooLarge]);
+  }, [accept, labels.invalidType, labels.fileTooLarge]);
 
   const handleFile = useCallback((file: File) => {
     setError(null);
