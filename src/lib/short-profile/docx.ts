@@ -271,19 +271,40 @@ export async function fillDocxTemplate(
     console.log("[DOCX] No photo URL provided");
   }
 
-  // Fix split tokens in document.xml before processing
+  // Fix document.xml before processing
   let documentXml = zip.file("word/document.xml")?.asText();
   if (documentXml) {
-    let fixedXml = fixSplitTokensRobust(documentXml);
+    let fixedXml = documentXml;
     
-    // Remove proofErr elements (spell check markers) that can cause rendering issues
+    // FIRST: Remove proofErr elements - they break token merging
     fixedXml = fixedXml.replace(/<w:proofErr[^/]*\/>/g, "");
     console.log("[DOCX] Removed proofErr elements");
+    
+    // THEN: Fix split tokens (now that proofErr is gone)
+    fixedXml = fixSplitTokensRobust(fixedXml);
+    
+    // Remove green borders (color 70AD47) - change to black
+    fixedXml = fixedXml.replace(/w:color="70AD47"/g, 'w:color="000000"');
+    console.log("[DOCX] Fixed green border color");
+    
+    // Remove the "Berufliche Erfahrung" paragraph that appears after the table
+    // Match: </w:tbl> followed by paragraph containing "Berufliche Erfahrung"
+    fixedXml = fixedXml.replace(
+      /(<\/w:tbl>)<w:p[^>]*>[^]*?Berufliche Erfahrung<\/w:t>[^]*?<\/w:p>/,
+      "$1"
+    );
+    console.log("[DOCX] Removed stray 'Berufliche Erfahrung' paragraph");
     
     // If no photo, remove the [[%photo]] tag entirely to avoid errors
     if (!hasPhoto) {
       fixedXml = fixedXml.replace(/\[\[%?photo\]\]/g, "");
       console.log("[DOCX] Removed photo placeholder (no photo available)");
+    }
+    
+    // Debug: Check if [[%photo]] exists
+    if (hasPhoto) {
+      const hasPhotoTag = fixedXml.includes("[[%photo]]");
+      console.log("[DOCX] [[%photo]] tag exists in XML:", hasPhotoTag);
     }
     
     zip.file("word/document.xml", fixedXml);
@@ -324,10 +345,18 @@ export async function fillDocxTemplate(
   }
   // If no photo, the tag was already removed from XML above
   
-  console.log("[DOCX] Rendering template with data...");
+  console.log("[DOCX] Rendering template with data:", Object.keys(templateData));
+  console.log("[DOCX] Has photo module:", !!imageModule);
+  console.log("[DOCX] Photo in templateData:", templateData.photo);
   
   // Render the document
-  doc.render(templateData);
+  try {
+    doc.render(templateData);
+    console.log("[DOCX] Render completed successfully");
+  } catch (renderErr) {
+    console.error("[DOCX] Render error:", renderErr);
+    throw renderErr;
+  }
   
   // Generate output
   const output = doc.getZip().generate({
