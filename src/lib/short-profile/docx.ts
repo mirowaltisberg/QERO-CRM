@@ -89,13 +89,10 @@ export async function fillDocxTemplate(
     // 4. Fix green border color (70AD47 -> black)
     fixedXml = fixedXml.replace(/w:color="70AD47"/g, 'w:color="000000"');
     
-    // 5. Remove table positioning (w:tblpPr) - causes LibreOffice to reflow content
-    // This makes tables flow normally instead of being positioned/floating
-    fixedXml = fixedXml.replace(/<w:tblpPr[^/]*\/>/g, "");
-    fixedXml = fixedXml.replace(/<w:tblpPr[^>]*>.*?<\/w:tblpPr>/g, "");
+    // NOTE: Do NOT remove w:tblpPr - it breaks document flow order
     
     zip.file("word/document.xml", fixedXml);
-    console.log("[DOCX] Preprocessed document.xml (fixed colors, removed table positioning)");
+    console.log("[DOCX] Preprocessed document.xml");
   }
   
   // Create docxtemplater instance (image is embedded directly, no module needed)
