@@ -773,3 +773,86 @@ Complete implementation of automatic Kurzprofil (short profile) PDF generation f
 - `src/app/api/tma/[id]/short-profile/generate/route.ts`
 - `supabase/migrations/038_tma_photo_url.sql`
 - Updated TmaDetail with photo upload + generate button
+
+---
+
+# Task 31 - Kurzprofil Fixes: Photo + Layout Stability (PLANNING)
+
+## Background and Motivation
+User reports remaining issues in generated Kurzprofil PDFs:
+- Photo is not embedded (placeholder remains empty / no image shown)
+- A green line appears (likely formatting artifact)
+- "Berufliche Erfahrung" block shifts to the bottom (layout instability)
+
+## Key Challenges and Analysis
+- **Photo embedding has 2 likely failure points**:
+  - Storage access: `candidate.photo_url` is a Supabase Storage URL; if the bucket/object is not truly public, server-side `fetch(photo_url)` fails and we silently continue without the photo.
+  - Template constraints: the image placeholder must be in a supported location (not in a shape/textbox/header that docxtemplater doesn’t process) and must be a “clean” tag that the image module can replace.
+- **Green line and shifting layout are often template/conversion issues**:
+  - Green line is usually a table border or paragraph underline style in the DOCX (or a style applied by LibreOffice during conversion).
+  - LibreOffice/Gotenberg can render Word layout slightly differently than Word itself; fixed row heights, spacing, or oversized images can push sections down.
+
+## High-level Task Breakdown (Planner)
+
+### 31.1 Add “debug artifacts” for fast diagnosis
+**Change**: During generation, also upload the filled DOCX (before PDF conversion) to Supabase Storage, and log photo download status (HTTP status + content-type + bytes).
+**Success criteria**:
+- We can open the generated DOCX and confirm whether the photo is embedded there (separates “docx templating” vs “pdf conversion” issues).
+
+### 31.2 Make photo fetching robust (no dependency on public URLs)
+**Change** (preferred): Store and use storage *paths* (or derive them) and download the photo via `supabase.storage.from("tma-docs").download(path)` server-side (service role/server client), instead of `fetch(publicUrl)`.
+**Fallback**: If we must keep URLs, generate a signed URL server-side for private objects and use that for download.
+**Success criteria**:
+- Photo reliably downloads server-side (works even if the bucket is private).
+
+### 31.3 Make image module integration deterministic
+**Change**: Pass the actual image payload via `templateData.photo` (e.g., base64 or Buffer reference) and implement `getImage(tagValue)` to decode that value, rather than relying on the sentinel `"photo"`.
+**Also**: Reduce and clamp `getSize()` to the exact placeholder box size (so inserted images cannot expand table rows and push “Berufliche Erfahrung” downward).
+**Success criteria**:
+- Filled DOCX contains an embedded image in `word/media/*`.
+- “Berufliche Erfahrung” no longer shifts due to image sizing.
+
+### 31.4 Fix the green line (template-first, then conversion fallback)
+**Change**:
+- Inspect the generated DOCX around “Berufliche Erfahrung” to identify whether the green line exists already in DOCX.
+  - If yes: remove the green border/underline in `template.docx` and re-embed `TEMPLATE_BASE64`.
+  - If no (only appears in PDF): adjust LibreOffice conversion options (where possible) or tweak template styles to avoid the artifact (e.g., remove borders/underlines on that row, avoid “accent” theme colors).
+**Success criteria**:
+- Green line is gone in the final PDF.
+
+### 31.5 Stabilize layout so “Berufliche Erfahrung” doesn’t drop to bottom
+**Change**:
+- Enforce tight length limits in code for fields that can explode layout (e.g. `kontaktperson`, `faehigkeiten_bullets` already constrained, but also clamp accidental long strings).
+- Ensure template uses auto row height (“At least”) not “Exactly” where content must flow, and avoid large spacing before/after paragraphs inside table cells.
+**Success criteria**:
+- Generated PDFs stay on one page and “Berufliche Erfahrung” stays in the intended position across multiple candidates.
+
+### 31.6 Version + changelog + deploy
+**Change**:
+- Bump version (required before deploy) and add a short entry describing the photo + layout fixes.
+**Success criteria**:
+- Vercel build succeeds and production shows fixed behavior.
+
+---
+
+## v1.42.0 - Kurzprofil Photo Fix (Dec 16, 2025)
+
+### Fixes
+- **Photo embedding**: Fixed image module configuration
+  - Added `%` prefix conversion for image tags (`[[photo]]` → `[[%photo]]`)
+  - Image module now properly configured with standard prefix
+  - Photo download includes content-type detection
+  - Better error handling and logging for photo processing
+  
+- **Template cleanup**:
+  - Remove `proofErr` elements (spell check markers) that caused rendering issues
+  - Graceful handling when no photo is uploaded (removes placeholder)
+  
+- **Layout stability**:
+  - Reduced photo size to 113x150 pixels (passport ratio)
+  - Should prevent content from being pushed to second page
+
+### Technical Details
+- Photo is fetched from Supabase Storage public URL
+- If photo download fails, generation continues without photo
+- Image module uses `[[%photo]]` syntax internally for compatibility

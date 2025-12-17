@@ -100,9 +100,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     // Step 3: Fill DOCX template
     console.log("[Kurzprofil Generate] Step 3: Filling DOCX template...");
+    console.log("[Kurzprofil Generate] Photo URL:", candidate.photo_url || "(none)");
     let docxBuffer: Buffer;
     try {
       docxBuffer = await fillDocxTemplate(kurzprofilData, candidate.photo_url);
+      console.log("[Kurzprofil Generate] DOCX filled, size:", docxBuffer.length, "bytes");
     } catch (err) {
       console.error("[Kurzprofil Generate] Template filling failed:", err);
       return respondError(

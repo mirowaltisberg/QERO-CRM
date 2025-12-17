@@ -131,6 +131,7 @@ function fixSplitTokensSimple(xml: string): string {
 
 /**
  * More robust token fixer using iterative approach
+ * Also converts [[photo]] to [[%photo]] for the image module
  */
 function fixSplitTokensRobust(xml: string): string {
   // Extract all text content concatenated
@@ -169,19 +170,39 @@ function fixSplitTokensRobust(xml: string): string {
     }
   }
   
+  // Convert [[photo]] to [[%photo]] for image module (requires % prefix)
+  result = result.replace(/\[\[photo\]\]/g, "[[%photo]]");
+  console.log("[DOCX] Converted [[photo]] to [[%photo]] for image module");
+  
   return result;
 }
 
 /**
  * Download an image from URL and return as base64
+ * Handles both public URLs and Supabase Storage URLs
  */
-async function downloadImageAsBase64(url: string): Promise<string> {
+async function downloadImageAsBase64(url: string): Promise<{ base64: string; extension: string }> {
+  console.log("[DOCX] Fetching image from:", url);
+  
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to download image: ${response.status}`);
+    throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
   }
+  
+  // Get content type to determine extension
+  const contentType = response.headers.get("content-type") || "image/jpeg";
+  let extension = "jpeg";
+  if (contentType.includes("png")) extension = "png";
+  else if (contentType.includes("gif")) extension = "gif";
+  else if (contentType.includes("webp")) extension = "webp";
+  else if (contentType.includes("jpeg") || contentType.includes("jpg")) extension = "jpeg";
+  
   const buffer = await response.arrayBuffer();
-  return Buffer.from(buffer).toString("base64");
+  const base64 = Buffer.from(buffer).toString("base64");
+  
+  console.log("[DOCX] Image downloaded:", buffer.byteLength, "bytes, type:", extension);
+  
+  return { base64, extension };
 }
 
 /**
@@ -207,39 +228,66 @@ export async function fillDocxTemplate(
   const templateBuffer = Buffer.from(TEMPLATE_BASE64, "base64");
   const zip = new PizZip(templateBuffer);
   
-  // Fix split tokens in document.xml before processing
-  const documentXml = zip.file("word/document.xml")?.asText();
-  if (documentXml) {
-    const fixedXml = fixSplitTokensRobust(documentXml);
-    zip.file("word/document.xml", fixedXml);
-    console.log("[DOCX] Fixed split tokens in document.xml");
-  }
-  
-  // Configure image module if we have a photo
+  // Configure image module if we have a photo - download first
   let imageModule: ImageModule | null = null;
-  let photoBase64: string | null = null;
+  let photoData: { base64: string; extension: string } | null = null;
+  let hasPhoto = false;
   
   if (photoUrl) {
     try {
       console.log("[DOCX] Downloading photo from:", photoUrl);
-      photoBase64 = await downloadImageAsBase64(photoUrl);
+      photoData = await downloadImageAsBase64(photoUrl);
+      console.log("[DOCX] Photo downloaded successfully, size:", photoData.base64.length, "chars base64");
+      hasPhoto = true;
+      
+      // Store reference for the image module closure
+      const imageBase64 = photoData.base64;
       
       imageModule = new ImageModule({
         centered: false,
         getImage: (tagValue: string) => {
-          if (tagValue === "photo" && photoBase64) {
-            return Buffer.from(photoBase64, "base64");
+          console.log("[DOCX] ImageModule.getImage called with:", tagValue);
+          if (tagValue === "photo" && imageBase64) {
+            const buffer = Buffer.from(imageBase64, "base64");
+            console.log("[DOCX] Returning image buffer, size:", buffer.length);
+            return buffer;
           }
           throw new Error(`Unknown image tag: ${tagValue}`);
         },
         getSize: () => {
-          // Size in pixels (will be converted to EMUs by the module)
-          return [150, 200];
+          // Size in pixels - passport photo ratio (3:4)
+          // Keep it small to not break layout: 113x150 pixels
+          console.log("[DOCX] ImageModule.getSize called");
+          return [113, 150];
         },
       });
+      console.log("[DOCX] ImageModule configured (uses [[%photo]] tag)");
     } catch (err) {
       console.error("[DOCX] Failed to load photo, continuing without it:", err);
+      photoData = null;
+      hasPhoto = false;
     }
+  } else {
+    console.log("[DOCX] No photo URL provided");
+  }
+
+  // Fix split tokens in document.xml before processing
+  let documentXml = zip.file("word/document.xml")?.asText();
+  if (documentXml) {
+    let fixedXml = fixSplitTokensRobust(documentXml);
+    
+    // Remove proofErr elements (spell check markers) that can cause rendering issues
+    fixedXml = fixedXml.replace(/<w:proofErr[^/]*\/>/g, "");
+    console.log("[DOCX] Removed proofErr elements");
+    
+    // If no photo, remove the [[%photo]] tag entirely to avoid errors
+    if (!hasPhoto) {
+      fixedXml = fixedXml.replace(/\[\[%?photo\]\]/g, "");
+      console.log("[DOCX] Removed photo placeholder (no photo available)");
+    }
+    
+    zip.file("word/document.xml", fixedXml);
+    console.log("[DOCX] Fixed document.xml");
   }
   
   // Create docxtemplater instance
@@ -268,13 +316,13 @@ export async function fillDocxTemplate(
     salaer_tarif: "Nach Vereinbarung",
   };
   
-  // Add photo placeholder if we have an image (for image module)
-  // If no photo, set to empty string to remove the placeholder
-  if (photoBase64 && imageModule) {
-    templateData.photo = "photo";
-  } else {
-    templateData.photo = ""; // Remove [[photo]] placeholder when no photo
+  // For image module with % prefix, the tag is [[%photo]] and we pass "photo" as value
+  // The getImage function receives "photo" and returns the image buffer
+  if (hasPhoto && photoData && imageModule) {
+    templateData.photo = "photo"; // This value is passed to getImage()
+    console.log("[DOCX] Photo data set for image module");
   }
+  // If no photo, the tag was already removed from XML above
   
   console.log("[DOCX] Rendering template with data...");
   
