@@ -264,6 +264,8 @@ export async function fillDocxTemplate(
     anstellungsart: data.anstellungsart,
     verfuegbar_ab: data.verfuegbar_ab,
     kontaktperson: data.kontaktperson,
+    // Fixed value - never show actual salary
+    salaer_tarif: "Nach Vereinbarung",
   };
   
   // Add photo placeholder if we have an image (for image module)
