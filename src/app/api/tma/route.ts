@@ -65,7 +65,8 @@ export async function GET(request: NextRequest) {
         .from("tma_candidates")
         .select(`
           *,
-          claimer:profiles!claimed_by(id, full_name, avatar_url)
+          claimer:profiles!claimed_by(id, full_name, avatar_url),
+          address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url)
         `)
         .order("created_at", { ascending: false })
         .range(from, to);

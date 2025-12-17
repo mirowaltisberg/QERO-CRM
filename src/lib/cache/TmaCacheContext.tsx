@@ -157,7 +157,7 @@ export function TmaCacheProvider({ children }: { children: ReactNode }) {
             // Fetch the full candidate with claimer info
             const { data } = await supabase.current
               .from("tma_candidates")
-              .select(`*, claimer:profiles!claimed_by(id, full_name, avatar_url)`)
+              .select(`*, claimer:profiles!claimed_by(id, full_name, avatar_url), address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url)`)
               .eq("id", (newRecord as { id: string }).id)
               .single();
 
@@ -184,7 +184,7 @@ export function TmaCacheProvider({ children }: { children: ReactNode }) {
             // Fetch updated candidate with claimer info
             const { data } = await supabase.current
               .from("tma_candidates")
-              .select(`*, claimer:profiles!claimed_by(id, full_name, avatar_url)`)
+              .select(`*, claimer:profiles!claimed_by(id, full_name, avatar_url), address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url)`)
               .eq("id", candidateId)
               .single();
 

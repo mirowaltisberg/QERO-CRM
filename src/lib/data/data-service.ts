@@ -602,7 +602,8 @@ export const tmaService = {
       .from("tma_candidates")
       .select(`
         *,
-        claimer:profiles!claimed_by(id, full_name, avatar_url)
+        claimer:profiles!claimed_by(id, full_name, avatar_url),
+        address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url)
       `)
       .order("created_at", { ascending: false });
 
@@ -641,7 +642,8 @@ export const tmaService = {
       .from("tma_candidates")
       .select(`
         *,
-        claimer:profiles!claimed_by(id, full_name, avatar_url)
+        claimer:profiles!claimed_by(id, full_name, avatar_url),
+        address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url)
       `)
       .eq("id", id)
       .single();
@@ -671,7 +673,8 @@ export const tmaService = {
       .insert(tmaData)
       .select(`
         *,
-        claimer:profiles!claimed_by(id, full_name, avatar_url)
+        claimer:profiles!claimed_by(id, full_name, avatar_url),
+        address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url)
       `)
       .single();
     if (error) {

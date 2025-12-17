@@ -124,6 +124,14 @@ export interface TmaCandidate {
     full_name: string;
     avatar_url: string | null;
   } | null;
+  // Address edit tracking
+  address_updated_by: string | null;
+  address_updated_at: string | null;
+  address_updated_by_profile?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 export interface TmaRole {

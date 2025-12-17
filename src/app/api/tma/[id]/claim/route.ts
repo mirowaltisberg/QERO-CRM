@@ -33,7 +33,8 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       .from("tma_candidates")
       .select(`
         *,
-        claimer:profiles!claimed_by(id, full_name, avatar_url)
+        claimer:profiles!claimed_by(id, full_name, avatar_url),
+        address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url)
       `)
       .eq("id", id)
       .single();
@@ -88,7 +89,8 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       .from("tma_candidates")
       .select(`
         *,
-        claimer:profiles!claimed_by(id, full_name, avatar_url)
+        claimer:profiles!claimed_by(id, full_name, avatar_url),
+        address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url)
       `)
       .eq("id", id)
       .single();

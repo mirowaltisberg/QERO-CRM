@@ -147,6 +147,8 @@ export const TmaUpdateSchema = tmaBaseSchema.extend({
   status: z.enum(TMA_STATUS_LIST).nullable().optional(),
   activity: z.enum(TMA_ACTIVITY_LIST).nullable().optional(),
   claimed_by: z.string().uuid().nullable().optional(),
+  address_updated_by: z.string().uuid().nullable().optional(),
+  address_updated_at: z.string().datetime().nullable().optional(),
 })
   .partial()
   .transform((data) => ({

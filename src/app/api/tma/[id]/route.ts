@@ -54,24 +54,28 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
     
     // Check if this is a document upload - auto-claim if unclaimed
     const isDocumentUpload = payload.cv_url || payload.references_url || payload.short_profile_url;
-    if (isDocumentUpload) {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        const { data: candidate } = await supabase
-          .from("tma_candidates")
-          .select("claimed_by")
-          .eq("id", id)
-          .single();
+    if (isDocumentUpload && user) {
+      const { data: candidate } = await supabase
+        .from("tma_candidates")
+        .select("claimed_by")
+        .eq("id", id)
+        .single();
 
-        if (candidate && !candidate.claimed_by) {
-          // Auto-claim when uploading a document
-          payload.claimed_by = user.id;
-        }
+      if (candidate && !candidate.claimed_by) {
+        // Auto-claim when uploading a document
+        payload.claimed_by = user.id;
       }
+    }
+
+    // Check if this is an address update - track who/when
+    const isAddressUpdate = payload.city !== undefined || payload.postal_code !== undefined || payload.street !== undefined;
+    if (isAddressUpdate && user) {
+      payload.address_updated_by = user.id;
+      payload.address_updated_at = new Date().toISOString();
     }
 
     // Perform update using server client
@@ -85,12 +89,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return respondError(updateError.message, 500);
     }
 
-    // Fetch updated record with claimer
+    // Fetch updated record with claimer and address editor
     const { data: updated, error: fetchError } = await supabase
       .from("tma_candidates")
       .select(`
         *,
-        claimer:profiles!claimed_by(id, full_name, avatar_url)
+        claimer:profiles!claimed_by(id, full_name, avatar_url),
+        address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url)
       `)
       .eq("id", id)
       .single();

@@ -28,6 +28,7 @@ import {
 } from "@/lib/utils/constants";
 import { DrivingLicenseSelector, DrivingLicenseBadge } from "@/components/ui/DrivingLicenseBadge";
 import { ExperienceLevelSelector } from "@/components/ui/ExperienceLevelSelector";
+import { SwissCityAutocomplete } from "@/components/ui/SwissCityAutocomplete";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils/cn";
 
@@ -134,10 +135,14 @@ export function TmaDetail({
       onUpdateQualityNote(value.trim() || null);
     }, 800);
   }, [onUpdateQualityNote]);
-  const [city, setCity] = useState(() => candidate?.city ?? "");
   const [street, setStreet] = useState(() => candidate?.street ?? "");
-  const [postalCode, setPostalCode] = useState(() => candidate?.postal_code ?? "");
   const [phone, setPhone] = useState(() => candidate?.phone ?? "");
+
+  // Sync street when candidate changes
+  useEffect(() => {
+    setStreet(candidate?.street ?? "");
+  }, [candidate?.id, candidate?.street]);
+
   const handleRoleSelect = useCallback(
     async (roleName: string | null) => {
       if (!candidate) return;
@@ -149,22 +154,39 @@ export function TmaDetail({
     [candidate, onUpdatePosition]
   );
 
-  const handleAddressBlur = useCallback(async () => {
+  // Handle city/PLZ selection from autocomplete
+  const handleCitySelect = useCallback(
+    async (value: { city: string | null; postal_code: string | null; canton?: string | null }) => {
+      if (!candidate) return;
+      // Check if anything changed
+      if (
+        value.city === (candidate.city ?? null) &&
+        value.postal_code === (candidate.postal_code ?? null)
+      ) {
+        return;
+      }
+      await onUpdateAddress({
+        city: value.city,
+        postal_code: value.postal_code,
+        street: candidate.street,
+      });
+    },
+    [candidate, onUpdateAddress]
+  );
+
+  // Handle street blur (separate from city/PLZ)
+  const handleStreetBlur = useCallback(async () => {
     if (!candidate) return;
-    const payload = {
-      city: city.trim() ? city.trim() : null,
-      street: street.trim() ? street.trim() : null,
-      postal_code: postalCode.trim() ? postalCode.trim() : null,
-    };
-    if (
-      payload.city === (candidate.city ?? null) &&
-      payload.street === (candidate.street ?? null) &&
-      payload.postal_code === (candidate.postal_code ?? null)
-    ) {
+    const trimmedStreet = street.trim() || null;
+    if (trimmedStreet === (candidate.street ?? null)) {
       return;
     }
-    await onUpdateAddress(payload);
-  }, [candidate, city, street, postalCode, onUpdateAddress]);
+    await onUpdateAddress({
+      city: candidate.city,
+      postal_code: candidate.postal_code,
+      street: trimmedStreet,
+    });
+  }, [candidate, street, onUpdateAddress]);
 
   const handlePhoneBlur = useCallback(async () => {
     if (!candidate) return;
@@ -442,32 +464,28 @@ export function TmaDetail({
                 />
               </div>
             </div>
-            <div>
-              <label className="text-xs uppercase text-gray-400">{t("city")}</label>
-              <Input
-                value={city}
-                onChange={(event) => setCity(event.target.value)}
-                onBlur={handleAddressBlur}
-                placeholder="e.g. Zürich"
+            <div className="sm:col-span-2">
+              <label className="text-xs uppercase text-gray-400">{t("cityPlz")}</label>
+              <SwissCityAutocomplete
+                value={{ city: candidate.city, postal_code: candidate.postal_code }}
+                onChange={handleCitySelect}
+                placeholder={t("searchCityPlz")}
                 className="mt-1"
               />
-            </div>
-            <div>
-              <label className="text-xs uppercase text-gray-400">{t("postalCode")}</label>
-              <Input
-                value={postalCode}
-                onChange={(event) => setPostalCode(event.target.value)}
-                onBlur={handleAddressBlur}
-                placeholder="e.g. 8004"
-                className="mt-1"
-              />
+              {/* Last edited by info */}
+              {candidate.address_updated_at && candidate.address_updated_by_profile && (
+                <p className="mt-1 text-xs text-gray-400">
+                  {t("addressLastEditedBy", { name: candidate.address_updated_by_profile.full_name })}{" "}
+                  {t("addressLastEditedAt", { date: formatAddressEditDate(candidate.address_updated_at) })}
+                </p>
+              )}
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs uppercase text-gray-400">{t("street")}</label>
               <Input
                 value={street}
                 onChange={(event) => setStreet(event.target.value)}
-                onBlur={handleAddressBlur}
+                onBlur={handleStreetBlur}
                 placeholder="e.g. Badenerstrasse 575"
                 className="mt-1"
               />
@@ -836,6 +854,16 @@ function formatFollowUp(value: string) {
     month: "short",
     day: "numeric",
     hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatAddressEditDate(value: string) {
+  return new Intl.DateTimeFormat("de-CH", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
 }

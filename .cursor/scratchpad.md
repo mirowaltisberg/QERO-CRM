@@ -922,3 +922,213 @@ This is almost certainly **LibreOffice (Gotenberg) layout behavior** interacting
 - Removed unused `mergeSplitTokens` and `fixSplitTokensSimple` functions
 - Removed unused `getImageSize` function
 - Simplified code flow
+
+---
+
+# Task 33 - Swiss City Autocomplete for TMA Address + "Last Edited By" (PLANNING)
+
+## Background and Motivation
+User wants to improve the address editing experience in TMA:
+1. **City/PLZ autocomplete**: User types beginning of city name OR PLZ → CRM shows dropdown of matching Swiss cities → User selects → City + PLZ auto-filled
+2. **"Last edited by" tracking**: Show who last edited the address and when
+
+## Key Challenges and Analysis
+
+### 1. Swiss City Data Already Exists ✅
+- **Dataset**: `/public/data/swiss-plz.json` contains ~4,700 Swiss postal codes with:
+  - `plz`: 4-digit postal code
+  - `name`: City/town name  
+  - `lat`, `lng`: Coordinates
+  - `canton`: Optional canton code
+- **Client-side search**: `src/lib/geo/client.ts` has `searchLocationsClient(query, limit)` that:
+  - Matches PLZ prefix (e.g., "80" → 8000, 8001, ...)
+  - Matches city name substring (normalized, diacritics-insensitive)
+  - Returns `PlzEntry[]` sorted by relevance
+
+### 2. Current Address Fields in TMA
+- `tma_candidates` table has: `city`, `postal_code`, `street`
+- `TmaDetail.tsx` has 3 separate Input fields (city, postal_code, street)
+- `onUpdateAddress` callback sends all 3 fields together on blur
+
+### 3. "Last Edited By" Pattern Exists
+- `contact_persons` table already has `updated_by` + `updated_by_profile` join pattern
+- We need to add: `address_updated_by` (FK → profiles) + `address_updated_at` (timestamp) to `tma_candidates`
+
+### 4. UX Design Decision
+**Option A (simpler)**: Single "City/PLZ" autocomplete input that fills BOTH city AND postal_code when selected
+- User types "Zür" → sees "8000 Zürich", "8001 Zürich", etc.
+- On select: city="Zürich", postal_code="8000"
+- Street remains separate text field
+
+**Option B (more flexible)**: Separate PLZ and City fields with linked autocomplete
+- User can type in either field; suggestions update both
+- More complex UX
+
+**→ Recommend Option A** for simplicity and most intuitive flow.
+
+## High-level Task Breakdown
+
+### 33.1 Database Migration: Add address edit tracking fields
+**Change**: Create migration to add `address_updated_by` and `address_updated_at` to `tma_candidates`
+```sql
+ALTER TABLE tma_candidates
+ADD COLUMN address_updated_by UUID REFERENCES profiles(id),
+ADD COLUMN address_updated_at TIMESTAMPTZ;
+```
+**Success criteria**: 
+- Migration applies cleanly to production
+- New columns exist on `tma_candidates`
+
+### 33.2 Create `SwissCityAutocomplete` Component
+**Files**: `src/components/ui/SwissCityAutocomplete.tsx`
+**Change**: Create a reusable autocomplete component:
+- Input field with dropdown
+- On type: debounced search using `searchLocationsClient()` from `src/lib/geo/client.ts`
+- Dropdown shows: "PLZ City (Canton)" format, e.g., "8000 Zürich (ZH)"
+- On select: calls `onSelect({ city, postal_code, canton })` callback
+- Keyboard navigation (↑/↓/Enter/Escape)
+- Click-outside closes dropdown
+**Success criteria**:
+- Component renders with placeholder
+- Typing "80" shows ~10 results starting with 80xx
+- Typing "Zürich" shows all Zürich postal codes
+- Selecting an item fires callback with city + postal_code + canton
+- Arrow keys + Enter work for selection
+
+### 33.3 Update TmaDetail to Use SwissCityAutocomplete
+**Files**: `src/components/tma/TmaDetail.tsx`
+**Change**:
+- Replace separate "City" and "Postal Code" inputs with single `SwissCityAutocomplete`
+- Display current value as "PLZ City" (e.g., "8000 Zürich")
+- Keep "Street" as separate text input (unchanged)
+- Update `handleAddressBlur` to work with new component (called on select, not blur)
+**Success criteria**:
+- City/PLZ autocomplete shows in TmaDetail
+- Selecting a city updates both fields in candidate
+- Street input still works independently
+- Address saves correctly
+
+### 33.4 Update TMA API to Track Address Editor
+**Files**: `src/app/api/tma/[id]/route.ts`
+**Change**:
+- When `city`, `postal_code`, or `street` changes, also set:
+  - `address_updated_by = user.id`
+  - `address_updated_at = NOW()`
+- Return these fields in response with joined profile info
+**Success criteria**:
+- Updating address sets `address_updated_by` and `address_updated_at`
+- Response includes editor's name
+
+### 33.5 Update TMA Types and Selects
+**Files**: `src/lib/types.ts`, data service files
+**Change**:
+- Add `address_updated_by`, `address_updated_at`, `address_updated_by_profile` to `TmaCandidate` type
+- Update select queries to join `profiles!address_updated_by`
+**Success criteria**:
+- TypeScript types are correct
+- API responses include the new fields
+
+### 33.6 Display "Last Edited By" in TmaDetail
+**Files**: `src/components/tma/TmaDetail.tsx`
+**Change**:
+- Below the address fields, show: "Zuletzt bearbeitet von {Name} am {Date}"
+- Format: Small gray text, relative time (e.g., "vor 2 Stunden") or absolute date
+- Only show if `address_updated_at` is set
+**Success criteria**:
+- After saving address, "Last edited by X on Y" appears
+- Shows correct editor name and formatted timestamp
+- Hidden if no address edits yet
+
+### 33.7 Add i18n Keys
+**Files**: `src/messages/en.json`, `src/messages/de.json`
+**Change**: Add translations:
+- `tma.cityPlz`: "City / PLZ"
+- `tma.searchCityPlz`: "Search city or postal code..."
+- `tma.addressLastEditedBy`: "Last edited by {name} on {date}"
+**Success criteria**:
+- No hardcoded strings in components
+- Both EN and DE translations work
+
+### 33.8 Version + Deploy
+**Change**:
+- Bump version to v1.44.0
+- Add changelog entry
+**Success criteria**:
+- Build passes
+- Deploys to production successfully
+
+## Technical Implementation Notes
+
+### SwissCityAutocomplete Props
+```typescript
+interface Props {
+  value: { city: string | null; postal_code: string | null };
+  onChange: (value: { city: string | null; postal_code: string | null; canton?: string | null }) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}
+```
+
+### Display Format
+- Dropdown item: "8000 Zürich (ZH)" 
+- Selected value display: "8000 Zürich"
+- Empty state: placeholder text
+
+### API Response Shape (after update)
+```typescript
+{
+  // ... existing fields ...
+  address_updated_by: string | null,
+  address_updated_at: string | null,
+  address_updated_by_profile: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  } | null
+}
+```
+
+## Success Criteria (Overall)
+- [ ] User can type "Zür" or "80" and see matching Swiss cities
+- [ ] Selecting a city auto-fills both city AND postal_code fields
+- [ ] Street remains editable separately
+- [ ] After saving, shows "Last edited by {Name} on {Date/Time}"
+- [ ] Works on mobile (iOS PWA)
+- [ ] No regressions to existing TMA functionality
+
+## Project Status Board
+- [x] **33.1** Database migration ✅
+- [x] **33.2** SwissCityAutocomplete component ✅
+- [x] **33.3** Integrate into TmaDetail ✅
+- [x] **33.4** Update TMA API (track editor) ✅
+- [x] **33.5** Update types and selects ✅
+- [x] **33.6** Display "Last edited by" ✅
+- [x] **33.7** i18n translations ✅
+- [x] **33.8** Version bump to v1.46.0 ✅
+
+## Implementation Complete (Dec 17, 2025)
+
+### Files Created
+- `supabase/migrations/039_tma_address_tracking.sql` - Database migration
+- `src/components/ui/SwissCityAutocomplete.tsx` - Autocomplete component
+
+### Files Modified
+- `src/lib/types.ts` - Added address tracking fields to TmaCandidate
+- `src/lib/validation/schemas.ts` - Added validation for new fields
+- `src/components/tma/TmaDetail.tsx` - Replaced city/PLZ inputs with autocomplete
+- `src/app/api/tma/[id]/route.ts` - Track who/when edited address
+- `src/app/api/tma/route.ts` - Include address editor in select
+- `src/app/api/tma/[id]/claim/route.ts` - Include address editor in select
+- `src/lib/data/data-service.ts` - Include address editor in all TMA queries
+- `src/lib/cache/TmaCacheContext.tsx` - Include address editor in cache queries
+- `src/i18n/messages/de.json` - Added German translations
+- `src/i18n/messages/en.json` - Added English translations
+- `src/components/layout/Sidebar.tsx` - Bumped version to v1.46.0
+
+### Migration Required
+Apply migration before testing:
+```sql
+ALTER TABLE tma_candidates
+ADD COLUMN IF NOT EXISTS address_updated_by UUID REFERENCES profiles(id),
+ADD COLUMN IF NOT EXISTS address_updated_at TIMESTAMPTZ;
+```
