@@ -267,8 +267,11 @@ export async function fillDocxTemplate(
   };
   
   // Add photo placeholder if we have an image (for image module)
+  // If no photo, set to empty string to remove the placeholder
   if (photoBase64 && imageModule) {
     templateData.photo = "photo";
+  } else {
+    templateData.photo = ""; // Remove [[photo]] placeholder when no photo
   }
   
   console.log("[DOCX] Rendering template with data...");

@@ -64,7 +64,9 @@ REGION REGELN
 - KEIN Komma nach PLZ!
 
 FÄHIGKEITEN REGELN (faehigkeiten_bullets)
+- MAXIMAL 6 Fähigkeiten (das Kurzprofil MUSS auf 1 Seite passen!)
 - Nur Aufzählungspunkte (jede Zeile beginnt mit "- ")
+- Kurz und prägnant formulieren (max 5-7 Wörter pro Punkt)
 - Inkludiere:
   • Kernfähigkeiten aus dem CV
   • Tools, Systeme, Methoden relevant für das Handwerk
@@ -74,6 +76,10 @@ FÄHIGKEITEN REGELN (faehigkeiten_bullets)
   • Microsoft Office
   • SAP
   • Sprachen
+
+WICHTIG: 1-SEITEN-LIMIT
+Das gesamte Kurzprofil MUSS auf eine A4-Seite passen.
+Halte alle Texte kurz und prägnant. Keine langen Beschreibungen.
 
 NAME FORMAT
 - name_vorname im Format "Nachname Vorname" (Familienname zuerst)
