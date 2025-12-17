@@ -835,6 +835,50 @@ User reports remaining issues in generated Kurzprofil PDFs:
 
 ---
 
+# Task 32 - Fix “green line” + heading shifts (Berufliche Erfahrung) (PLANNING)
+
+## Problem (observed)
+- **Green line comes back** intermittently in the generated PDF.
+- The **“Berufliche Erfahrung” heading shifts downward** (often leaving large whitespace), even though it is correctly placed in the Word template between the two tables.
+
+## Most likely root cause (think hard)
+This is almost certainly **LibreOffice (Gotenberg) layout behavior** interacting with **Word “floating tables / positioned tables” and/or border theme colors**:
+- The template tables contain `w:tblpPr` (positioned table). LibreOffice can reflow positioned tables differently than Word, causing following paragraphs (the heading) to be pushed down.
+- The green line is a **real border color** in the DOCX (`70AD47`) that LibreOffice renders; it may reappear depending on which style/border instance is actually used after token processing.
+
+## Fix strategy: diagnose first, then apply minimal-safe transforms
+
+### 32.1 Add DOCX artifact output (debug)
+**Change**: During generation, upload the **filled DOCX** (pre-PDF) alongside the PDF and return its URL in the API response.
+**Why**: Determine whether the heading shift exists in the DOCX (template/templating issue) or only in the PDF (conversion issue).
+**Success criteria**:
+- API response includes `filled_docx_url`.
+- Opening the DOCX in Word shows whether the heading placement is correct.
+
+### 32.2 Make template “LibreOffice-safe”: remove positioned-table properties
+**Change**: Remove `w:tblpPr` blocks from `word/document.xml` before rendering (or preferably, remove them in `template.docx` permanently).
+**Why**: Positioned tables are the #1 cause of “content jumps” in LibreOffice conversion.
+**Success criteria**:
+- In the resulting PDF, the heading “Berufliche Erfahrung” stays immediately under the first table (as intended) across multiple candidates.
+
+### 32.3 Remove green border color deterministically (safe replace)
+**Change**: Before rendering, apply a safe string replacement in `document.xml`:
+- Replace all `w:color="70AD47"` with `w:color="000000"` (or the intended border color).
+**Why**: This is safe (does not delete structure) and directly targets the known green border.
+**Success criteria**:
+- No green line in the PDF across multiple generations.
+
+### 32.4 Reduce “layout pressure” from dynamic fields (guard rails)
+**Change**: Hard-cap or normalize the most layout-sensitive fields:
+- Ensure `faehigkeiten_bullets` stays exactly 5 lines (already enforced, but double-check for long words).
+- Cap `kontaktperson` to 2 lines max (name + tel/email) to avoid pushing the second table.
+**Success criteria**:
+- One-page PDF, heading remains correctly positioned.
+
+### 32.5 Version + changelog + deploy
+
+---
+
 ## v1.42.0 - Kurzprofil Photo Fix (Dec 16, 2025)
 
 ### Fixes

@@ -72,22 +72,30 @@ export async function fillDocxTemplate(
     console.log("[DOCX] Photo URL provided but embedding is temporarily disabled:", photoUrl);
   }
 
-  // Minimal XML fixes - only what's absolutely necessary
+  // XML fixes for LibreOffice compatibility
   const documentXml = zip.file("word/document.xml")?.asText();
   if (documentXml) {
     let fixedXml = documentXml;
     
-    // Remove proofErr elements (spell check markers) - they break token merging
+    // 1. Remove proofErr elements (spell check markers) - they break token merging
     fixedXml = fixedXml.replace(/<w:proofErr[^/]*\/>/g, "");
     
-    // Fix split tokens (Word splits [[token]] across multiple XML runs)
+    // 2. Fix split tokens (Word splits [[token]] across multiple XML runs)
     fixedXml = fixSplitTokensRobust(fixedXml);
     
-    // Remove [[photo]] placeholder (photo embedding not yet implemented)
+    // 3. Remove [[photo]] placeholder (photo embedding not yet implemented)
     fixedXml = fixedXml.replace(/\[\[photo\]\]/g, "");
     
+    // 4. Fix green border color (70AD47 -> black)
+    fixedXml = fixedXml.replace(/w:color="70AD47"/g, 'w:color="000000"');
+    
+    // 5. Remove table positioning (w:tblpPr) - causes LibreOffice to reflow content
+    // This makes tables flow normally instead of being positioned/floating
+    fixedXml = fixedXml.replace(/<w:tblpPr[^/]*\/>/g, "");
+    fixedXml = fixedXml.replace(/<w:tblpPr[^>]*>.*?<\/w:tblpPr>/g, "");
+    
     zip.file("word/document.xml", fixedXml);
-    console.log("[DOCX] Preprocessed document.xml");
+    console.log("[DOCX] Preprocessed document.xml (fixed colors, removed table positioning)");
   }
   
   // Create docxtemplater instance (image is embedded directly, no module needed)
