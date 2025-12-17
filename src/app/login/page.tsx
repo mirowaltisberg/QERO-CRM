@@ -4,16 +4,23 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "@/lib/auth/actions";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { motion } from "framer-motion";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+  InputOTPSeparator,
+} from "@/components/ui/input-otp";
+import { motion, AnimatePresence } from "framer-motion";
+import { Shield, ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [mfaStep, setMfaStep] = useState<"password" | "mfa">("password");
+  const [step, setStep] = useState<"password" | "mfa">("password");
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
-  const [mfaChallengeId, setMfaChallengeId] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState("");
   const [verifyingMfa, setVerifyingMfa] = useState(false);
   const [resumingMfa, setResumingMfa] = useState(false);
@@ -26,39 +33,24 @@ export default function LoginPage() {
   const resumeMfaChallenge = useCallback(async () => {
     setResumingMfa(true);
     setError(null);
-    
+
     try {
-      // Get MFA status to find the factor ID
-      const statusRes = await fetch("/api/auth/mfa/status");
-      const statusJson = await statusRes.json();
+      const supabase = createClient();
       
-      if (!statusRes.ok || !statusJson.data?.factor?.id) {
-        // No MFA factor found - user may have been signed out, show password form
+      // Check if user has a session and MFA factors
+      const { data: factorsData } = await supabase.auth.mfa.listFactors();
+      const totpFactor = factorsData?.totp?.find((f) => f.status === "verified");
+
+      if (!totpFactor) {
+        // No MFA factor found - user may have been signed out
         setResumingMfa(false);
         return;
       }
-      
-      const factorId = statusJson.data.factor.id;
-      setMfaFactorId(factorId);
-      
-      // Create a new challenge
-      const challengeRes = await fetch("/api/auth/mfa/challenge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ factorId }),
-      });
-      const challengeJson = await challengeRes.json();
-      
-      if (!challengeRes.ok) {
-        throw new Error(challengeJson.error || "Failed to create MFA challenge");
-      }
-      
-      setMfaChallengeId(challengeJson.data.id);
-      setMfaStep("mfa");
+
+      setMfaFactorId(totpFactor.id);
+      setStep("mfa");
     } catch (err) {
       console.error("[Login] Failed to resume MFA:", err);
-      // If we can't resume, just show the password form
-      setError(null);
     } finally {
       setResumingMfa(false);
     }
@@ -66,17 +58,17 @@ export default function LoginPage() {
 
   // Check if we need to resume MFA on mount
   useEffect(() => {
-    if (mfaRequired && mfaStep === "password") {
+    if (mfaRequired && step === "password") {
       resumeMfaChallenge();
     }
-  }, [mfaRequired, mfaStep, resumeMfaChallenge]);
+  }, [mfaRequired, step, resumeMfaChallenge]);
 
-  async function handleSubmit(formData: FormData) {
+  async function handlePasswordSubmit(formData: FormData) {
     setLoading(true);
     setError(null);
 
     const result = await signIn(formData);
-    
+
     if (!result.success) {
       setError(result.error || "Login failed");
       setLoading(false);
@@ -86,34 +78,14 @@ export default function LoginPage() {
     // Check if MFA is required
     if (result.requiresMfa && result.factorId) {
       setMfaFactorId(result.factorId);
+      setStep("mfa");
       setLoading(false);
-      
-      // Create MFA challenge
-      try {
-        const challengeRes = await fetch("/api/auth/mfa/challenge", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ factorId: result.factorId }),
-        });
-        const challengeJson = await challengeRes.json();
-
-        if (!challengeRes.ok) {
-          throw new Error(challengeJson.error || "Failed to create MFA challenge");
-        }
-
-        setMfaChallengeId(challengeJson.data.id);
-        setMfaStep("mfa");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to start MFA verification");
-        setLoading(false);
-      }
     }
     // If no MFA required, signIn redirects automatically
   }
 
-  async function handleMfaVerify() {
-    if (!mfaFactorId || !mfaChallengeId || !mfaCode.trim()) {
-      setError("Please enter the 6-digit code");
+  async function handleMfaVerify(code: string) {
+    if (!mfaFactorId || code.length !== 6) {
       return;
     }
 
@@ -121,27 +93,53 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/auth/mfa/verify-challenge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          factorId: mfaFactorId,
-          challengeId: mfaChallengeId,
-          code: mfaCode.trim(),
-        }),
-      });
-      const json = await res.json();
+      const supabase = createClient();
 
-      if (!res.ok) {
-        throw new Error(json.error || "Invalid code");
+      // Create challenge and verify - all client-side to avoid IP mismatch
+      const { data: challengeData, error: challengeError } =
+        await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
+
+      if (challengeError) {
+        throw new Error(challengeError.message);
       }
 
-      // MFA verified successfully - use hard redirect to ensure cookie changes are processed
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: challengeData.id,
+        code: code,
+      });
+
+      if (verifyError) {
+        throw new Error(verifyError.message);
+      }
+
+      // Clear the MFA pending cookie via API
+      await fetch("/api/auth/mfa/clear-pending", { method: "POST" });
+
+      // MFA verified successfully - hard redirect to ensure session is fresh
       window.location.href = "/calling";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid code. Please try again.");
+      setMfaCode("");
       setVerifyingMfa(false);
     }
+  }
+
+  function handleCodeChange(value: string) {
+    setMfaCode(value);
+    setError(null);
+
+    // Auto-submit when 6 digits entered
+    if (value.length === 6) {
+      handleMfaVerify(value);
+    }
+  }
+
+  function handleBackToPassword() {
+    setStep("password");
+    setMfaCode("");
+    setMfaFactorId(null);
+    setError(null);
   }
 
   return (
@@ -163,7 +161,7 @@ export default function LoginPage() {
               Your session expired due to inactivity. Please sign in again.
             </div>
           )}
-          
+
           {(error || callbackError) && (
             <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
               {error || "Authentication failed. Please try again."}
@@ -175,98 +173,117 @@ export default function LoginPage() {
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
               <p className="mt-4 text-sm text-gray-500">Resuming authentication...</p>
             </div>
-          ) : mfaStep === "password" ? (
-            <>
-              <form action={handleSubmit} className="space-y-4">
-                <Input
-                  name="email"
-                  type="email"
-                  label="Email"
-                  placeholder="you@qero.ch"
-                  required
-                  autoComplete="email"
-                />
-
-                <Input
-                  name="password"
-                  type="password"
-                  label="Password"
-                  placeholder="••••••••"
-                  required
-                  autoComplete="current-password"
-                />
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={loading}
-                >
-                  {loading ? "Signing in..." : "Sign in"}
-                </Button>
-              </form>
-
-              <div className="mt-4 text-center text-sm text-gray-500">
-                Don&apos;t have an account?{" "}
-                <Link
-                  href="/register"
-                  className="font-medium text-gray-900 hover:underline"
-                >
-                  Register
-                </Link>
-              </div>
-            </>
           ) : (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-semibold text-gray-900">Two-Factor Authentication</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Enter the 6-digit code from your authenticator app
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  value={mfaCode}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, "").slice(0, 6);
-                    setMfaCode(value);
-                    setError(null);
-                  }}
-                  placeholder="000000"
-                  label="Authentication Code"
-                  className="text-center text-2xl tracking-widest font-mono"
-                  autoFocus
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setMfaStep("password");
-                    setMfaCode("");
-                    setMfaFactorId(null);
-                    setMfaChallengeId(null);
-                    setError(null);
-                  }}
-                  disabled={verifyingMfa}
-                  className="flex-1"
+            <AnimatePresence mode="wait">
+              {step === "password" ? (
+                <motion.div
+                  key="password"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  Back
-                </Button>
-                <Button
-                  onClick={handleMfaVerify}
-                  disabled={verifyingMfa || mfaCode.length !== 6}
-                  className="flex-1"
+                  <form action={handlePasswordSubmit} className="space-y-4">
+                    <Input
+                      name="email"
+                      type="email"
+                      label="Email"
+                      placeholder="you@qero.ch"
+                      required
+                      autoComplete="email"
+                    />
+
+                    <Input
+                      name="password"
+                      type="password"
+                      label="Password"
+                      placeholder="••••••••"
+                      required
+                      autoComplete="current-password"
+                    />
+
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? "Signing in..." : "Sign in"}
+                    </Button>
+                  </form>
+
+                  <div className="mt-4 text-center text-sm text-gray-500">
+                    Don&apos;t have an account?{" "}
+                    <Link
+                      href="/register"
+                      className="font-medium text-gray-900 hover:underline"
+                    >
+                      Register
+                    </Link>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="mfa"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-6"
                 >
-                  {verifyingMfa ? "Verifying..." : "Verify"}
-                </Button>
-              </div>
-            </div>
+                  {/* Header */}
+                  <div className="text-center">
+                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
+                      <Shield className="h-7 w-7 text-gray-700" />
+                    </div>
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      Two-Factor Authentication
+                    </h2>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Enter the 6-digit code from your authenticator app
+                    </p>
+                  </div>
+
+                  {/* OTP Input */}
+                  <div className="flex flex-col items-center gap-4">
+                    <InputOTP
+                      maxLength={6}
+                      value={mfaCode}
+                      onChange={handleCodeChange}
+                      disabled={verifyingMfa}
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                      </InputOTPGroup>
+                      <InputOTPSeparator />
+                      <InputOTPGroup>
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="space-y-3">
+                    <Button
+                      onClick={() => handleMfaVerify(mfaCode)}
+                      disabled={verifyingMfa || mfaCode.length !== 6}
+                      className="w-full"
+                    >
+                      {verifyingMfa ? "Verifying..." : "Verify Code"}
+                    </Button>
+
+                    <button
+                      type="button"
+                      onClick={handleBackToPassword}
+                      disabled={verifyingMfa}
+                      className="flex w-full items-center justify-center gap-2 py-2 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Back to Sign In
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           )}
         </div>
 
@@ -277,4 +294,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
