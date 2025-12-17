@@ -856,3 +856,25 @@ User reports remaining issues in generated Kurzprofil PDFs:
 - Photo is fetched from Supabase Storage public URL
 - If photo download fails, generation continues without photo
 - Image module uses `[[%photo]]` syntax internally for compatibility
+
+---
+
+## v1.43.0 - Direct Image Embedding (Dec 16, 2025)
+
+### Major Fix: Photo Embedding
+- **Replaced broken image module with direct DOCX XML manipulation**
+- Photo is now embedded directly into the DOCX:
+  1. Added to `word/media/` folder
+  2. Relationship added to `word/_rels/document.xml.rels`
+  3. `[[photo]]` placeholder replaced with inline drawing XML
+- No longer depends on `docxtemplater-image-module-free` for photos
+
+### Template Fixes
+- **Green line**: Changed border color `70AD47` to black `000000`
+- **"Berufliche Erfahrung" at bottom**: Removed stray paragraph after `</w:tbl>`
+
+### Code Cleanup
+- Removed unused `ImageModule` import
+- Removed unused `mergeSplitTokens` and `fixSplitTokensSimple` functions
+- Removed unused `getImageSize` function
+- Simplified code flow
