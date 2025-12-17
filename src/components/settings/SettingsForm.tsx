@@ -71,6 +71,7 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [mfaSetupOpen, setMfaSetupOpen] = useState(false);
   const [disablingMfa, setDisablingMfa] = useState(false);
+  const [resettingMfa, setResettingMfa] = useState(false);
 
   const supabase = createClient();
 
@@ -270,6 +271,35 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
         }
       });
     setMessage({ type: "success", text: "Two-factor authentication enabled successfully!" });
+  }
+
+  async function handleResetMfa() {
+    if (!confirm("This will remove ALL 2FA factors (including failed setup attempts). Continue?")) return;
+
+    setResettingMfa(true);
+    try {
+      const response = await fetch("/api/auth/mfa/reset", { method: "DELETE" });
+      const json = await response.json();
+
+      if (response.ok) {
+        setMfaEnabled(false);
+        setMfaFactorId(null);
+        setMessage({ 
+          type: "success", 
+          text: json.message || "All 2FA factors removed. You can now set up 2FA again." 
+        });
+      } else {
+        throw new Error(json.error || "Failed to reset MFA");
+      }
+    } catch (err) {
+      console.error("Reset MFA error:", err);
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to reset two-factor authentication.",
+      });
+    } finally {
+      setResettingMfa(false);
+    }
   }
 
   const openCropper = useCallback((file: File) => {
@@ -735,9 +765,20 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
                 Enable two-factor authentication to require a code from your phone in addition to your password when signing in.
               </p>
             </div>
-            <Button onClick={() => setMfaSetupOpen(true)} className="w-full sm:w-auto">
-              Enable Two-Factor Authentication
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={() => setMfaSetupOpen(true)} className="w-full sm:w-auto">
+                Enable Two-Factor Authentication
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleResetMfa}
+                disabled={resettingMfa}
+                className="text-gray-500"
+              >
+                {resettingMfa ? "Resetting..." : "Reset failed attempts"}
+              </Button>
+            </div>
           </div>
         )}
       </Panel>
