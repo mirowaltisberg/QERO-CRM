@@ -5,133 +5,12 @@
 
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
-import ImageModule from "docxtemplater-image-module-free";
 import type { KurzprofilData } from "./schema";
 import { TEMPLATE_BASE64 } from "./template-data";
 
 /**
- * Pre-process XML to merge split tokens across runs
- * Word often splits [[token]] into multiple <w:t> elements like [[, token, ]]
- * This function merges them back together
- */
-function mergeSplitTokens(xml: string): string {
-  // Pattern: finds sequences of <w:t> elements that together form [[...]]
-  // Strategy: find all text content, merge tokens, then reconstruct
-  
-  // First, let's do a simpler approach: replace the content while preserving structure
-  // Find patterns like </w:t>...</w:t> where the combined text forms a token
-  
-  // Extract all <w:t>...</w:t> content and their positions
-  const textPattern = /<w:t[^>]*>([^<]*)<\/w:t>/g;
-  
-  // Build a map of text runs
-  const runs: { match: string; text: string; start: number; end: number }[] = [];
-  let match;
-  while ((match = textPattern.exec(xml)) !== null) {
-    runs.push({
-      match: match[0],
-      text: match[1],
-      start: match.index,
-      end: match.index + match[0].length,
-    });
-  }
-  
-  // Now find sequences that form [[...]] patterns
-  let result = xml;
-  let offset = 0;
-  
-  for (let i = 0; i < runs.length; i++) {
-    // Look for [[ at the start
-    if (!runs[i].text.includes("[[")) continue;
-    
-    // Find where ]] ends
-    let combined = runs[i].text;
-    let endIdx = i;
-    
-    while (!combined.includes("]]") && endIdx < runs.length - 1) {
-      endIdx++;
-      combined += runs[endIdx].text;
-    }
-    
-    if (!combined.includes("]]")) continue;
-    
-    // Check if we have a valid token
-    const tokenMatch = combined.match(/\[\[([^\[\]]+)\]\]/);
-    if (!tokenMatch) continue;
-    
-    // If the token spans multiple runs, we need to merge them
-    if (endIdx > i) {
-      // Find the actual XML span from first run start to last run end
-      const spanStart = runs[i].start + offset;
-      const spanEnd = runs[endIdx].end + offset;
-      const originalSpan = result.slice(spanStart, spanEnd);
-      
-      // Create a single run with the complete token
-      // Find the first <w:t> tag and use it as the template
-      const firstTMatch = originalSpan.match(/<w:t[^>]*>/);
-      if (firstTMatch) {
-        // Replace just the text content, keeping the structure simple
-        // We'll put all the text in the first run's <w:t> and empty the rest
-        const newSpan = originalSpan.replace(
-          /(<w:t[^>]*>)[^<]*(<\/w:t>)/g, 
-          (fullMatch, openTag, closeTag, idx) => {
-            // First occurrence gets all the text, rest get empty
-            if (idx === 0 || fullMatch === originalSpan.match(/<w:t[^>]*>[^<]*<\/w:t>/)?.[0]) {
-              return `${openTag}${combined}${closeTag}`;
-            }
-            return `${openTag}${closeTag}`;
-          }
-        );
-        
-        // Actually, let's do a simpler replacement
-        // Just replace the entire span with a single run containing the merged text
-        const newContent = originalSpan.replace(
-          /<w:t[^>]*>[^<]*<\/w:t>/g,
-          ""
-        ).replace(
-          /(<w:r[^>]*>)/, 
-          `$1<w:t>${combined}</w:t>`
-        );
-        
-        // Skip this complex approach for now - docxtemplater should handle it
-      }
-    }
-  }
-  
-  return result;
-}
-
-/**
- * Simple token merger that works at the string level
- * Joins adjacent text runs that form split [[...]] patterns
- */
-function fixSplitTokensSimple(xml: string): string {
-  // Replace patterns where [[ and ]] are split across tags
-  // Pattern: ]]</w:t>...<w:t>...[[  should become whole tokens
-  
-  // Step 1: Find all potential token fragments and rebuild
-  let result = xml;
-  
-  // Handle common split patterns:
-  // [[</w:t>...<w:t>name</w:t>...<w:t>]]
-  // We need to identify these and merge them
-  
-  // First, let's try a regex that finds broken tokens
-  // This matches: [[ (possibly across tags) token_name (possibly across tags) ]]
-  
-  // Simpler approach: remove tags between [[ and ]] within reasonable distance
-  const brokenTokenPattern = /\[\[(<\/w:t>.*?<w:t[^>]*>)*([a-z_]+)(<\/w:t>.*?<w:t[^>]*>)*\]\]/gi;
-  
-  result = result.replace(brokenTokenPattern, (match, _p1, tokenName, _p2) => {
-    return `[[${tokenName}]]`;
-  });
-  
-  return result;
-}
-
-/**
- * More robust token fixer using iterative approach
- * Also converts [[photo]] to [[%photo]] for the image module
+ * Robust token fixer using iterative approach
+ * Merges split [[...]] tokens that Word may have split across XML runs
  */
 function fixSplitTokensRobust(xml: string): string {
   // Extract all text content concatenated
@@ -170,11 +49,19 @@ function fixSplitTokensRobust(xml: string): string {
     }
   }
   
-  // Convert [[photo]] to [[%photo]] for image module (requires % prefix)
-  result = result.replace(/\[\[photo\]\]/g, "[[%photo]]");
-  console.log("[DOCX] Converted [[photo]] to [[%photo]] for image module");
-  
   return result;
+}
+
+/**
+ * Generate the XML for an inline image in DOCX
+ * Size is in EMUs (English Metric Units): 1 inch = 914400 EMUs
+ */
+function generateImageXml(rId: string, widthPx: number, heightPx: number): string {
+  // Convert pixels to EMUs (assuming 96 DPI)
+  const widthEmu = Math.round(widthPx * 914400 / 96);
+  const heightEmu = Math.round(heightPx * 914400 / 96);
+  
+  return `<w:r><w:rPr></w:rPr><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${widthEmu}" cy="${heightEmu}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="1" name="Photo"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="Photo"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${widthEmu}" cy="${heightEmu}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
 }
 
 /**
@@ -206,16 +93,6 @@ async function downloadImageAsBase64(url: string): Promise<{ base64: string; ext
 }
 
 /**
- * Get image dimensions from base64 data
- * Returns approximate dimensions for common image formats
- */
-function getImageSize(base64: string): { width: number; height: number } {
-  // Default size for profile photo (matching template photo box)
-  // The template has a photo box approximately 107x167 points (based on screenshot)
-  return { width: 150, height: 200 };
-}
-
-/**
  * Fill the DOCX template with candidate data
  */
 export async function fillDocxTemplate(
@@ -228,44 +105,17 @@ export async function fillDocxTemplate(
   const templateBuffer = Buffer.from(TEMPLATE_BASE64, "base64");
   const zip = new PizZip(templateBuffer);
   
-  // Configure image module if we have a photo - download first
-  let imageModule: ImageModule | null = null;
+  // Download photo if provided
   let photoData: { base64: string; extension: string } | null = null;
-  let hasPhoto = false;
   
   if (photoUrl) {
     try {
       console.log("[DOCX] Downloading photo from:", photoUrl);
       photoData = await downloadImageAsBase64(photoUrl);
       console.log("[DOCX] Photo downloaded successfully, size:", photoData.base64.length, "chars base64");
-      hasPhoto = true;
-      
-      // Store reference for the image module closure
-      const imageBase64 = photoData.base64;
-      
-      imageModule = new ImageModule({
-        centered: false,
-        getImage: (tagValue: string) => {
-          console.log("[DOCX] ImageModule.getImage called with:", tagValue);
-          if (tagValue === "photo" && imageBase64) {
-            const buffer = Buffer.from(imageBase64, "base64");
-            console.log("[DOCX] Returning image buffer, size:", buffer.length);
-            return buffer;
-          }
-          throw new Error(`Unknown image tag: ${tagValue}`);
-        },
-        getSize: () => {
-          // Size in pixels - passport photo ratio (3:4)
-          // Keep it small to not break layout: 113x150 pixels
-          console.log("[DOCX] ImageModule.getSize called");
-          return [113, 150];
-        },
-      });
-      console.log("[DOCX] ImageModule configured (uses [[%photo]] tag)");
     } catch (err) {
       console.error("[DOCX] Failed to load photo, continuing without it:", err);
       photoData = null;
-      hasPhoto = false;
     }
   } else {
     console.log("[DOCX] No photo URL provided");
@@ -295,28 +145,62 @@ export async function fillDocxTemplate(
     );
     console.log("[DOCX] Removed stray 'Berufliche Erfahrung' paragraph");
     
-    // If no photo, remove the [[%photo]] tag entirely to avoid errors
-    if (!hasPhoto) {
-      fixedXml = fixedXml.replace(/\[\[%?photo\]\]/g, "");
+    // Handle photo: either embed image or remove placeholder
+    if (photoData) {
+      // Add image to media folder
+      const imageFileName = `image_photo.${photoData.extension}`;
+      const imagePath = `word/media/${imageFileName}`;
+      zip.file(imagePath, Buffer.from(photoData.base64, "base64"));
+      console.log("[DOCX] Added photo to media folder:", imagePath);
+      
+      // Add relationship for the image
+      const relsPath = "word/_rels/document.xml.rels";
+      let relsXml = zip.file(relsPath)?.asText() || "";
+      
+      // Find the highest rId and add a new one
+      const rIdMatches = relsXml.match(/Id="rId(\d+)"/g) || [];
+      const rIdNumbers = rIdMatches.map(m => parseInt(m.match(/\d+/)?.[0] || "0"));
+      const nextRId = Math.max(...rIdNumbers, 0) + 1;
+      const photoRId = `rId${nextRId}`;
+      
+      // Add new relationship before closing tag
+      const newRel = `<Relationship Id="${photoRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageFileName}"/>`;
+      relsXml = relsXml.replace("</Relationships>", `${newRel}</Relationships>`);
+      zip.file(relsPath, relsXml);
+      console.log("[DOCX] Added image relationship:", photoRId);
+      
+      // Replace [[photo]] with image XML
+      // Find the paragraph containing [[photo]] and replace just the run
+      const imageXml = generateImageXml(photoRId, 113, 150);
+      
+      // Replace the entire run containing [[photo]]
+      fixedXml = fixedXml.replace(
+        /<w:r[^>]*>(?:<[^>]*>)*<w:t[^>]*>\[\[photo\]\]<\/w:t>(?:<[^>]*>)*<\/w:r>/g,
+        imageXml
+      );
+      
+      // Also try simpler pattern if the above didn't match
+      if (fixedXml.includes("[[photo]]")) {
+        fixedXml = fixedXml.replace(/\[\[photo\]\]/g, "");
+        console.log("[DOCX] Warning: Could not replace photo run, removed placeholder");
+      } else {
+        console.log("[DOCX] Replaced [[photo]] with image XML");
+      }
+    } else {
+      // No photo - remove placeholder
+      fixedXml = fixedXml.replace(/\[\[photo\]\]/g, "");
       console.log("[DOCX] Removed photo placeholder (no photo available)");
-    }
-    
-    // Debug: Check if [[%photo]] exists
-    if (hasPhoto) {
-      const hasPhotoTag = fixedXml.includes("[[%photo]]");
-      console.log("[DOCX] [[%photo]] tag exists in XML:", hasPhotoTag);
     }
     
     zip.file("word/document.xml", fixedXml);
     console.log("[DOCX] Fixed document.xml");
   }
   
-  // Create docxtemplater instance
+  // Create docxtemplater instance (image is embedded directly, no module needed)
   const doc = new Docxtemplater(zip, {
     paragraphLoop: true,
     linebreaks: true,
     delimiters: { start: "[[", end: "]]" },
-    modules: imageModule ? [imageModule] : [],
   });
   
   // Prepare template data
@@ -337,17 +221,10 @@ export async function fillDocxTemplate(
     salaer_tarif: "Nach Vereinbarung",
   };
   
-  // For image module with % prefix, the tag is [[%photo]] and we pass "photo" as value
-  // The getImage function receives "photo" and returns the image buffer
-  if (hasPhoto && photoData && imageModule) {
-    templateData.photo = "photo"; // This value is passed to getImage()
-    console.log("[DOCX] Photo data set for image module");
-  }
-  // If no photo, the tag was already removed from XML above
+  // Photo is embedded directly in the XML, no template data needed
   
   console.log("[DOCX] Rendering template with data:", Object.keys(templateData));
-  console.log("[DOCX] Has photo module:", !!imageModule);
-  console.log("[DOCX] Photo in templateData:", templateData.photo);
+  console.log("[DOCX] Photo embedded:", !!photoData);
   
   // Render the document
   try {
