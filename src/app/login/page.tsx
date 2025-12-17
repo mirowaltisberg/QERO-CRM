@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [mfaStep, setMfaStep] = useState<"password" | "mfa">("password");
@@ -138,8 +136,8 @@ export default function LoginPage() {
         throw new Error(json.error || "Invalid code");
       }
 
-      // MFA verified successfully, redirect to app
-      router.push("/calling");
+      // MFA verified successfully - use hard redirect to ensure cookie changes are processed
+      window.location.href = "/calling";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid code. Please try again.");
       setVerifyingMfa(false);
