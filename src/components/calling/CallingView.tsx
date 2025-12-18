@@ -450,24 +450,17 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
 
   // Handle team filter change
   const handleTeamFilterChange = useCallback((teamId: string | "all") => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CallingView.tsx:452',message:'Team filter change requested',data:{requestedTeamId:teamId,teamIdType:typeof teamId,currentUserTeamId:currentUserTeamId,isAll:teamId==="all",isUserTeam:teamId===currentUserTeamId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D,E'})}).catch(()=>{});
-    // #endregion
     // Update URL to trigger page re-render with new team filter
     const params = new URLSearchParams(searchParams.toString());
     if (teamId === currentUserTeamId) {
       // Remove param if switching back to user's team (default)
       params.delete("team");
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CallingView.tsx:458',message:'Branch: Removing team param (user team)',data:{finalUrl:`/calling?${params.toString()}`},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
     } else {
       params.set("team", teamId);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CallingView.tsx:461',message:'Branch: Setting team param',data:{teamParam:teamId,finalUrl:`/calling?${params.toString()}`},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
     }
     router.push(`/calling?${params.toString()}`);
+    // Force server component to re-execute and fetch new data
+    router.refresh();
   }, [router, searchParams, currentUserTeamId]);
 
   useKeyboardShortcuts([
