@@ -82,6 +82,8 @@ export const serverContactService = {
     const { count } = await countQuery;
     const totalCount = count ?? 0;
 
+    console.log("[Server Data] Total contacts found:", totalCount, "Team filter:", teamFilter || "ALL TEAMS");
+
     if (totalCount === 0) {
       return [];
     }
@@ -89,6 +91,7 @@ export const serverContactService = {
     // Fetch in batches using range()
     const allContacts: Contact[] = [];
     const batches = Math.ceil(totalCount / BATCH_SIZE);
+    console.log("[Server Data] Will fetch", batches, "batches of", BATCH_SIZE);
 
     for (let i = 0; i < batches; i++) {
       const from = i * BATCH_SIZE;
@@ -141,8 +144,11 @@ export const serverContactService = {
 
       if (data) {
         allContacts.push(...data);
+        console.log(`[Server Data] Batch ${i + 1}/${batches}: Added ${data.length} contacts, total so far: ${allContacts.length}`);
       }
     }
+
+    console.log("[Server Data] Finished fetching, total contacts:", allContacts.length);
 
     // Merge personal settings for current user
     if (user && allContacts.length > 0) {
