@@ -4,8 +4,9 @@ import { memo, useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Vacancy, VacancyUrgency, TmaRole } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
-import { TMA_STATUS_LIST, type DrivingLicense } from "@/lib/utils/constants";
+import { TMA_STATUS_LIST, type DrivingLicense, type ExperienceLevel } from "@/lib/utils/constants";
 import { DrivingLicenseSelector } from "@/components/ui/DrivingLicenseBadge";
+import { ExperienceLevelSelector } from "@/components/ui/ExperienceLevelSelector";
 
 interface QuickVacancyPopupProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
   const [urgency, setUrgency] = useState<VacancyUrgency>(2);
   const [radiusKm, setRadiusKm] = useState(25);
   const [drivingLicense, setDrivingLicense] = useState<DrivingLicense | null>(null);
+  const [minExperience, setMinExperience] = useState<ExperienceLevel | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [roles, setRoles] = useState<TmaRole[]>([]);
@@ -66,6 +68,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
       setUrgency(2);
       setRadiusKm(25);
       setDrivingLicense(null);
+      setMinExperience(null);
       setSuccess(false);
       // Focus title input after animation
       setTimeout(() => titleInputRef.current?.focus(), 100);
@@ -115,6 +118,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
           min_quality: minQuality || null,
           urgency,
           driving_license: drivingLicense || null,
+          min_experience: minExperience || null,
         }),
       });
 
@@ -134,7 +138,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
     } finally {
       setSubmitting(false);
     }
-  }, [title, role, description, minQuality, urgency, radiusKm, drivingLicense, contact, onCreated, onClose, submitting]);
+  }, [title, role, description, minQuality, urgency, radiusKm, drivingLicense, minExperience, contact, onCreated, onClose, submitting]);
 
   // Handle Enter to submit
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -427,6 +431,14 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
               Führerschein
             </label>
             <DrivingLicenseSelector value={drivingLicense} onChange={setDrivingLicense} size="sm" />
+          </div>
+
+          {/* Min Experience */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+              Mindest-Berufserfahrung
+            </label>
+            <ExperienceLevelSelector value={minExperience} onChange={setMinExperience} size="sm" />
           </div>
 
           {/* Description */}
