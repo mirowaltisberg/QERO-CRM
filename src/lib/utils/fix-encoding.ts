@@ -117,8 +117,11 @@ const ENCODING_FIXES: [string, string][] = [
 // Markers that indicate mojibake is present
 const MOJIBAKE_MARKERS = [
   "\u00C3", // Ã - Most common: UTF-8 lead byte C3 decoded as Latin-1
+  "Ã", // Plain text form of Ã
   "\u00C2", // Â - UTF-8 lead byte C2 decoded as Latin-1
+  "Â", // Plain text form of Â
   "\u00E2\u20AC", // â€ - UTF-8 sequence for smart quotes/dashes
+  "â€", // Plain text form
   "\u00E2\u201E", // â„ - UTF-8 sequence for trademark etc.
   "\u00E2\u201A", // â‚ - UTF-8 sequence for currency
 ];
