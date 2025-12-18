@@ -62,6 +62,7 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
   const [statusFilter, setStatusFilter] = useState<TmaStatus | "all">("all");
   const [activityFilter, setActivityFilter] = useState<TmaActivity | "all">("all");
   const [teamFilter, setTeamFilter] = useState<string | null>(defaultTeamFilter);
+  const [experienceFilter, setExperienceFilter] = useState<ExperienceLevel | null>(null);
   const [sortOption, setSortOption] = useState<"recent" | "oldest" | "name" | "activity" | "distance">("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const [locationSearch, setLocationSearch] = useState<LocationSearchState>({
@@ -190,6 +191,7 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
       if (activityFilter !== "all" && candidate.activity !== activityFilter) return false;
       if (cantonFilter && candidate.canton !== cantonFilter) return false;
       if (teamFilter && candidate.team_id !== teamFilter) return false;
+      if (experienceFilter && candidate.experience_level !== experienceFilter) return false;
       
       // Search filter - matches any part of name, email, phone, position, or canton
       if (searchQuery.trim()) {
@@ -220,7 +222,7 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
       
       return true;
     });
-  }, [candidates, cantonFilter, statusFilter, activityFilter, teamFilter, searchQuery]);
+  }, [candidates, cantonFilter, statusFilter, activityFilter, teamFilter, experienceFilter, searchQuery]);
 
   const availableCantons = useMemo(() => {
     return Array.from(
@@ -849,6 +851,8 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
     activityFilter,
     teamFilter,
     setTeamFilter,
+    experienceFilter,
+    setExperienceFilter,
     searchQuery,
     selectCandidate,
     refreshCandidates,

@@ -3,6 +3,7 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import type { TmaCandidate, Team } from "@/lib/types";
+import type { ExperienceLevel } from "@/lib/utils/constants";
 import { useTmaCandidates } from "@/lib/hooks/useTmaCandidates";
 import { TmaList } from "./TmaList";
 import { TmaDetail } from "./TmaDetail";
@@ -64,6 +65,8 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
     deleteRole,
     refreshRoles: refreshRolePresets,
     cantonFilter,
+    experienceFilter,
+    setExperienceFilter,
     sortOption,
     setSortOption,
     searchQuery,
@@ -594,6 +597,28 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
                 ))}
               </select>
             </label>
+            <div className="mx-1 h-4 w-px bg-gray-200" />
+            <label className="flex items-center gap-2">
+              <span className="text-gray-500">Berufserfahrung</span>
+              <select
+                className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
+                value={experienceFilter ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setExperienceFilter(value ? (value as ExperienceLevel) : null);
+                }}
+              >
+                <option value="">Alle</option>
+                <option value="less_than_1">{"< 1 Jahr"}</option>
+                <option value="more_than_1">{"> 1 Jahr"}</option>
+                <option value="more_than_3">{"> 3 Jahre"}</option>
+              </select>
+            </label>
+            {experienceFilter && (
+              <Button variant="ghost" size="sm" onClick={() => setExperienceFilter(null)}>
+                Clear
+              </Button>
+            )}
             <label className="flex items-center gap-2">
               <span className="text-gray-500">Sort</span>
               <select
