@@ -142,6 +142,17 @@ export function hasEncodingIssues(str: string | null | undefined): boolean {
     if (str.includes(marker)) return true;
   }
 
+  // Aggressive pattern matching for common mojibake:
+  // "Ã" followed by any character in the Latin-1 supplement range (U+0080 to U+00FF)
+  // This catches variations we might have missed
+  if (/Ã[\x80-\xFF]/.test(str)) return true;
+  
+  // "Â" followed by Latin-1 supplement characters (for symbols like ©, ®, etc.)
+  if (/Â[\x80-\xFF]/.test(str)) return true;
+  
+  // "â€" patterns (smart quotes, dashes)
+  if (/â€[^\s]/.test(str)) return true;
+
   return false;
 }
 

@@ -144,6 +144,9 @@ describe("hasEncodingIssues", () => {
     assert.strictEqual(hasEncodingIssues("Z\u00C3\u00BCrich"), true);
     // Â© has mojibake
     assert.strictEqual(hasEncodingIssues("\u00C2\u00A9"), true);
+    // Plain text "Ã¼" (as it appears in database)
+    assert.strictEqual(hasEncodingIssues("ZÃ¼ger"), true);
+    assert.strictEqual(hasEncodingIssues("wiwÃ¼ GmbH"), true);
   });
 });
 
