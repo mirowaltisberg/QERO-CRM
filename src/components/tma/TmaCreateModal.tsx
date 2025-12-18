@@ -69,7 +69,7 @@ export function TmaCreateModal({
         last_name: lastName.trim(),
         email: email.trim() || null,
         phone: phone.trim() || null,
-        team_id: teamId,
+        team_id: teamId || null, // Ensure empty string becomes null
       });
       handleClose();
     } catch (err) {

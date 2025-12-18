@@ -467,7 +467,7 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
           onClose={() => setCreateOpen(false)}
           onCreateCandidate={handleCreateCandidate}
           teams={teams}
-          defaultTeamId={teamFilter || userTeamId}
+          defaultTeamId={teamFilter ?? userTeamId ?? null}
         />
       </>
     );
