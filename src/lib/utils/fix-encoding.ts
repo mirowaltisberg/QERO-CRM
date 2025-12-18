@@ -271,7 +271,8 @@ export function fixContactEncoding(contact: {
 
   for (const field of fieldsToCheck) {
     const value = contact[field];
-    if (value && hasEncodingIssues(value)) {
+    if (value) {
+      // Changed: Just try to fix, and if it's different, there was an issue
       const fixed = fixEncodingString(value);
       if (fixed && fixed !== value) {
         fixes[field] = fixed;
@@ -296,7 +297,8 @@ export function fixObjectEncoding<T extends Record<string, unknown>>(
 
   for (const field of fields) {
     const value = obj[field];
-    if (typeof value === "string" && hasEncodingIssues(value)) {
+    if (typeof value === "string") {
+      // Changed: Just try to fix, and if it's different, there was an issue
       const fixed = fixEncodingString(value);
       if (fixed && fixed !== value) {
         (fixes as Record<string, unknown>)[field as string] = fixed;

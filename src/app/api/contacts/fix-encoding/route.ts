@@ -4,7 +4,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   fixContactEncoding,
   fixObjectEncoding,
-  hasEncodingIssues,
 } from "@/lib/utils/fix-encoding";
 import { isCleanupAllowed } from "@/lib/utils/cleanup-auth";
 
@@ -326,11 +325,13 @@ async function processContactNotes(supabase: any, teamId: string | null, applyFi
   stats.scanned = notes?.length || 0;
 
   for (const note of notes || []) {
-    if (note.content && hasEncodingIssues(note.content)) {
-      stats.withIssues++;
-      const fixes = fixObjectEncoding(note, ["content"]);
+    // Changed strategy: Try to fix first, then check if anything changed
+    const fixes = fixObjectEncoding(note, ["content"]);
 
-      if (fixes && stats.examples.length < 5) {
+    if (fixes && Object.keys(fixes).length > 0) {
+      stats.withIssues++;
+
+      if (stats.examples.length < 5 && note.content) {
         stats.examples.push({
           id: note.id,
           field: "content",
@@ -339,7 +340,7 @@ async function processContactNotes(supabase: any, teamId: string | null, applyFi
         });
       }
 
-      if (applyFixes && fixes) {
+      if (applyFixes) {
         const { error: updateError } = await supabase
           .from("contact_notes")
           .update(fixes)
