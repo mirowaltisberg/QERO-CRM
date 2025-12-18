@@ -36,21 +36,22 @@ export const serverContactService = {
     
     // Determine team filter strategy
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-data-service.ts:37',message:'Filter input received',data:{filtersTeamId:filters?.teamId,filtersTeamIdType:typeof filters?.teamId,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D,E'})}).catch(()=>{});
+    const fs = require('fs');
+    try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'server-data-service.ts:37',message:'Filter input received',data:{filtersTeamId:filters?.teamId,filtersTeamIdType:typeof filters?.teamId,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D,E'})+'\n'); } catch(e) {}
     // #endregion
     let teamFilter: string | null = null;
     if (filters?.teamId === "all") {
       // Explicitly requested all teams - no filter
       teamFilter = null;
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-data-service.ts:41',message:'Branch: ALL teams selected',data:{teamFilter:null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D'})}).catch(()=>{});
+      try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'server-data-service.ts:41',message:'Branch: ALL teams selected',data:{teamFilter:null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D'})+'\n'); } catch(e) {}
       // #endregion
       console.log("[Server Data] Fetching contacts from ALL teams");
     } else if (filters?.teamId) {
       // Specific team requested
       teamFilter = filters.teamId;
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-data-service.ts:45',message:'Branch: Specific team requested',data:{teamFilter:teamFilter},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,D'})}).catch(()=>{});
+      try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'server-data-service.ts:45',message:'Branch: Specific team requested',data:{teamFilter:teamFilter},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,D'})+'\n'); } catch(e) {}
       // #endregion
       console.log("[Server Data] Fetching contacts from team:", teamFilter);
     } else {
@@ -64,7 +65,7 @@ export const serverContactService = {
         
         teamFilter = profile?.team_id || null;
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-data-service.ts:57',message:'Branch: Defaulting to user team',data:{teamFilter:teamFilter,profileTeamId:profile?.team_id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D,E'})}).catch(()=>{});
+        try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'server-data-service.ts:57',message:'Branch: Defaulting to user team',data:{teamFilter:teamFilter,profileTeamId:profile?.team_id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D,E'})+'\n'); } catch(e) {}
         // #endregion
         console.log("[Server Data] Defaulting to user's team:", teamFilter);
       }
@@ -72,7 +73,7 @@ export const serverContactService = {
     
     // First get the total count
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-data-service.ts:62',message:'BEFORE count query',data:{teamFilterForCount:teamFilter,willApplyFilter:!!teamFilter},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,C'})}).catch(()=>{});
+    try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'server-data-service.ts:62',message:'BEFORE count query',data:{teamFilterForCount:teamFilter,willApplyFilter:!!teamFilter},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,C'})+'\n'); } catch(e) {}
     // #endregion
     let countQuery = supabase
       .from("contacts")
@@ -81,11 +82,11 @@ export const serverContactService = {
     if (teamFilter) {
       countQuery = countQuery.eq("team_id", teamFilter);
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-data-service.ts:69',message:'Applied team filter to COUNT query',data:{teamFilter:teamFilter},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+      try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'server-data-service.ts:69',message:'Applied team filter to COUNT query',data:{teamFilter:teamFilter},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})+'\n'); } catch(e) {}
       // #endregion
     } else {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-data-service.ts:72',message:'NO team filter applied to COUNT (all teams)',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+      try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'server-data-service.ts:72',message:'NO team filter applied to COUNT (all teams)',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})+'\n'); } catch(e) {}
       // #endregion
     }
     if (filters?.status) {
@@ -120,7 +121,7 @@ export const serverContactService = {
       const to = from + BATCH_SIZE - 1;
 
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-data-service.ts:106',message:'BEFORE batch query',data:{batchNum:i+1,teamFilterForBatch:teamFilter,willApplyFilter:!!teamFilter},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,C'})}).catch(()=>{});
+      try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'server-data-service.ts:106',message:'BEFORE batch query',data:{batchNum:i+1,teamFilterForBatch:teamFilter,willApplyFilter:!!teamFilter},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,C'})+'\n'); } catch(e) {}
       // #endregion
 
       let query = supabase
@@ -135,11 +136,11 @@ export const serverContactService = {
       if (teamFilter) {
         query = query.eq("team_id", teamFilter);
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-data-service.ts:118',message:'Applied team filter to BATCH query',data:{batchNum:i+1,teamFilter:teamFilter},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+        try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'server-data-service.ts:118',message:'Applied team filter to BATCH query',data:{batchNum:i+1,teamFilter:teamFilter},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})+'\n'); } catch(e) {}
         // #endregion
       } else {
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-data-service.ts:121',message:'NO team filter applied to BATCH (all teams)',data:{batchNum:i+1},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+        try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'server-data-service.ts:121',message:'NO team filter applied to BATCH (all teams)',data:{batchNum:i+1},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})+'\n'); } catch(e) {}
         // #endregion
       }
       if (filters?.status) {

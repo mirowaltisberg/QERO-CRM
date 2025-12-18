@@ -13,7 +13,8 @@ export default async function CallingPage({
   const teamId = typeof params.team === "string" ? params.team : undefined;
   
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calling/page.tsx:13',message:'URL params parsed',data:{rawParamsTeam:params.team,parsedTeamId:teamId,teamIdType:typeof teamId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+  const fs = require('fs');
+  try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'calling/page.tsx:13',message:'URL params parsed',data:{rawParamsTeam:params.team,parsedTeamId:teamId,teamIdType:typeof teamId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})+'\n'); } catch(e) {}
   // #endregion
   
   // Get current user's team ID for TeamFilter component
@@ -31,7 +32,7 @@ export default async function CallingPage({
   }
   
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calling/page.tsx:29',message:'Calling serverContactService.getAll',data:{teamIdParam:teamId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+  try { fs.appendFileSync('/Users/miro/Desktop/QERO_CRM/.cursor/debug.log', JSON.stringify({location:'calling/page.tsx:29',message:'Calling serverContactService.getAll',data:{teamIdParam:teamId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})+'\n'); } catch(e) {}
   // #endregion
   const contacts = await serverContactService.getAll({ teamId });
   return (
