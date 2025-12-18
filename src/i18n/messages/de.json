@@ -255,7 +255,10 @@
     "replace": "Ersetzen",
     "invalidFileType": "Ungültiger Dateityp. Bitte PDF oder DOCX verwenden.",
     "fileTooLarge": "Datei zu gross. Maximale Grösse ist 5 MB.",
-    "preview": "Vorschau"
+    "preview": "Vorschau",
+    "newCandidate": "Neuer Kandidat",
+    "createCandidate": "Kandidat erstellen",
+    "creating": "Erstellen..."
   },
   "contact": {
     "title": "Kontakt",

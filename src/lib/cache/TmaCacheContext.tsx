@@ -115,12 +115,18 @@ export function TmaCacheProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  // Add candidate to cache
+  // Add candidate to cache (with dedup to avoid duplicates from realtime)
   const addCandidate = useCallback((candidate: TmaCandidate) => {
-    setState((prev) => ({
-      ...prev,
-      candidates: [candidate, ...prev.candidates],
-    }));
+    setState((prev) => {
+      // Avoid duplicates - check if candidate already exists
+      if (prev.candidates.some((c) => c.id === candidate.id)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        candidates: [candidate, ...prev.candidates],
+      };
+    });
   }, []);
 
   // Get candidate by ID

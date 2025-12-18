@@ -8,6 +8,7 @@ import { TmaList } from "./TmaList";
 import { TmaDetail } from "./TmaDetail";
 import { TmaImporter } from "./TmaImporter";
 import { TmaLocationSearch } from "./TmaLocationSearch";
+import { TmaCreateModal } from "./TmaCreateModal";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 
@@ -74,8 +75,10 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
     updateLocationRadius,
     claimCandidate,
     unclaimCandidate,
+    createCandidate,
   } = useTmaCandidates({ initialCandidates, defaultTeamFilter: userTeamId });
   const [importOpen, setImportOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -107,6 +110,24 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
   const handleMobileBack = useCallback(() => {
     setMobileView("list");
   }, []);
+
+  // Create candidate handler - opens detail view on mobile after creation
+  const handleCreateCandidate = useCallback(
+    async (payload: {
+      first_name: string;
+      last_name: string;
+      email?: string | null;
+      phone?: string | null;
+      team_id?: string | null;
+    }) => {
+      await createCandidate(payload);
+      // On mobile, switch to detail view after creating
+      if (isMobile) {
+        setMobileView("detail");
+      }
+    },
+    [createCandidate, isMobile]
+  );
 
   // Handle URL-based selection (from command palette)
   useEffect(() => {
@@ -199,9 +220,16 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
                   <h1 className="text-lg font-semibold text-gray-900">TMA Kandidaten</h1>
                   <p className="text-xs text-gray-500">{allCandidates.length} total</p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setMenuOpen(!menuOpen)}>
-                  ⋯
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => setCreateOpen(true)}>
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setMenuOpen(!menuOpen)}>
+                    ⋯
+                  </Button>
+                </div>
               </div>
               {/* Mobile filter pills */}
               <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
@@ -433,6 +461,14 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
             }}
           />
         </Modal>
+
+        <TmaCreateModal
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreateCandidate={handleCreateCandidate}
+          teams={teams}
+          defaultTeamId={teamFilter || userTeamId}
+        />
       </>
     );
   }
@@ -575,6 +611,11 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
               </select>
             </label>
             {actionState.type && <span>{actionState.message}</span>}
+            <Button variant="ghost" size="sm" onClick={() => setCreateOpen(true)} title="New Candidate">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </Button>
             <Button variant="ghost" size="sm" onClick={refreshCandidates}>
               Refresh
             </Button>
@@ -671,6 +712,14 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
           }}
         />
       </Modal>
+
+      <TmaCreateModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreateCandidate={handleCreateCandidate}
+        teams={teams}
+        defaultTeamId={teamFilter || userTeamId}
+      />
     </div>
   );
 }

@@ -255,7 +255,10 @@
     "replace": "Replace",
     "invalidFileType": "Invalid file type. Please use PDF or DOCX.",
     "fileTooLarge": "File too large. Maximum size is 5 MB.",
-    "preview": "Preview"
+    "preview": "Preview",
+    "newCandidate": "New Candidate",
+    "createCandidate": "Create Candidate",
+    "creating": "Creating..."
   },
   "contact": {
     "title": "Contact",

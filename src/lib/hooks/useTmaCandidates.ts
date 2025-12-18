@@ -793,6 +793,51 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
     });
   }, [activeCandidate, updateCandidateLocally]);
 
+  // Create a new TMA candidate
+  const createCandidate = useCallback(
+    async (payload: {
+      first_name: string;
+      last_name: string;
+      email?: string | null;
+      phone?: string | null;
+      team_id?: string | null;
+    }) => {
+      setActionState({ type: "saving", message: "Creating candidate..." });
+      try {
+        const response = await fetch("/api/tma", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await response.json();
+        if (!response.ok) {
+          throw new Error(json.error || "Failed to create candidate");
+        }
+        const newCandidate = json.data as TmaCandidate;
+        
+        // Add to local state
+        setCandidates((prev) => [newCandidate, ...prev]);
+        
+        // Also add to global cache if available
+        if (cache) {
+          cache.addCandidate(newCandidate);
+        }
+        
+        // Select the new candidate
+        setActiveId(newCandidate.id);
+        
+        return newCandidate;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to create candidate";
+        setError(message);
+        throw err;
+      } finally {
+        setActionState({ type: null });
+      }
+    },
+    [cache]
+  );
+
   return {
     candidates: sortedCandidates,
     allCandidates: candidates,
@@ -807,6 +852,7 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
     searchQuery,
     selectCandidate,
     refreshCandidates,
+    createCandidate,
     toggleStatusTag,
     clearStatusTags,
     updateActivity,
