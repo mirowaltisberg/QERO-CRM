@@ -27,6 +27,17 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
   const searchParams = useSearchParams();
   const selectFromUrl = searchParams.get("select");
   
+  // #region agent log
+  useEffect(() => {
+    console.log('[DEBUG] CallingView rendered with:', {
+      contactCount: initialContacts.length,
+      initialTeamFilter,
+      currentUserTeamId,
+      timestamp: new Date().toISOString()
+    });
+  }, [initialContacts, initialTeamFilter, currentUserTeamId]);
+  // #endregion
+  
   // Fix encoding issues on initial contacts
   const fixedInitialContacts = useMemo(
     () => initialContacts.map(fixContactDisplay),
@@ -450,6 +461,9 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
 
   // Handle team filter change
   const handleTeamFilterChange = useCallback((teamId: string | "all") => {
+    // #region agent log
+    console.log('[DEBUG] Team filter change requested:', {teamId, currentUserTeamId, isAll: teamId === 'all'});
+    // #endregion
     // Update URL to trigger page re-render with new team filter
     const params = new URLSearchParams(searchParams.toString());
     if (teamId === currentUserTeamId) {
@@ -458,10 +472,14 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
     } else {
       params.set("team", teamId);
     }
-    router.push(`/calling?${params.toString()}`);
-    // Force server component to re-execute and fetch new data
-    router.refresh();
-  }, [router, searchParams, currentUserTeamId]);
+    const newUrl = `/calling?${params.toString()}`;
+    // #region agent log
+    console.log('[DEBUG] Navigating to:', newUrl);
+    console.log('[DEBUG] Using window.location.href for full page reload');
+    // #endregion
+    // Use window.location.href to force a full page reload with server-side rendering
+    window.location.href = newUrl;
+  }, [searchParams, currentUserTeamId]);
 
   useKeyboardShortcuts([
     {
