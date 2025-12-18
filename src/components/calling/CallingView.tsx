@@ -106,32 +106,48 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Restore candidate from localStorage on mount
+  // Restore candidate from localStorage on mount - fetch fresh data from API
   useEffect(() => {
     const stored = localStorage.getItem(CANDIDATE_STORAGE_KEY);
     if (stored) {
       try {
-        const candidate = JSON.parse(stored) as TmaCandidate;
-        // Restore the candidate and fetch sorted contacts
-        setSelectedCandidate(candidate);
+        const storedCandidate = JSON.parse(stored) as TmaCandidate;
+        const candidateId = storedCandidate.id;
         
-        if (candidate.latitude && candidate.longitude) {
-          setSortingLoading(true);
-          fetch(`/api/contacts/sorted-by-candidate?candidateId=${candidate.id}`)
-            .then((res) => res.json())
-            .then((json) => {
-              setSortedContacts(json.data || []);
-            })
-            .catch((err) => {
-              console.error("Error restoring sorted contacts:", err);
-            })
-            .finally(() => {
-              setSortingLoading(false);
-              setRestoringSession(false);
-            });
-        } else {
-          setRestoringSession(false);
-        }
+        // Fetch fresh candidate data from API to ensure we have latest info (e.g., short_profile_url)
+        fetch(`/api/tma/${candidateId}`)
+          .then((res) => res.json())
+          .then((json) => {
+            if (json.data) {
+              const freshCandidate = json.data as TmaCandidate;
+              setSelectedCandidate(freshCandidate);
+              // Update localStorage with fresh data
+              localStorage.setItem(CANDIDATE_STORAGE_KEY, JSON.stringify(freshCandidate));
+              
+              if (freshCandidate.latitude && freshCandidate.longitude) {
+                setSortingLoading(true);
+                return fetch(`/api/contacts/sorted-by-candidate?candidateId=${candidateId}`)
+                  .then((res) => res.json())
+                  .then((json) => {
+                    setSortedContacts(json.data || []);
+                  })
+                  .finally(() => {
+                    setSortingLoading(false);
+                  });
+              }
+            } else {
+              // Candidate not found - clear from storage
+              localStorage.removeItem(CANDIDATE_STORAGE_KEY);
+            }
+          })
+          .catch((err) => {
+            console.error("Error fetching candidate:", err);
+            // Fall back to stored data if fetch fails
+            setSelectedCandidate(storedCandidate);
+          })
+          .finally(() => {
+            setRestoringSession(false);
+          });
       } catch (err) {
         console.error("Error parsing stored candidate:", err);
         localStorage.removeItem(CANDIDATE_STORAGE_KEY);

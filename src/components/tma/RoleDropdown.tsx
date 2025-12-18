@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { TmaRole } from "@/lib/types";
 import { ROLE_COLOR_SWATCHES } from "@/lib/utils/constants";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,16 @@ export function RoleDropdown({
   const [newRoleColor, setNewRoleColor] = useState<string>(ROLE_COLOR_SWATCHES[0]);
   const [creatingRole, setCreatingRole] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const normalizedValue = (value ?? "").trim().toLowerCase();
   const selectedRole = useMemo(
@@ -44,13 +54,27 @@ export function RoleDropdown({
     [roles, normalizedValue]
   );
 
+  // Calculate dropdown position when opening
+  const updateDropdownPosition = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPos({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+      });
+    }
+  }, []);
+
   const handleDocumentClick = useCallback(
     (event: MouseEvent) => {
       if (!open) return;
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-        setShowCreateForm(false);
-      }
+      const target = event.target as Node;
+      // Check if click is inside button or dropdown
+      if (buttonRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
+      setShowCreateForm(false);
+      setSearchQuery("");
     },
     [open]
   );
@@ -60,9 +84,28 @@ export function RoleDropdown({
     return () => document.removeEventListener("mousedown", handleDocumentClick);
   }, [handleDocumentClick]);
 
+  // Update position when dropdown opens
+  useEffect(() => {
+    if (open) {
+      updateDropdownPosition();
+    }
+  }, [open, updateDropdownPosition]);
+
+  // Focus search input when dropdown opens and is positioned
+  useEffect(() => {
+    if (open && dropdownPos) {
+      // Delay to ensure portal is rendered
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [open, dropdownPos]);
+
   const clearSelection = useCallback(() => {
     onSelect(null);
     setOpen(false);
+    setSearchQuery("");
   }, [onSelect]);
 
   const handleCreateRole = useCallback(async () => {
@@ -74,6 +117,7 @@ export function RoleDropdown({
       setNewRoleName("");
       setShowCreateForm(false);
       setOpen(false);
+      setSearchQuery("");
     } catch (error) {
       // Error already surfaced via hook-level setError
     } finally {
@@ -86,9 +130,19 @@ export function RoleDropdown({
     [roles]
   );
 
+  // Filter roles based on search query
+  const filteredRoles = useMemo(() => {
+    if (!searchQuery.trim()) return roleList;
+    const query = searchQuery.toLowerCase().trim();
+    return roleList.filter((role) => role.name.toLowerCase().includes(query));
+  }, [roleList, searchQuery]);
+
+  const portalRoot = mounted ? document.body : null;
+
   return (
-    <div className="relative" ref={containerRef}>
+    <div className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
@@ -123,19 +177,39 @@ export function RoleDropdown({
         </svg>
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
-          <div className="max-h-72 overflow-y-auto">
+      {open && portalRoot && dropdownPos && createPortal(
+        <div 
+          ref={dropdownRef}
+          className="fixed z-[9999] min-w-[220px] rounded-xl border border-gray-200 bg-white shadow-lg"
+          style={{ top: dropdownPos.top, left: dropdownPos.left }}
+        >
+          {/* Search input */}
+          <div className="px-3 pt-3 pb-2 border-b border-gray-100">
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rolle suchen..."
+              autoFocus
+              className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto">
             {roleList.length === 0 && !showCreateForm && (
               <p className="px-4 py-3 text-sm text-gray-500">No roles yet. Create one below.</p>
             )}
-            {roleList.map((role) => (
+            {filteredRoles.length === 0 && roleList.length > 0 && (
+              <p className="px-4 py-3 text-sm text-gray-500">Keine Rollen gefunden</p>
+            )}
+            {filteredRoles.map((role) => (
               <button
                 key={role.id}
                 type="button"
                 onClick={() => {
                   onSelect(role.name);
                   setOpen(false);
+                  setSearchQuery("");
                 }}
                 className={cn(
                   "flex w-full items-center gap-3 px-4 py-2 text-left text-sm hover:bg-gray-50",
@@ -143,12 +217,12 @@ export function RoleDropdown({
                 )}
               >
                 <span
-                  className="h-2.5 w-2.5 rounded-full"
+                  className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                   style={{ backgroundColor: role.color }}
                 />
-                <span className="flex-1 text-gray-900">{role.name}</span>
+                <span className="flex-1 text-gray-900 whitespace-nowrap">{role.name}</span>
                 {role.note && (
-                  <span className="text-xs text-gray-500 truncate max-w-[40%]">{role.note}</span>
+                  <span className="text-xs text-gray-500 truncate max-w-[80px]">{role.note}</span>
                 )}
               </button>
             ))}
@@ -212,7 +286,8 @@ export function RoleDropdown({
               </Button>
             </div>
           )}
-        </div>
+        </div>,
+        portalRoot
       )}
 
       <RoleManagerModal

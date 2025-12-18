@@ -532,5 +532,20 @@
     "calculateDriving": "Calculate drive time",
     "calculateTransit": "Calculate transit time",
     "missingCoordinates": "Coordinates missing"
+  },
+  "candidateMatch": {
+    "title": "Find Candidates",
+    "role": "Role",
+    "selectRole": "Enter or select a role...",
+    "method": "Method",
+    "points": "Points",
+    "ai": "AI",
+    "search": "Search",
+    "searching": "Searching...",
+    "selectRoleToSearch": "Select a role to find matching candidates",
+    "noResults": "No matching candidates found",
+    "candidatesFound": "candidates found",
+    "noProfile": "No short profile",
+    "pointsLabel": "Points"
   }
 }

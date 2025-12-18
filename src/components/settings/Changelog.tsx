@@ -14,6 +14,18 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.50.0",
+    date: "2025-12-18",
+    type: "minor",
+    changes: [
+      "Calling: Quick candidate finder - search by TMA role to find matching candidates",
+      "Candidates sorted by distance to the active contact",
+      "Points-based scoring with breakdown (role match, quality, experience, docs)",
+      "Optional AI scoring mode for smarter matching",
+      "Click to open candidate Kurzprofil PDF preview",
+    ],
+  },
+  {
     version: "1.37.0",
     date: "2025-12-15",
     type: "minor",

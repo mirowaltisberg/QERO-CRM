@@ -64,13 +64,14 @@ export function TmaCreateModal({
 
     setCreating(true);
     try {
-      await onCreateCandidate({
+      const payload = {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         email: email.trim() || null,
         phone: phone.trim() || null,
-        team_id: teamId || null, // Ensure empty string becomes null
-      });
+        team_id: teamId || null,
+      };
+      await onCreateCandidate(payload);
       handleClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create candidate");

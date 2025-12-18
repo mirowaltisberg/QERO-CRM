@@ -14,6 +14,7 @@ import { TableToolbar } from "./TableToolbar";
 import { CantonTag } from "@/components/ui/CantonTag";
 import { cn } from "@/lib/utils/cn";
 import { ContactsImporter } from "./ContactsImporter";
+import { CleanupModal } from "./CleanupModal";
 
 interface ContactsTableProps {
   initialContacts: Contact[];
@@ -161,34 +162,24 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
   const handleBulkDelete = useCallback(() => runBulkAction({ type: "delete" }), [runBulkAction]);
   const handleCloseBulkModal = useCallback(() => setBulkModal(null), []);
 
-  // Fix encoding state and handler
-  const [fixingEncoding, setFixingEncoding] = useState(false);
-  const handleFixEncoding = useCallback(async () => {
-    if (fixingEncoding) return;
-    
-    const confirmed = window.confirm(
-      "This will fix ä, ö, ü encoding issues in all company names, contact names, streets, and cities.\n\nContinue?"
-    );
-    if (!confirmed) return;
+  // Cleanup modal state
+  const [cleanupModal, setCleanupModal] = useState<"encoding" | "dedupe" | null>(null);
 
-    setFixingEncoding(true);
-    try {
-      const res = await fetch("/api/contacts/fix-encoding", { method: "POST" });
-      const data = await res.json();
-      
-      if (res.ok) {
-        alert(`✅ Fixed encoding in ${data.fixed} of ${data.total} contacts.`);
-        router.refresh();
-      } else {
-        alert(`❌ Error: ${data.error}`);
-      }
-    } catch (err) {
-      alert("❌ Failed to fix encoding. Please try again.");
-      console.error(err);
-    } finally {
-      setFixingEncoding(false);
-    }
-  }, [fixingEncoding, router]);
+  const handleFixEncoding = useCallback(() => {
+    setCleanupModal("encoding");
+  }, []);
+
+  const handleMergeDuplicates = useCallback(() => {
+    setCleanupModal("dedupe");
+  }, []);
+
+  const handleCleanupComplete = useCallback(() => {
+    router.refresh();
+  }, [router]);
+
+  const handleCloseCleanupModal = useCallback(() => {
+    setCleanupModal(null);
+  }, []);
 
   return (
     <section 
@@ -205,7 +196,9 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
           onOpenBulkList={handleOpenBulkList}
           onBulkDelete={handleBulkDelete}
           onFixEncoding={handleFixEncoding}
-          fixingEncoding={fixingEncoding}
+          fixingEncoding={cleanupModal === "encoding"}
+          onMergeDuplicates={handleMergeDuplicates}
+          mergingDuplicates={cleanupModal === "dedupe"}
           groupByCanton={groupByCanton}
           onToggleGroupByCanton={toggleGroupByCanton}
           availableCantons={availableCantons}
@@ -384,6 +377,14 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {cleanupModal && (
+        <CleanupModal
+          type={cleanupModal}
+          onClose={handleCloseCleanupModal}
+          onComplete={handleCleanupComplete}
+        />
       )}
     </section>
   );

@@ -528,5 +528,20 @@
     "calculateDriving": "Fahrzeit berechnen",
     "calculateTransit": "ÖV-Zeit berechnen",
     "missingCoordinates": "Koordinaten fehlen"
+  },
+  "candidateMatch": {
+    "title": "Kandidaten finden",
+    "role": "Rolle",
+    "selectRole": "Rolle eingeben oder auswählen...",
+    "method": "Methode",
+    "points": "Punkte",
+    "ai": "AI",
+    "search": "Suchen",
+    "searching": "Suche...",
+    "selectRoleToSearch": "Wähle eine Rolle um passende Kandidaten zu finden",
+    "noResults": "Keine passenden Kandidaten gefunden",
+    "candidatesFound": "Kandidaten gefunden",
+    "noProfile": "Kein Kurzprofil",
+    "pointsLabel": "Punkte"
   }
 }

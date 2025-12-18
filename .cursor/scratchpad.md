@@ -463,6 +463,7 @@ Redesign the Calling page to feel like an Apple-native app with:
 - **Realtime can cause race conditions** - When updating data, realtime subscription might fire and overwrite local state. Use a skip mechanism to ignore realtime updates for recently-modified records.
 - **ALWAYS update version number** on every deploy (format: v1.XX.X - major.middle.small)
 - If `npm test` fails with an esbuild platform/binary mismatch, running `npm rebuild esbuild` can fix it without reinstalling everything.
+- **Zod's `.uuid()` uses strict RFC 4122 validation** - It rejects UUIDs that don't have valid version (1-5) and variant (8,9,a,b) bits. Use a lenient regex pattern `/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/` if your database uses non-RFC-4122 compliant UUIDs.
 
 ---
 

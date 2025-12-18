@@ -17,6 +17,7 @@ import { TravelTimeWidget } from "./TravelTimeWidget";
 type EmailSentState = { status: "success" | "warning" | "error"; message: string };
 import { VacancyQuickView } from "./VacancyQuickView";
 import { CandidatePickerModal } from "./CandidatePickerModal";
+import { CandidateMatchModal } from "./CandidateMatchModal";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import type { Contact, Vacancy, TmaCandidate, ContactPerson } from "@/lib/types";
 import type { ContactStatus } from "@/lib/utils/constants";
@@ -142,6 +143,7 @@ export const ContactDetail = memo(function ContactDetail({
   const [editableSubject, setEditableSubject] = useState("");
   const [editableBody, setEditableBody] = useState("");
   const [showCandidatePicker, setShowCandidatePicker] = useState(false);
+  const [showCandidateMatch, setShowCandidateMatch] = useState(false);
   const [generatingAi, setGeneratingAi] = useState<"standard" | "best" | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [activeDraftType, setActiveDraftType] = useState<"standard" | "best">("standard");
@@ -812,6 +814,18 @@ export const ContactDetail = memo(function ContactDetail({
                   </svg>
                   {loadingPreview ? "Laden..." : "E-Mail"}
                 </Button>
+                <Button 
+                  onClick={() => setShowCandidateMatch(true)} 
+                  variant="secondary"
+                  size="md"
+                  className="shadow-sm"
+                  title="Alternative Kandidaten finden"
+                >
+                  <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                  </svg>
+                  Kandidaten
+                </Button>
               </div>
             </div>
           </div>
@@ -1202,6 +1216,13 @@ export const ContactDetail = memo(function ContactDetail({
           open={showCandidatePicker}
           onClose={() => setShowCandidatePicker(false)}
           onSelect={handleAddCandidate}
+        />
+
+        {/* Candidate Match Modal for finding alternative candidates */}
+        <CandidateMatchModal
+          open={showCandidateMatch}
+          onClose={() => setShowCandidateMatch(false)}
+          contact={contact}
         />
 
         {/* Vacancy Quick View Popup */}

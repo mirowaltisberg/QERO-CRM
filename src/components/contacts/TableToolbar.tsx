@@ -19,6 +19,8 @@ interface TableToolbarProps {
   onBulkDelete: () => void;
   onFixEncoding: () => void;
   fixingEncoding?: boolean;
+  onMergeDuplicates: () => void;
+  mergingDuplicates?: boolean;
   groupByCanton: boolean;
   onToggleGroupByCanton: () => void;
   availableCantons?: string[];
@@ -34,6 +36,8 @@ export function TableToolbar({
   onBulkDelete,
   onFixEncoding,
   fixingEncoding = false,
+  onMergeDuplicates,
+  mergingDuplicates = false,
   groupByCanton,
   onToggleGroupByCanton,
   availableCantons = [],
@@ -114,10 +118,19 @@ export function TableToolbar({
           variant="ghost"
           size="sm"
           onClick={onFixEncoding}
-          disabled={fixingEncoding}
-          title="Fix ä, ö, ü encoding issues"
+          disabled={fixingEncoding || mergingDuplicates}
+          title="Fix ä, ö, ü encoding issues (Admin only)"
         >
-          {fixingEncoding ? "Fixing..." : "🔧 Fix Encoding"}
+          {fixingEncoding ? "Scanning..." : "🔧 Fix Encoding"}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onMergeDuplicates}
+          disabled={mergingDuplicates || fixingEncoding}
+          title="Merge duplicate companies (Admin only)"
+        >
+          {mergingDuplicates ? "Scanning..." : "🔗 Merge Duplicates"}
         </Button>
         <Button
           variant="secondary"

@@ -30,6 +30,10 @@ const statusSchema = z.enum(CONTACT_STATUS_LIST, {
   message: 'Invalid contact status',
 });
 
+// Lenient UUID pattern - accepts any 8-4-4-4-12 hex format (not strict RFC 4122)
+const uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const uuidSchema = z.string().regex(uuidPattern, "Invalid UUID").optional().nullable();
+
 const baseContactSchema = z.object({
   company_name: z.string().trim().min(1, 'Company name is required'),
   contact_name: z.string().trim().min(1, 'Contact name is required'),
@@ -45,7 +49,7 @@ const baseContactSchema = z.object({
   follow_up_at: z.string().datetime().optional().nullable(),
   follow_up_note: optionalTextSchema,
   notes: optionalTextSchema,
-  team_id: z.string().uuid().optional().nullable(),
+  team_id: uuidSchema,
 });
 
 export const ContactCreateSchema = baseContactSchema.extend({
@@ -114,7 +118,7 @@ const tmaBaseSchema = z.object({
   ahv_url: z.string().url().optional().nullable(),
   id_url: z.string().url().optional().nullable(),
   bank_url: z.string().url().optional().nullable(),
-  team_id: z.string().uuid().optional().nullable(),
+  team_id: uuidSchema,
   driving_license: z.enum(DRIVING_LICENSE_VALUES).optional().nullable(),
   experience_level: z.enum(EXPERIENCE_LEVEL_VALUES).optional().nullable(),
   status_tags: z
@@ -146,8 +150,8 @@ export const TmaCreateSchema = tmaBaseSchema.extend({
 export const TmaUpdateSchema = tmaBaseSchema.extend({
   status: z.enum(TMA_STATUS_LIST).nullable().optional(),
   activity: z.enum(TMA_ACTIVITY_LIST).nullable().optional(),
-  claimed_by: z.string().uuid().nullable().optional(),
-  address_updated_by: z.string().uuid().nullable().optional(),
+  claimed_by: uuidSchema,
+  address_updated_by: uuidSchema,
   address_updated_at: z.string().datetime().nullable().optional(),
 })
   .partial()

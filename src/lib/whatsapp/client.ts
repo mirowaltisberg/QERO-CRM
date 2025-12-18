@@ -369,3 +369,5 @@ export function isWithinMessageWindow(lastCustomerMessageAt: Date | null): boole
   return now.getTime() - lastCustomerMessageAt.getTime() < windowMs;
 }
 
+
+
