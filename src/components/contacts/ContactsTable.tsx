@@ -106,8 +106,10 @@ export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamF
     } else {
       params.set("team", teamId);
     }
-    router.push(`/contacts?${params.toString()}`);
-  }, [router, searchParams, currentUserTeamId]);
+    const newUrl = `/contacts?${params.toString()}`;
+    // Use window.location.href to force a full page reload with server-side rendering
+    window.location.href = newUrl;
+  }, [searchParams, currentUserTeamId]);
   
   // Fix encoding issues on initial contacts
   const fixedInitialContacts = useMemo(
