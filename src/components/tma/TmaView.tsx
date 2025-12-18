@@ -298,6 +298,16 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
                     </option>
                   ))}
                 </select>
+                <select
+                  className="shrink-0 rounded-full border-0 bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600"
+                  value={experienceFilter ?? ""}
+                  onChange={(e) => setExperienceFilter(e.target.value ? (e.target.value as ExperienceLevel) : null)}
+                >
+                  <option value="">Alle Erfahrung</option>
+                  <option value="less_than_1">{"< 1 Jahr"}</option>
+                  <option value="more_than_1">{"> 1 Jahr"}</option>
+                  <option value="more_than_3">{"> 3 Jahre"}</option>
+                </select>
               </div>
             </header>
             
