@@ -19,6 +19,15 @@ const ENCODING_FIXES: [string, string][] = [
   ["\u00C3\u201E", "\u00C4"], // Ã„ → Ä
   ["\u00C3\u2013", "\u00D6"], // Ã– → Ö
   ["\u00C3\u0153", "\u00DC"], // Ãœ → Ü
+  
+  // Additional patterns for double/mixed encoding
+  ["Ã¤", "ä"], // Plain text form
+  ["Ã¶", "ö"],
+  ["Ã¼", "ü"],
+  ["ÃŸ", "ß"],
+  ["Ã„", "Ä"],
+  ["Ã–", "Ö"],
+  ["Ãœ", "Ü"],
 
   // ========== Lowercase accented vowels ==========
   ["\u00C3\u00A1", "\u00E1"], // Ã¡ → á
