@@ -247,6 +247,7 @@ export interface ContactFilters {
   list_id?: string;
   page?: number;
   pageSize?: number;
+  teamId?: string | "all" | null; // Filter by team: specific UUID, "all", or null (default to user's team)
 }
 
 export interface TmaFilters {

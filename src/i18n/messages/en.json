@@ -288,7 +288,12 @@
     "importDescription": "Import CSV file with contact data",
     "fixEncoding": "🔧 Fix Encoding",
     "selectContact": "Select a contact to view details",
-    "address": "Address"
+    "address": "Address",
+    "teamFilter": {
+      "label": "Team",
+      "myTeam": "My Team",
+      "allTeams": "All Teams"
+    }
   },
   "calling": {
     "title": "Calling",
@@ -520,6 +525,12 @@
     "callForCandidate": "Call for a specific candidate?",
     "callForCandidateHint": "Companies will be sorted by distance",
     "companies": "companies"
+  },
+  "cleanup": {
+    "allTeamsCheckbox": "Apply to all teams",
+    "allTeamsWarning": "This will affect {count} companies across {teamCount} teams",
+    "applyingToAllTeams": "Applying to all teams",
+    "applyingToMyTeam": "Applying to my team only"
   },
   "travelTime": {
     "title": "Travel Time",

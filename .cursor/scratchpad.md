@@ -1133,3 +1133,521 @@ ALTER TABLE tma_candidates
 ADD COLUMN IF NOT EXISTS address_updated_by UUID REFERENCES profiles(id),
 ADD COLUMN IF NOT EXISTS address_updated_at TIMESTAMPTZ;
 ```
+
+---
+
+# Task 34: Cross-Team Company Access with Team Filter (PLANNING)
+
+## Background and Motivation
+
+User wants to make companies (contacts/Firmen) available across all teams, not just restricted to one team:
+
+1. **Every member in EVERY team can see ALL companies** - break the current team isolation
+2. **Default filter: show user's team** - don't overwhelm users, show their team by default
+3. **Option to view ALL companies** - toggle/filter to expand beyond team boundary
+4. **Admin features work across all teams** - encoding fix and duplicate merge should work on ALL companies when executed by admins
+
+## Current Architecture
+
+### Team Isolation Model (Current State)
+- **Database**: `contacts` table has `team_id` column (FK to `teams`)
+- **RLS Policies**: Row-Level Security restricts users to only see contacts where `team_id` matches their profile's `team_id`
+  ```sql
+  -- From 001_teams.sql
+  CREATE POLICY "Team members can view team contacts" ON contacts
+    FOR SELECT USING (
+      team_id IS NULL OR team_id = (SELECT team_id FROM profiles WHERE id = auth.uid())
+    );
+  ```
+- **API Routes**: Server services respect RLS automatically (no explicit team filtering in code)
+- **UI Components**: No team selector/filter exists - users only see their own team's data
+
+### Admin Operations (Current State)
+- **Authorization**: Only specific emails can run cleanup operations (`cleanup-auth.ts`)
+  - Hardcoded: `shtanaj@qero.ch`, `m.waltisberg@qero.ch`
+- **Encoding Fix** (`/api/contacts/fix-encoding`): Currently scoped to user's team
+  ```typescript
+  // Lines 50-102 in fix-encoding/route.ts
+  const { data: profile } = await supabase.from("profiles").select("team_id").eq("id", user.id).single();
+  const teamId = profile?.team_id;
+  const result = await scanForEncodingIssues(adminClient, teamId, true);
+  ```
+- **Duplicate Merge** (`/api/contacts/dedupe`): Currently scoped to user's team
+  ```typescript
+  // Lines 74-90 in dedupe/route.ts
+  const teamId = profile?.team_id;
+  let query = supabase.from("contacts").select("...");
+  if (teamId) {
+    query = query.eq("team_id", teamId);
+  }
+  ```
+
+## Key Challenges and Analysis
+
+### 1. RLS Policy Redesign
+**Current**: Users can only SELECT contacts where `team_id = their_team_id`  
+**Required**: Users can SELECT all contacts, but we need application-level filtering for good UX
+
+**Options**:
+- **Option A**: Drop team restriction from RLS SELECT policy entirely → all users see all contacts at DB level
+  - ✅ Simple, no RLS complexity
+  - ✅ Allows cross-team queries
+  - ⚠️ Need to ensure INSERT/UPDATE/DELETE still respect teams (prevent cross-team modifications)
+  
+- **Option B**: Keep RLS, use admin client for cross-team reads
+  - ❌ Complex, need admin client in many places
+  - ❌ Breaks server-side caching patterns
+
+**→ Recommendation: Option A** - Relax SELECT policy, keep write restrictions
+
+### 2. Application-Level Team Filtering
+**Challenge**: Don't break existing UX - users should still see "their" contacts by default
+
+**Implementation**:
+- Add `?team_id=<uuid>` query param to `/api/contacts` (optional)
+- Add `?team_id=all` to fetch all teams
+- Default (no param): filter to user's `team_id`
+- Server service accepts optional `teamId` filter parameter
+
+### 3. UI Team Selector
+**Required UI Changes**:
+- **Calling Page**: Add team filter dropdown in toolbar/header
+  - Options: "Mein Team" (default), "Alle Teams", plus individual team names
+- **Contacts Page**: Same team filter dropdown
+- **Merge/Encoding Modals**: Add "Apply to all teams" checkbox (admin-only)
+
+**State Management**:
+- Use URL search params (`?team=elektro` or `?team=all`) for persistence
+- Update `useContacts` hook to accept/pass team filter
+- Update server data service to accept team filter
+
+### 4. Admin Operations Across All Teams
+**Current Problem**: Admin operations are team-scoped (only fix/merge within admin's team)
+
+**Solution**:
+- Add `?all_teams=true` query param to admin endpoints
+- Check `isCleanupAllowed(user.email)` → if true, allow `all_teams` param
+- When `all_teams=true`, pass `teamId = null` to processing functions
+- Processing functions already handle `teamId = null` as "fetch all" (see dedupe/route.ts line 88-90)
+
+### 5. Team Display in UI
+**Enhancement**: Show which team each contact belongs to
+- Add team badge/color indicator in contact list
+- Already have `team` join in types (lines 52-57 of types.ts)
+- Display team name/color next to company name
+
+## High-level Task Breakdown
+
+### 34.1 Database Migration: Relax RLS SELECT Policy ✅ PLANNED
+**Change**: Update RLS policy to allow all authenticated users to SELECT contacts regardless of team
+```sql
+-- Drop existing restrictive SELECT policy
+DROP POLICY IF EXISTS "Team members can view team contacts" ON contacts;
+
+-- Create new permissive SELECT policy (anyone authenticated can read)
+CREATE POLICY "Authenticated users can view all contacts" ON contacts
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+-- Keep INSERT/UPDATE/DELETE team-restricted (prevent cross-team modifications)
+-- (existing policies are fine)
+```
+
+**Success criteria**:
+- Any authenticated user can SELECT contacts from any team
+- INSERT/UPDATE/DELETE still restricted to user's own team
+- No errors on existing queries
+
+### 34.2 Update Server Data Service: Add Team Filter Parameter
+**Files**: `src/lib/data/server-data-service.ts`, `src/lib/data/data-service.ts` (client-side)
+
+**Change**:
+- Add optional `teamId?: string | "all" | null` to `ContactFilters` type
+- Update `serverContactService.getAll()`:
+  ```typescript
+  async getAll(filters?: ContactFilters): Promise<Contact[]> {
+    // ... existing code ...
+    
+    // Team filtering logic
+    if (filters?.teamId && filters.teamId !== "all") {
+      query = query.eq("team_id", filters.teamId);
+    } else if (!filters?.teamId) {
+      // Default: filter to current user's team
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("team_id").eq("id", user.id).single();
+        if (profile?.team_id) {
+          query = query.eq("team_id", profile.team_id);
+        }
+      }
+    }
+    // If filters.teamId === "all", no team filter applied
+  }
+  ```
+
+**Success criteria**:
+- Default behavior (no `teamId` param): returns user's team contacts
+- `teamId: "all"`: returns all contacts across all teams
+- `teamId: "<uuid>"`: returns specific team's contacts
+- All existing code continues to work (default filter preserves current behavior)
+
+### 34.3 Update API Routes: Accept Team Filter
+**Files**: `src/app/api/contacts/route.ts`
+
+**Change**:
+- Update `buildFilters()` to parse `team` or `team_id` from query params
+- Pass through to server service
+```typescript
+function buildFilters(request: NextRequest) {
+  const params = request.nextUrl.searchParams;
+  const raw = {
+    // ... existing filters ...
+    teamId: params.get('team_id') || params.get('team') || undefined,
+  };
+  return ContactFilterSchema.safeParse(raw);
+}
+```
+
+**Success criteria**:
+- `/api/contacts` returns user's team by default
+- `/api/contacts?team_id=all` returns all teams
+- `/api/contacts?team_id=<uuid>` returns specific team
+
+### 34.4 Update Types and Validation
+**Files**: `src/lib/types.ts`, `src/lib/validation/schemas.ts`
+
+**Change**:
+- Add `teamId?: string | null` to `ContactFilters` interface
+- Update `ContactFilterSchema` to accept and validate team filter
+
+**Success criteria**:
+- TypeScript accepts new filter parameter
+- Zod validation passes for valid team UUIDs and "all"
+
+### 34.5 Create TeamFilter Component
+**Files**: `src/components/contacts/TeamFilter.tsx` (new)
+
+**Change**: Create dropdown component
+```tsx
+interface Props {
+  value: string | "all";
+  onChange: (teamId: string | "all") => void;
+  teams: Team[];
+  currentUserTeamId: string | null;
+}
+```
+- Shows: "Mein Team (Elektro)" (default), "Alle Teams", individual team options
+- Uses Radix Select for consistent UI
+- Syncs with URL search params
+
+**Success criteria**:
+- Dropdown renders with team options
+- Selecting "Alle Teams" passes "all" to onChange
+- Selecting a specific team passes that team UUID
+- Default shows current user's team
+
+### 34.6 Integrate TeamFilter in Calling Page
+**Files**: `src/components/calling/CallingView.tsx`
+
+**Change**:
+- Add team filter state (read from URL, default to user's team)
+- Add `<TeamFilter>` to toolbar/header
+- Pass team filter to `useContacts` hook
+- Update URL when filter changes
+
+**Success criteria**:
+- Team filter dropdown appears in Calling page
+- Changing filter refreshes contact list
+- URL updates with `?team=all` or `?team=<uuid>`
+- Persists across navigation/refresh
+
+### 34.7 Integrate TeamFilter in Contacts Page
+**Files**: `src/components/contacts/ContactsTable.tsx` or parent page
+
+**Change**: Same as Calling page integration
+
+**Success criteria**:
+- Team filter works on Contacts page
+- Consistent behavior with Calling page
+
+### 34.8 Update Cleanup/Admin Operations: Support All Teams
+**Files**: 
+- `src/app/api/contacts/fix-encoding/route.ts`
+- `src/app/api/contacts/dedupe/route.ts`
+
+**Change**:
+- Accept `?all_teams=true` query param (or similar)
+- Only allow if `isCleanupAllowed(user.email) === true`
+- Pass `teamId = null` to processing functions when `all_teams=true`
+
+```typescript
+// In fix-encoding/route.ts
+export async function POST(request: NextRequest) {
+  // ... auth checks ...
+  if (!isCleanupAllowed(user.email)) {
+    return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  }
+
+  const allTeams = request.nextUrl.searchParams.get('all_teams') === 'true';
+  
+  const { data: profile } = await supabase.from("profiles").select("team_id").eq("id", user.id).single();
+  const teamId = allTeams ? null : profile?.team_id; // null = all teams
+
+  const result = await scanForEncodingIssues(adminClient, teamId, true);
+  // ...
+}
+```
+
+**Success criteria**:
+- Admins can run encoding fix on all teams via `POST /api/contacts/fix-encoding?all_teams=true`
+- Admins can run dedupe on all teams via `POST /api/contacts/dedupe?all_teams=true`
+- Non-admins attempting `all_teams=true` get 403 Forbidden
+- Default behavior (no param): operates on user's team only
+
+### 34.9 Update Cleanup Modals: Add "All Teams" Checkbox
+**Files**: `src/components/contacts/CleanupModal.tsx` (or wherever these modals live)
+
+**Change**:
+- Add checkbox: "Apply to all teams" (only show if `isCleanupAllowed`)
+- Pass `all_teams` query param when checked
+- Show warning: "This will affect X companies across Y teams"
+
+**Success criteria**:
+- Admins see "All Teams" checkbox
+- Non-admins don't see it
+- Selecting checkbox updates preview counts
+- Apply operation uses `all_teams=true` param
+
+### 34.10 Display Team Badges in Contact Lists
+**Files**: 
+- `src/components/calling/ContactList.tsx`
+- `src/components/contacts/ContactsTable.tsx`
+
+**Change**:
+- Show team badge/color next to company name
+- Use existing `contact.team` join data
+- Small colored dot or pill with team name
+
+**Success criteria**:
+- Each contact shows its team affiliation
+- Color matches team color from database
+- Visible but not intrusive
+- Works when viewing "All Teams"
+
+### 34.11 Update Personal Settings Join
+**Files**: `src/lib/data/server-data-service.ts`
+
+**Note**: Personal settings (`user_contact_settings`) are user-specific, not team-specific  
+**Verification Needed**: Ensure personal settings queries still work when viewing contacts from other teams
+
+**Success criteria**:
+- User can set status on contacts from any team
+- Personal settings remain user-specific (not leaked to other users)
+- RLS on `user_contact_settings` remains intact
+
+### 34.12 i18n Translations
+**Files**: `src/messages/en.json`, `src/messages/de.json`
+
+**Change**: Add keys
+```json
+{
+  "contacts.teamFilter.myTeam": "Mein Team",
+  "contacts.teamFilter.allTeams": "Alle Teams",
+  "contacts.teamFilter.label": "Team",
+  "cleanup.allTeamsCheckbox": "Auf alle Teams anwenden",
+  "cleanup.allTeamsWarning": "Dies betrifft {count} Firmen in {teamCount} Teams"
+}
+```
+
+**Success criteria**:
+- German and English translations exist
+- No hardcoded strings in components
+
+### 34.13 Version Bump and Deploy
+**Files**: `src/components/layout/Sidebar.tsx` (version display)
+
+**Change**:
+- Bump version to v1.47.0 (or next appropriate version)
+- Add changelog entry
+
+**Success criteria**:
+- Version updated before deploy
+- Build passes
+- Deploys successfully
+
+## Technical Implementation Notes
+
+### RLS Policy Changes (Critical)
+Current policy:
+```sql
+CREATE POLICY "Team members can view team contacts" ON contacts
+  FOR SELECT USING (
+    team_id IS NULL OR team_id = (SELECT team_id FROM profiles WHERE id = auth.uid())
+  );
+```
+
+New policy:
+```sql
+CREATE POLICY "Authenticated users can view all contacts" ON contacts
+  FOR SELECT USING (auth.role() = 'authenticated');
+```
+
+**IMPORTANT**: Keep existing UPDATE/DELETE policies unchanged to prevent cross-team modifications
+
+### API Response Shape (no change needed)
+Contacts already include team info via join:
+```typescript
+{
+  id: "...",
+  company_name: "...",
+  team_id: "...",
+  team: {
+    id: "...",
+    name: "Elektro",
+    color: "#3B82F6"
+  }
+}
+```
+
+### Default Filter Behavior
+**Key Principle**: Preserve existing UX by default
+- If user doesn't specify `team` param → show only their team
+- Explicit opt-in to view "all teams" or switch teams
+- URL state drives the filter (enables bookmarking/sharing)
+
+### Admin Authorization Check
+```typescript
+import { isCleanupAllowed } from "@/lib/utils/cleanup-auth";
+
+// In admin endpoints:
+if (!isCleanupAllowed(user.email)) {
+  return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+}
+
+const allTeams = request.nextUrl.searchParams.get('all_teams') === 'true';
+if (allTeams && !isCleanupAllowed(user.email)) {
+  return NextResponse.json({ error: "Cannot apply to all teams" }, { status: 403 });
+}
+```
+
+## Success Criteria (Overall)
+
+### For Regular Users
+- [ ] Can see their team's contacts by default (existing behavior preserved)
+- [ ] Can switch to "All Teams" view via dropdown
+- [ ] Can switch to a specific other team via dropdown
+- [ ] Can see which team each contact belongs to (badge/color)
+- [ ] Personal settings (status, follow-ups) work on any contact regardless of team
+- [ ] No access to admin operations
+
+### For Admins
+- [ ] All regular user features work
+- [ ] Can run encoding fix on all teams via checkbox/toggle
+- [ ] Can run duplicate merge on all teams via checkbox/toggle
+- [ ] See clear indication when operating on "all teams" vs "my team"
+- [ ] Cleanup operations log which teams were affected
+
+### Technical
+- [ ] RLS allows cross-team reads but restricts cross-team writes
+- [ ] Server services default to user's team (backward compatible)
+- [ ] API routes accept and respect team filter parameter
+- [ ] No N+1 query issues when joining team data
+- [ ] Personal settings RLS remains secure (user can only see their own)
+
+## Risks and Mitigations
+
+### Risk 1: Performance Impact
+**Concern**: Fetching all teams' contacts could be slow  
+**Mitigation**: 
+- Keep default filter to user's team (no change in typical usage)
+- Existing batching logic in server-data-service handles large datasets
+- Add indexes on `team_id` if not already present
+
+### Risk 2: Accidental Cross-Team Modifications
+**Concern**: User might try to edit a contact from another team  
+**Mitigation**:
+- RLS UPDATE/DELETE policies remain team-restricted
+- Database will reject cross-team updates automatically
+- Could add UI-level check (disable edit for other team's contacts) as enhancement
+
+### Risk 3: Admin Operations Too Powerful
+**Concern**: Admin accidentally runs dedupe/encoding on all teams  
+**Mitigation**:
+- Require explicit checkbox selection (not default)
+- Show preview with team breakdown before applying
+- Log all operations with team scope in `contact_cleanup_runs` table
+
+### Risk 4: Personal Settings Confusion
+**Concern**: User sets status on contact from Team A, then teammate on Team A doesn't see it  
+**Mitigation**:
+- This is expected behavior (personal settings are per-user)
+- No change from current system
+- Could add tooltip: "Status is personal - only you see it"
+
+## Project Status Board
+
+- [x] **34.1** Database migration: Relax RLS SELECT policy ✅
+- [x] **34.2** Update server data service: team filter parameter ✅
+- [x] **34.3** Update API routes: accept team filter ✅
+- [x] **34.4** Update types and validation schemas ✅
+- [x] **34.5** Create TeamFilter component ✅
+- [x] **34.6** Integrate TeamFilter in Calling page ✅
+- [x] **34.7** Integrate TeamFilter in Contacts page ✅
+- [x] **34.8** Update admin operations: support all teams ✅
+- [ ] **34.9** Update cleanup modals: add "all teams" checkbox (DEFERRED - can be added later)
+- [ ] **34.10** Display team badges in contact lists (DEFERRED - can be added later)
+- [ ] **34.11** Verify personal settings work cross-team (NEEDS TESTING)
+- [x] **34.12** Add i18n translations ✅
+- [x] **34.13** Version bump to v1.53.0 ✅
+
+## Executor Notes (Dec 18, 2025)
+**✅ CORE IMPLEMENTATION COMPLETE**
+
+**What was implemented:**
+1. ✅ Database migration to allow cross-team reads (RLS policy updated)
+2. ✅ Server data service with team filtering (default: user's team, "all": all teams, UUID: specific team)
+3. ✅ API routes accept team_id/team query params
+4. ✅ Admin operations (fix-encoding, dedupe) support ?all_teams=true for admins
+5. ✅ TeamFilter component with dropdown UI
+6. ✅ /api/teams endpoint to fetch teams
+7. ✅ Calling page integrated with TeamFilter
+8. ✅ Contacts page integrated with TeamFilter
+9. ✅ i18n translations (German & English)
+10. ✅ Version bumped to v1.53.0
+11. ✅ Build passes successfully
+
+**How it works:**
+- By default, users see contacts from their own team
+- Team filter dropdown allows switching to "All Teams" or any specific team
+- URL params persist the selection (?team=all or ?team=<uuid>)
+- Page re-renders server-side with new team data
+- Personal settings (status, follow-ups) work across teams (user-specific, not team-specific)
+- Admins can apply encoding fix and dedupe to all teams via ?all_teams=true query param
+
+**Deferred (can be added incrementally):**
+- Task 34.9: Add "All Teams" checkbox in cleanup modals UI (backend already supports it)
+- Task 34.10: Display team color badges next to company names (data is already joined)
+
+**Ready for deployment** - Database migration needs to be applied first:
+```bash
+# Apply migration in Supabase dashboard or via CLI:
+supabase db push
+# Or run the SQL from: supabase/migrations/041_cross_team_contact_access.sql
+```
+
+**Testing checklist for user:**
+1. ✅ Build passes
+2. [ ] Apply database migration (041_cross_team_contact_access.sql)
+3. [ ] Test team filter dropdown in Calling page
+4. [ ] Test team filter dropdown in Contacts page
+5. [ ] Verify "All Teams" shows contacts from all teams
+6. [ ] Verify personal status/follow-ups work on cross-team contacts
+7. [ ] Test admin encoding fix with ?all_teams=true (admin only)
+8. [ ] Test admin dedupe with ?all_teams=true (admin only)
+
+## Executor's Feedback or Assistance Requests
+
+**Ready for Review**: This plan covers the full scope of making companies available across all teams with proper filtering and admin controls.
+
+**Questions for User**:
+1. Should regular users be able to **modify** contacts from other teams, or only view them? (Current plan: view-only for other teams)
+2. Team filter persistence: URL params (current plan) or localStorage? URL enables sharing/bookmarking.
+3. Should we add a "Recently Viewed Teams" list for quick switching?

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCleanupAllowed } from "@/lib/utils/cleanup-auth";
@@ -40,19 +40,19 @@ interface DedupeApplyResult extends DedupePreviewResult {
  * GET /api/contacts/dedupe
  * Alias for preview endpoint
  */
-export async function GET() {
-  return handlePreview();
+export async function GET(request: NextRequest) {
+  return handlePreview(request);
 }
 
 /**
  * POST /api/contacts/dedupe
  * Apply the dedupe merge
  */
-export async function POST() {
-  return handleApply();
+export async function POST(request: NextRequest) {
+  return handleApply(request);
 }
 
-async function handlePreview(): Promise<NextResponse> {
+async function handlePreview(request: NextRequest): Promise<NextResponse> {
   try {
     const supabase = await createClient();
     const {
@@ -71,16 +71,21 @@ async function handlePreview(): Promise<NextResponse> {
       );
     }
 
-    // Get user's team_id
+    // Check if all_teams mode is requested (admin-only)
+    const allTeams = request.nextUrl.searchParams.get('all_teams') === 'true';
+
+    // Get user's team_id (or null for all teams)
     const { data: profile } = await supabase
       .from("profiles")
       .select("team_id")
       .eq("id", user.id)
       .single();
 
-    const teamId = profile?.team_id;
+    const teamId = allTeams ? null : profile?.team_id;
 
-    // Fetch all contacts for the team
+    console.log(`[Dedupe Preview] User: ${user.email}, All teams: ${allTeams}, Team ID: ${teamId || 'ALL'}`);
+
+    // Fetch all contacts for the team(s)
     let query = supabase
       .from("contacts")
       .select("id, company_name, contact_name, phone, email, street, city, canton, postal_code, created_at, team_id");
@@ -109,14 +114,14 @@ async function handlePreview(): Promise<NextResponse> {
       })),
     };
 
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, allTeams });
   } catch (error) {
     console.error("[Dedupe Preview] Error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-async function handleApply(): Promise<NextResponse> {
+async function handleApply(request: NextRequest): Promise<NextResponse> {
   try {
     const supabase = await createClient();
     const {
@@ -135,18 +140,23 @@ async function handleApply(): Promise<NextResponse> {
       );
     }
 
-    // Get user's team_id
+    // Check if all_teams mode is requested (admin-only)
+    const allTeams = request.nextUrl.searchParams.get('all_teams') === 'true';
+
+    // Get user's team_id (or null for all teams)
     const { data: profile } = await supabase
       .from("profiles")
       .select("team_id")
       .eq("id", user.id)
       .single();
 
-    const teamId = profile?.team_id;
+    const teamId = allTeams ? null : profile?.team_id;
     const adminClient = createAdminClient();
     const runId = crypto.randomUUID();
 
-    // Fetch all contacts for the team
+    console.log(`[Dedupe Apply] User: ${user.email}, All teams: ${allTeams}, Team ID: ${teamId || 'ALL'}`);
+
+    // Fetch all contacts for the team(s)
     let query = adminClient
       .from("contacts")
       .select("id, company_name, contact_name, phone, email, street, city, canton, postal_code, created_at, team_id, latitude, longitude, notes");
@@ -204,6 +214,7 @@ async function handleApply(): Promise<NextResponse> {
         contactsDeleted: archived,
         merged,
         errors: errors.length,
+        allTeams,
       },
       status: errors.length > 0 ? "partial" : "completed",
     });
@@ -224,7 +235,7 @@ async function handleApply(): Promise<NextResponse> {
       })),
     };
 
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, allTeams });
   } catch (error) {
     console.error("[Dedupe Apply] Error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

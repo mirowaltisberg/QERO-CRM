@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -27,7 +27,7 @@ interface EncodingFixResult {
  * GET /api/contacts/fix-encoding
  * Preview: scan for encoding issues without making changes
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     const {
@@ -47,19 +47,25 @@ export async function GET() {
       );
     }
 
-    // Get user's team_id
+    // Check if all_teams mode is requested (admin-only)
+    const allTeams = request.nextUrl.searchParams.get('all_teams') === 'true';
+
+    // Get user's team_id (or null for all teams)
     const { data: profile } = await supabase
       .from("profiles")
       .select("team_id")
       .eq("id", user.id)
       .single();
 
-    const teamId = profile?.team_id;
+    const teamId = allTeams ? null : profile?.team_id;
+
+    console.log(`[Fix Encoding Preview] User: ${user.email}, All teams: ${allTeams}, Team ID: ${teamId || 'ALL'}`);
 
     const result = await scanForEncodingIssues(supabase, teamId, false);
 
     return NextResponse.json({
       preview: true,
+      allTeams,
       ...result,
     });
   } catch (error) {
@@ -72,7 +78,7 @@ export async function GET() {
  * POST /api/contacts/fix-encoding
  * Apply: fix encoding issues in all contacts and related tables
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const {
@@ -92,14 +98,19 @@ export async function POST() {
       );
     }
 
-    // Get user's team_id
+    // Check if all_teams mode is requested (admin-only)
+    const allTeams = request.nextUrl.searchParams.get('all_teams') === 'true';
+
+    // Get user's team_id (or null for all teams)
     const { data: profile } = await supabase
       .from("profiles")
       .select("team_id")
       .eq("id", user.id)
       .single();
 
-    const teamId = profile?.team_id;
+    const teamId = allTeams ? null : profile?.team_id;
+
+    console.log(`[Fix Encoding] User: ${user.email}, All teams: ${allTeams}, Team ID: ${teamId || 'ALL'}`);
 
     // Use admin client for writes to bypass RLS edge cases
     const adminClient = createAdminClient();
@@ -120,6 +131,7 @@ export async function POST() {
     return NextResponse.json({
       preview: false,
       runId,
+      allTeams,
       ...result,
     });
   } catch (error) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Contact } from "@/lib/types";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { useContactsTable } from "@/lib/hooks/useContactsTable";
 import { TableToolbar } from "./TableToolbar";
+import { TeamFilter } from "./TeamFilter";
 import { CantonTag } from "@/components/ui/CantonTag";
 import { cn } from "@/lib/utils/cn";
 import { ContactsImporter } from "./ContactsImporter";
@@ -19,6 +20,8 @@ import { fixContactDisplay } from "@/lib/utils/client-encoding-fix";
 
 interface ContactsTableProps {
   initialContacts: Contact[];
+  currentUserTeamId: string | null;
+  initialTeamFilter: string | "all";
 }
 
 const ROW_HEIGHT = 64; // Approximate height of each table row
@@ -87,10 +90,24 @@ const ContactTableRow = memo(function ContactTableRow({
   );
 });
 
-export function ContactsTable({ initialContacts }: ContactsTableProps) {
+export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamFilter }: ContactsTableProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useTranslations("contact");
   const tStatus = useTranslations("status");
+  
+  // Handle team filter change
+  const handleTeamFilterChange = useCallback((teamId: string | "all") => {
+    // Update URL to trigger page re-render with new team filter
+    const params = new URLSearchParams(searchParams.toString());
+    if (teamId === currentUserTeamId) {
+      // Remove param if switching back to user's team (default)
+      params.delete("team");
+    } else {
+      params.set("team", teamId);
+    }
+    router.push(`/contacts?${params.toString()}`);
+  }, [router, searchParams, currentUserTeamId]);
   
   // Fix encoding issues on initial contacts
   const fixedInitialContacts = useMemo(
@@ -194,22 +211,29 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
       <div className="flex flex-wrap items-center justify-between gap-4 px-4 md:px-0">
-        <TableToolbar
-          filters={filters}
-          totalCount={clientContacts.length}
-          selectedCount={selectedIds.length}
-          onFilterChange={applyFilters}
-          onOpenBulkStatus={handleOpenBulkStatus}
-          onOpenBulkList={handleOpenBulkList}
-          onBulkDelete={handleBulkDelete}
-          onFixEncoding={handleFixEncoding}
-          fixingEncoding={cleanupModal === "encoding"}
-          onMergeDuplicates={handleMergeDuplicates}
-          mergingDuplicates={cleanupModal === "dedupe"}
-          groupByCanton={groupByCanton}
-          onToggleGroupByCanton={toggleGroupByCanton}
-          availableCantons={availableCantons}
-        />
+        <div className="flex items-center gap-4">
+          <TableToolbar
+            filters={filters}
+            totalCount={clientContacts.length}
+            selectedCount={selectedIds.length}
+            onFilterChange={applyFilters}
+            onOpenBulkStatus={handleOpenBulkStatus}
+            onOpenBulkList={handleOpenBulkList}
+            onBulkDelete={handleBulkDelete}
+            onFixEncoding={handleFixEncoding}
+            fixingEncoding={cleanupModal === "encoding"}
+            onMergeDuplicates={handleMergeDuplicates}
+            mergingDuplicates={cleanupModal === "dedupe"}
+            groupByCanton={groupByCanton}
+            onToggleGroupByCanton={toggleGroupByCanton}
+            availableCantons={availableCantons}
+          />
+          <TeamFilter
+            value={initialTeamFilter}
+            onChange={handleTeamFilterChange}
+            currentUserTeamId={currentUserTeamId}
+          />
+        </div>
         <ContactsImporter onImportComplete={handleImportComplete} />
       </div>
 

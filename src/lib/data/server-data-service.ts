@@ -34,11 +34,38 @@ export const serverContactService = {
       authError: authError?.message 
     });
     
+    // Determine team filter strategy
+    let teamFilter: string | null = null;
+    if (filters?.teamId === "all") {
+      // Explicitly requested all teams - no filter
+      teamFilter = null;
+      console.log("[Server Data] Fetching contacts from ALL teams");
+    } else if (filters?.teamId) {
+      // Specific team requested
+      teamFilter = filters.teamId;
+      console.log("[Server Data] Fetching contacts from team:", teamFilter);
+    } else {
+      // No teamId specified - default to user's team
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("team_id")
+          .eq("id", user.id)
+          .single();
+        
+        teamFilter = profile?.team_id || null;
+        console.log("[Server Data] Defaulting to user's team:", teamFilter);
+      }
+    }
+    
     // First get the total count
     let countQuery = supabase
       .from("contacts")
       .select("*", { count: "exact", head: true });
 
+    if (teamFilter) {
+      countQuery = countQuery.eq("team_id", teamFilter);
+    }
     if (filters?.status) {
       countQuery = countQuery.eq("status", filters.status);
     }
@@ -69,10 +96,16 @@ export const serverContactService = {
 
       let query = supabase
         .from("contacts")
-        .select("*")
+        .select(`
+          *,
+          team:teams(id, name, color)
+        `)
         .order("created_at", { ascending: false })
         .range(from, to);
 
+      if (teamFilter) {
+        query = query.eq("team_id", teamFilter);
+      }
       if (filters?.status) {
         query = query.eq("status", filters.status);
       }

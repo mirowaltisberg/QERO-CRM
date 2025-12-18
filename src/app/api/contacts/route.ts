@@ -16,6 +16,7 @@ function buildFilters(request: NextRequest) {
     list_id: params.get('list_id') || undefined,
     page: params.get('page') ? parseInt(params.get('page')!, 10) : undefined,
     pageSize: params.get('pageSize') ? parseInt(params.get('pageSize')!, 10) : undefined,
+    teamId: params.get('team_id') || params.get('team') || undefined,
   };
   return ContactFilterSchema.safeParse(raw);
 }

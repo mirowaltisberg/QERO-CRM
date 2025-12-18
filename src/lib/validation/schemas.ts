@@ -69,6 +69,10 @@ export const ContactFilterSchema = z.object({
   list_id: z.string().trim().min(1).optional(),
   page: z.number().int().min(1).optional(),
   pageSize: z.number().int().min(1).max(1000).optional(),
+  teamId: z.union([
+    z.string().regex(uuidPattern, "Invalid team UUID"),
+    z.literal("all"),
+  ]).optional().nullable(),
 });
 
 const GENDER_VALUES = ["male", "female"] as const;

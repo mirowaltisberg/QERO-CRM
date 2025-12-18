@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { ContactList } from "./ContactList";
 import { ContactDetail } from "./ContactDetail";
 import { CandidatePickerModal } from "./CandidatePickerModal";
 import { CandidateModeBanner } from "./CandidateModeBanner";
 import { SelectCandidateButton } from "./SelectCandidateButton";
+import { TeamFilter } from "@/components/contacts/TeamFilter";
 import type { Contact, ContactCallLog, Vacancy, TmaCandidate } from "@/lib/types";
 import { useContacts } from "@/lib/hooks/useContacts";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
@@ -17,9 +18,12 @@ import { fixContactDisplay } from "@/lib/utils/client-encoding-fix";
 
 interface CallingViewProps {
   initialContacts: Contact[];
+  currentUserTeamId: string | null;
+  initialTeamFilter: string | "all";
 }
 
-export function CallingView({ initialContacts }: CallingViewProps) {
+export function CallingView({ initialContacts, currentUserTeamId, initialTeamFilter }: CallingViewProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const selectFromUrl = searchParams.get("select");
   
@@ -444,6 +448,19 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     await logCallOutcome(outcome);
   };
 
+  // Handle team filter change
+  const handleTeamFilterChange = useCallback((teamId: string | "all") => {
+    // Update URL to trigger page re-render with new team filter
+    const params = new URLSearchParams(searchParams.toString());
+    if (teamId === currentUserTeamId) {
+      // Remove param if switching back to user's team (default)
+      params.delete("team");
+    } else {
+      params.set("team", teamId);
+    }
+    router.push(`/calling?${params.toString()}`);
+  }, [router, searchParams, currentUserTeamId]);
+
   useKeyboardShortcuts([
     {
       key: KEYBOARD_SHORTCUTS.NAVIGATE_DOWN,
@@ -647,7 +664,14 @@ export function CallingView({ initialContacts }: CallingViewProps) {
           totalCount={sortedContacts?.length ?? 0}
         />
       ) : (
-        <SelectCandidateButton onClick={handleOpenCandidatePicker} />
+        <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-6 py-3">
+          <SelectCandidateButton onClick={handleOpenCandidatePicker} />
+          <TeamFilter
+            value={initialTeamFilter}
+            onChange={handleTeamFilterChange}
+            currentUserTeamId={currentUserTeamId}
+          />
+        </div>
       )}
 
       {/* Main Content */}

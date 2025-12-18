@@ -288,7 +288,12 @@
     "importDescription": "CSV-Datei mit Kontaktdaten importieren",
     "fixEncoding": "🔧 Encoding korrigieren",
     "selectContact": "Kontakt auswählen zur Ansicht",
-    "address": "Adresse"
+    "address": "Adresse",
+    "teamFilter": {
+      "label": "Team",
+      "myTeam": "Mein Team",
+      "allTeams": "Alle Teams"
+    }
   },
   "calling": {
     "title": "Calling",
@@ -516,6 +521,12 @@
     "callForCandidate": "Für einen Kandidaten anrufen?",
     "callForCandidateHint": "Firmen werden nach Entfernung sortiert",
     "companies": "Firmen"
+  },
+  "cleanup": {
+    "allTeamsCheckbox": "Auf alle Teams anwenden",
+    "allTeamsWarning": "Dies betrifft {count} Firmen in {teamCount} Teams",
+    "applyingToAllTeams": "Wird auf alle Teams angewendet",
+    "applyingToMyTeam": "Wird auf mein Team angewendet"
   },
   "travelTime": {
     "title": "Reisezeit",
