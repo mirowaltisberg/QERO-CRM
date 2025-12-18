@@ -200,10 +200,24 @@ async function processContacts(supabase: any, teamId: string | null, applyFixes:
 
   stats.scanned = contacts?.length || 0;
 
-  // DEBUG: Log first 10 company names
+  // DEBUG: Log first 10 company names AND search for mojibake patterns
   console.log('[DEBUG] First 10 company names from database:');
   contacts?.slice(0, 10).forEach((c: any, i: number) => {
     console.log(`  ${i + 1}. "${c.company_name}"`);
+  });
+  
+  // DEBUG: Search for companies with mojibake patterns
+  const withMojibake = contacts?.filter((c: any) => 
+    c.company_name && (
+      c.company_name.includes('Ã') || 
+      c.company_name.includes('Â') || 
+      c.company_name.includes('â€')
+    )
+  ).slice(0, 20);
+  
+  console.log(`[DEBUG] Found ${withMojibake?.length || 0} companies with mojibake patterns (showing first 20):`);
+  withMojibake?.forEach((c: any) => {
+    console.log(`  - "${c.company_name}" (ID: ${c.id})`);
   });
 
   for (const contact of contacts || []) {
