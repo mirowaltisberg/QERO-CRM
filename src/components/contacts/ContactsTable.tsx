@@ -15,6 +15,7 @@ import { CantonTag } from "@/components/ui/CantonTag";
 import { cn } from "@/lib/utils/cn";
 import { ContactsImporter } from "./ContactsImporter";
 import { CleanupModal } from "./CleanupModal";
+import { fixContactDisplay } from "@/lib/utils/client-encoding-fix";
 
 interface ContactsTableProps {
   initialContacts: Contact[];
@@ -90,9 +91,15 @@ export function ContactsTable({ initialContacts }: ContactsTableProps) {
   const router = useRouter();
   const t = useTranslations("contact");
   const tStatus = useTranslations("status");
+  
+  // Fix encoding issues on initial contacts
+  const fixedInitialContacts = useMemo(
+    () => initialContacts.map(fixContactDisplay),
+    [initialContacts]
+  );
   const [bulkModal, setBulkModal] = useState<"status" | "list" | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
-  const clientContacts = initialContacts;
+  const clientContacts = fixedInitialContacts;
   
   const {
     contacts,

@@ -13,6 +13,7 @@ import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { KEYBOARD_SHORTCUTS } from "@/lib/utils/constants";
 import { createClient } from "@/lib/supabase/client";
 import { chunkUnique } from "@/lib/utils/chunk";
+import { fixContactDisplay } from "@/lib/utils/client-encoding-fix";
 
 interface CallingViewProps {
   initialContacts: Contact[];
@@ -22,6 +23,11 @@ export function CallingView({ initialContacts }: CallingViewProps) {
   const searchParams = useSearchParams();
   const selectFromUrl = searchParams.get("select");
   
+  // Fix encoding issues on initial contacts
+  const fixedInitialContacts = useMemo(
+    () => initialContacts.map(fixContactDisplay),
+    [initialContacts]
+  );
   // Mobile state
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
@@ -59,7 +65,7 @@ export function CallingView({ initialContacts }: CallingViewProps) {
     setCantonFilter,
     clearCantonFilter,
     setSearchQuery,
-  } = useContacts({ initialContacts });
+  } = useContacts({ initialContacts: fixedInitialContacts });
 
   // Use sorted contacts when in candidate mode, otherwise original contacts
   // Apply distance filter AND search query when in candidate mode
