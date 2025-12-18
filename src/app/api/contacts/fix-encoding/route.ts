@@ -179,7 +179,6 @@ async function scanForEncodingIssues(
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function processContacts(supabase: any, teamId: string | null, applyFixes: boolean): Promise<TableStats> {
   const stats: TableStats = { scanned: 0, withIssues: 0, fixed: 0, errors: [], examples: [] };
 
@@ -201,11 +200,20 @@ async function processContacts(supabase: any, teamId: string | null, applyFixes:
 
   stats.scanned = contacts?.length || 0;
 
+  // DEBUG: Log first 10 company names
+  console.log('[DEBUG] First 10 company names from database:');
+  contacts?.slice(0, 10).forEach((c: any, i: number) => {
+    console.log(`  ${i + 1}. "${c.company_name}"`);
+  });
+
   for (const contact of contacts || []) {
     const fixes = fixContactEncoding(contact);
 
     if (fixes) {
       stats.withIssues++;
+      
+      // DEBUG: Log what we're fixing
+      console.log(`[DEBUG] Found issue in contact ${contact.id}:`, fixes);
 
       // Collect examples (max 5)
       if (stats.examples.length < 5) {
@@ -232,6 +240,8 @@ async function processContacts(supabase: any, teamId: string | null, applyFixes:
       }
     }
   }
+
+  console.log(`[DEBUG] Total scanned: ${stats.scanned}, withIssues: ${stats.withIssues}`);
 
   return stats;
 }
