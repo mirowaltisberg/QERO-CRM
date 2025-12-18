@@ -461,7 +461,7 @@ Redesign the Calling page to feel like an Apple-native app with:
 - **API routes MUST use server Supabase client** - `createClient` from `@/lib/supabase/server`, NOT from `@/lib/supabase/client`. Browser client has no auth context in server context, so `auth.getUser()` returns null.
 - **CRITICAL: Never hardcode status_tags in API payloads** - The `scheduleFollowUp` was sending `status_tags: ["C"]` which wiped out existing quality ratings. Follow-ups should be independent from quality assessment.
 - **Realtime can cause race conditions** - When updating data, realtime subscription might fire and overwrite local state. Use a skip mechanism to ignore realtime updates for recently-modified records.
-- **ALWAYS update version number** on every deploy (format: v1.XX.X - major.middle.small)
+- **🚨 CRITICAL: ALWAYS UPDATE VERSION NUMBER BEFORE EVERY DEPLOYMENT 🚨** - Version format: v1.XX.X (major.middle.small). This is MANDATORY and must be done BEFORE pushing to production. NO EXCEPTIONS.
 - If `npm test` fails with an esbuild platform/binary mismatch, running `npm rebuild esbuild` can fix it without reinstalling everything.
 - **Zod's `.uuid()` uses strict RFC 4122 validation** - It rejects UUIDs that don't have valid version (1-5) and variant (8,9,a,b) bits. Use a lenient regex pattern `/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/` if your database uses non-RFC-4122 compliant UUIDs.
 
