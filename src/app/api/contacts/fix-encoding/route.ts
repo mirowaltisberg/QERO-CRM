@@ -200,10 +200,26 @@ async function processContacts(supabase: any, teamId: string | null, applyFixes:
 
   stats.scanned = contacts?.length || 0;
 
-  // DEBUG: Log first 10 company names AND search for mojibake patterns
+  // DEBUG: Log first 10 company names
   console.log('[DEBUG] First 10 company names from database:');
   contacts?.slice(0, 10).forEach((c: any, i: number) => {
-    console.log(`  ${i + 1}. "${c.company_name}"`);
+    const bytes = Buffer.from(c.company_name || '', 'utf8').toString('hex');
+    console.log(`  ${i + 1}. "${c.company_name}" [bytes: ${bytes.substring(0, 50)}...]`);
+  });
+  
+  // DEBUG: Search for companies with umlauts (CORRECT encoding)
+  const withUmlaut = contacts?.filter((c: any) => 
+    c.company_name && (
+      c.company_name.includes('ü') ||
+      c.company_name.includes('ä') ||
+      c.company_name.includes('ö')
+    )
+  ).slice(0, 10);
+  
+  console.log(`[DEBUG] Found ${withUmlaut?.length || 0} companies with correct umlauts (ü,ä,ö):`);
+  withUmlaut?.forEach((c: any) => {
+    const bytes = Buffer.from(c.company_name, 'utf8').toString('hex');
+    console.log(`  - "${c.company_name}" [hex: ${bytes}]`);
   });
   
   // DEBUG: Search for companies with mojibake patterns
@@ -215,7 +231,7 @@ async function processContacts(supabase: any, teamId: string | null, applyFixes:
     )
   ).slice(0, 20);
   
-  console.log(`[DEBUG] Found ${withMojibake?.length || 0} companies with mojibake patterns (showing first 20):`);
+  console.log(`[DEBUG] Found ${withMojibake?.length || 0} companies with mojibake patterns (Ã, Â, â€):`);
   withMojibake?.forEach((c: any) => {
     console.log(`  - "${c.company_name}" (ID: ${c.id})`);
   });
