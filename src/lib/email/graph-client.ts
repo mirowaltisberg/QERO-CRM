@@ -219,7 +219,7 @@ export async function sendEmail(
   const message = {
     subject,
     body: {
-      contentType: "HTML",
+      contentType: "html",
       content: body,
     },
     toRecipients: to.map((email) => ({
@@ -247,7 +247,7 @@ export async function sendEmail(
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
+      "Content-Type": "application/json; charset=utf-8",
     },
     body: JSON.stringify(requestBody),
   });

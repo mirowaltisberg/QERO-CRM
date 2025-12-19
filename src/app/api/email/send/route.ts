@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       } = {
         subject,
         body: {
-          contentType: "HTML",
+          contentType: "html",
           content: emailBody,
         },
         toRecipients: to.map((email) => ({
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
+            "Content-Type": "application/json; charset=utf-8",
           },
           body: JSON.stringify({
             message: {
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
+            "Content-Type": "application/json; charset=utf-8",
           },
           body: JSON.stringify({ message }),
         });

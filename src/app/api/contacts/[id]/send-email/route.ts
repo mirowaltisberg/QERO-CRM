@@ -528,7 +528,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const message = {
         subject,
         body: {
-          contentType: "HTML",
+          contentType: "html",
           content: fullBodyHtml,
         },
         toRecipients: [
@@ -546,7 +546,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: JSON.stringify({ message }),
       });

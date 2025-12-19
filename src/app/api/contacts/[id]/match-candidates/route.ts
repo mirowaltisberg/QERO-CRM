@@ -418,3 +418,4 @@ Bewerte jeden Kandidaten mit Score und kurzer Begründung.`;
 
   return results;
 }
+
