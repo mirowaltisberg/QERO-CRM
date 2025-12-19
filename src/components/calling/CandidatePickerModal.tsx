@@ -54,7 +54,11 @@ export function CandidatePickerModal({
   }, [open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      // Ensure body overflow is reset when modal closes
+      document.body.style.overflow = "";
+      return;
+    }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
