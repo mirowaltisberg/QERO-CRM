@@ -14,7 +14,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "QERO CRM - Cold Calling for Recruiters v1.55.1",
+  title: "QERO CRM - Cold Calling for Recruiters v1.55.2",
   description: "Hyper-focused CRM for recruiters making 100+ calls per day",
   manifest: "/manifest.json",
   appleWebApp: {

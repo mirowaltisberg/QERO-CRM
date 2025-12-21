@@ -13,6 +13,8 @@ interface Props {
   onClose: () => void;
   onSent: () => void;
   replyTo?: { threadId: string; messageId: string } | null;
+  /** Pre-fill the To field when opening compose */
+  initialTo?: string | null;
 }
 
 interface AttachmentFile {
@@ -104,7 +106,7 @@ export function insertEmailIntoList(currentValue: string, email: string): string
   return emails.join(", ");
 }
 
-export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
+export function ComposeModal({ open, onClose, onSent, replyTo, initialTo }: Props) {
   const t = useTranslations("email");
   const tCommon = useTranslations("common");
   const [to, setTo] = useState("");
@@ -146,6 +148,10 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
       if (!replyTo) {
         setBody(signatureText);
       }
+      // Pre-fill To field if provided
+      if (initialTo) {
+        setTo(initialTo);
+      }
     } else {
       setTo("");
       setCc("");
@@ -157,7 +163,7 @@ export function ComposeModal({ open, onClose, onSent, replyTo }: Props) {
       setShowCc(false);
       setShowBcc(false);
     }
-  }, [open, replyTo]);
+  }, [open, replyTo, initialTo]);
 
   // If replying, pre-fill subject
   useEffect(() => {

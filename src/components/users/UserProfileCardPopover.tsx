@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, memo } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getWhatsAppLink, formatPhoneForDisplay } from "@/lib/utils/phone";
@@ -212,6 +213,7 @@ const UserCardContent = memo(function UserCardContent({
   online: boolean;
   pinned: boolean;
 }) {
+  const router = useRouter();
   const { profile, stats } = data;
   const initials = profile.full_name
     ?.split(" ")
@@ -222,6 +224,12 @@ const UserCardContent = memo(function UserCardContent({
 
   const whatsAppLink = getWhatsAppLink(profile.phone);
   const phoneDisplay = formatPhoneForDisplay(profile.phone);
+
+  const handleEmailClick = useCallback(() => {
+    if (profile.email) {
+      router.push(`/email?compose=true&to=${encodeURIComponent(profile.email)}`);
+    }
+  }, [profile.email, router]);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -326,13 +334,13 @@ const UserCardContent = memo(function UserCardContent({
           )}
           {profile.email && (
             <>
-              <a
-                href={`mailto:${profile.email}`}
+              <button
+                onClick={handleEmailClick}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-                title="Email"
+                title="E-Mail im CRM öffnen"
               >
                 ✉️ E-Mail
-              </a>
+              </button>
               <button
                 onClick={() => copyToClipboard(profile.email!, "email")}
                 className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors"

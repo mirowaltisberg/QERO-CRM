@@ -23,7 +23,10 @@ export function EmailView({ account }: Props) {
   const tCommon = useTranslations("common");
   const searchParams = useSearchParams();
   const threadIdFromUrl = searchParams.get("thread");
+  const composeFromUrl = searchParams.get("compose");
+  const composeToFromUrl = searchParams.get("to");
   const [folder, setFolder] = useState<EmailFolder>("inbox");
+  const [initialComposeTo, setInitialComposeTo] = useState<string | null>(null);
   const [threads, setThreads] = useState<EmailThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<EmailThread | null>(null);
   const [pendingThreadId, setPendingThreadId] = useState<string | null>(threadIdFromUrl);
@@ -56,6 +59,16 @@ export function EmailView({ account }: Props) {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  // Handle compose from URL params (e.g., /email?compose=true&to=email@example.com)
+  useEffect(() => {
+    if (composeFromUrl === "true") {
+      setInitialComposeTo(composeToFromUrl);
+      setComposeOpen(true);
+      // Clear the URL params after opening compose
+      router.replace("/email", { scroll: false });
+    }
+  }, [composeFromUrl, composeToFromUrl, router]);
 
   // Fetch thread list from database (conversation-based folders; full thread is fetched on open)
   const fetchThreads = useCallback(async (pageNum: number = 1, append: boolean = false) => {
@@ -519,11 +532,14 @@ export function EmailView({ account }: Props) {
           onClose={() => {
             setComposeOpen(false);
             setReplyTo(null);
+            setInitialComposeTo(null);
           }}
           replyTo={replyTo}
+          initialTo={initialComposeTo}
           onSent={() => {
             setComposeOpen(false);
             setReplyTo(null);
+            setInitialComposeTo(null);
             handleSync();
           }}
         />
@@ -578,11 +594,14 @@ export function EmailView({ account }: Props) {
         onClose={() => {
           setComposeOpen(false);
           setReplyTo(null);
+          setInitialComposeTo(null);
         }}
         replyTo={replyTo}
+        initialTo={initialComposeTo}
         onSent={() => {
           setComposeOpen(false);
           setReplyTo(null);
+          setInitialComposeTo(null);
           handleSync();
         }}
       />
