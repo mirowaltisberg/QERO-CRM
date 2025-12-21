@@ -57,30 +57,52 @@ export async function GET(request: NextRequest, context: RouteContext) {
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
 
     // Count calls today (count-only query for efficiency)
-    const { count: callsToday } = await adminSupabase
+    const { count: callsToday, error: callsTodayError } = await adminSupabase
       .from("contact_call_logs")
       .select("*", { count: "exact", head: true })
       .eq("user_id", targetUserId)
       .gte("called_at", todayStart.toISOString());
 
+    if (callsTodayError) {
+      console.error("[User Card] Error counting calls today:", callsTodayError);
+    }
+
     // Count calls this week
-    const { count: callsThisWeek } = await adminSupabase
+    const { count: callsThisWeek, error: callsWeekError } = await adminSupabase
       .from("contact_call_logs")
       .select("*", { count: "exact", head: true })
       .eq("user_id", targetUserId)
       .gte("called_at", weekStart.toISOString());
 
+    if (callsWeekError) {
+      console.error("[User Card] Error counting calls this week:", callsWeekError);
+    }
+
     // Count claimed TMA candidates
-    const { count: claimedTmaCount } = await adminSupabase
+    const { count: claimedTmaCount, error: claimedError } = await adminSupabase
       .from("tma_candidates")
       .select("*", { count: "exact", head: true })
       .eq("claimed_by", targetUserId);
 
-    // Count assigned WhatsApp conversations (optional)
-    const { count: assignedWhatsappCount } = await adminSupabase
-      .from("whatsapp_conversations")
-      .select("*", { count: "exact", head: true })
-      .eq("assigned_to", targetUserId);
+    if (claimedError) {
+      console.error("[User Card] Error counting claimed TMA:", claimedError);
+    }
+
+    // Count assigned WhatsApp conversations (optional - table may not exist)
+    let assignedWhatsappCount: number | null = 0;
+    try {
+      const { count, error: whatsappError } = await adminSupabase
+        .from("whatsapp_conversations")
+        .select("*", { count: "exact", head: true })
+        .eq("assigned_to", targetUserId);
+      
+      if (!whatsappError) {
+        assignedWhatsappCount = count;
+      }
+    } catch {
+      // Table might not exist, ignore
+      assignedWhatsappCount = 0;
+    }
 
     // Handle team being an array (Supabase sometimes returns arrays for joins)
     const team = Array.isArray(profile.team) ? profile.team[0] : profile.team;

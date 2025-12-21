@@ -394,7 +394,8 @@
     "members": "Members",
     "online": "Online",
     "offline": "Offline",
-    "typing": "typing..."
+    "typing": "typing...",
+    "writeMessage": "Write a message..."
   },
   "dashboard": {
     "title": "Dashboard",

@@ -390,7 +390,8 @@
     "members": "Mitglieder",
     "online": "Online",
     "offline": "Offline",
-    "typing": "schreibt..."
+    "typing": "schreibt...",
+    "writeMessage": "Nachricht schreiben..."
   },
   "dashboard": {
     "title": "Dashboard",
