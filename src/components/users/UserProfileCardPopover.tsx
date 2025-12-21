@@ -64,15 +64,17 @@ export const UserProfileCardPopover = memo(function UserProfileCardPopover({
 
     try {
       const res = await fetch(`/api/users/${userId}/card`);
-      if (!res.ok) {
-        throw new Error("Failed to fetch user data");
-      }
       const json = await res.json();
-      if (json.success && json.data) {
+      
+      if (!res.ok || json.error) {
+        throw new Error(json.error || `HTTP ${res.status}`);
+      }
+      
+      if (json.data) {
         setData(json.data);
         userCardCache.set(userId, { data: json.data, timestamp: Date.now() });
       } else {
-        throw new Error(json.error || "Unknown error");
+        throw new Error("No data returned");
       }
     } catch (err) {
       console.error("[UserProfileCard] Fetch error:", err);
