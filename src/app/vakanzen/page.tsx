@@ -120,6 +120,19 @@ async function getTeams(): Promise<Team[]> {
 }
 
 export default async function VakanzenPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  let currentUserTeamId: string | null = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("team_id")
+      .eq("id", user.id)
+      .single();
+    currentUserTeamId = profile?.team_id || null;
+  }
+
   const [vacancies, contacts, roles, teams] = await Promise.all([
     getVacancies(),
     getContacts(),
@@ -127,5 +140,13 @@ export default async function VakanzenPage() {
     getTeams(),
   ]);
 
-  return <VakanzenView initialVacancies={vacancies} contacts={contacts} roles={roles} teams={teams} />;
+  return (
+    <VakanzenView
+      initialVacancies={vacancies}
+      contacts={contacts}
+      roles={roles}
+      teams={teams}
+      currentUserTeamId={currentUserTeamId}
+    />
+  );
 }

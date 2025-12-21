@@ -32,6 +32,7 @@ interface Props {
   contacts: ContactForVacancy[];
   roles: TmaRole[];
   teams: Team[];
+  currentUserTeamId?: string | null;
 }
 
 interface CandidateData {
@@ -39,7 +40,7 @@ interface CandidateData {
   suggested: (TmaCandidate & { distance_km: number; match_score: number })[];
 }
 
-export function VakanzenView({ initialVacancies, contacts, roles, teams }: Props) {
+export function VakanzenView({ initialVacancies, contacts, roles, teams, currentUserTeamId }: Props) {
   // State
   const [vacancies, setVacancies] = useState<Vacancy[]>(initialVacancies);
   const [activeVacancy, setActiveVacancy] = useState<Vacancy | null>(null);
@@ -362,6 +363,7 @@ export function VakanzenView({ initialVacancies, contacts, roles, teams }: Props
         teams={teams}
         onCreateRole={createRole}
         onRefreshRoles={refreshRoles}
+        currentUserTeamId={currentUserTeamId}
       />
 
       {/* Desktop Layout */}

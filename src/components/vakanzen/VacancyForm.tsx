@@ -38,9 +38,10 @@ interface Props {
   teams: Team[];
   onCreateRole: (payload: { name: string; color: string; note?: string | null }) => Promise<TmaRole>;
   onRefreshRoles: () => Promise<void>;
+  currentUserTeamId?: string | null;
 }
 
-export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, roles, teams, onCreateRole, onRefreshRoles }: Props) {
+export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, roles, teams, onCreateRole, onRefreshRoles, currentUserTeamId }: Props) {
   const t = useTranslations("vacancy");
   const tQuality = useTranslations("quality");
   const tUrgency = useTranslations("urgency");
@@ -245,6 +246,7 @@ export function VacancyForm({ isOpen, onClose, onSubmit, contacts, vacancy, role
             onCreateRole={onCreateRole}
             onRefreshRoles={onRefreshRoles}
             placeholder={t("role") + "..."}
+            currentUserTeamId={currentUserTeamId}
           />
           <p className="mt-1 text-xs text-gray-400">
             Wird verwendet um passende TMA-Kandidaten vorzuschlagen
