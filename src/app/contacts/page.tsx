@@ -12,18 +12,20 @@ export default async function ContactsPage({
   const params = await searchParams;
   const teamId = typeof params.team === "string" ? params.team : undefined;
   
-  // Get current user's team ID for TeamFilter component
+  // Get current user's team ID and email for TeamFilter component
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   let currentUserTeamId: string | null = null;
+  let userEmail: string | null = null;
   
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("team_id")
+      .select("team_id, email")
       .eq("id", user.id)
       .single();
     currentUserTeamId = profile?.team_id || null;
+    userEmail = profile?.email || user.email || null;
   }
   
   const contacts = await serverContactService.getAll({ teamId });
@@ -32,6 +34,7 @@ export default async function ContactsPage({
       initialContacts={contacts}
       currentUserTeamId={currentUserTeamId}
       initialTeamFilter={teamId || currentUserTeamId || "all"}
+      userEmail={userEmail}
     />
   );
 }

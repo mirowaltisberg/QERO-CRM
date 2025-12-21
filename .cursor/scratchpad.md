@@ -1651,3 +1651,81 @@ supabase db push
 1. Should regular users be able to **modify** contacts from other teams, or only view them? (Current plan: view-only for other teams)
 2. Team filter persistence: URL params (current plan) or localStorage? URL enables sharing/bookmarking.
 3. Should we add a "Recently Viewed Teams" list for quick switching?
+
+---
+
+# Task 35: Outlook Contact Sync via Microsoft Graph ✅ COMPLETE
+
+## Goal
+Import Outlook personal contacts via Microsoft Graph into Supabase. No auto-loading from Outlook on page open - only manual sync button. Source of truth remains Supabase (notes/CRM fields never lost). Duplicates are skipped entirely using loose matching.
+
+## Implementation Complete (Dec 21, 2025)
+
+### Files Created
+- `supabase/migrations/042_outlook_contact_sync.sql` - Database migration for sync state and normalized fields
+- `src/app/api/contacts/outlook/sync/route.ts` - User sync endpoint
+- `src/app/api/admin/contacts/outlook/sync-all/route.ts` - Admin bulk sync endpoint
+- `src/components/contacts/OutlookSyncButton.tsx` - UI component with buttons
+- `src/lib/utils/outlook-dedupe.ts` - Deduplication utilities
+- `tests/outlook-dedupe.test.ts` - Unit tests for dedupe logic
+
+### Files Modified
+- `src/app/api/email/auth/connect/route.ts` - Added Contacts.Read scope
+- `src/app/contacts/page.tsx` - Pass userEmail to ContactsTable
+- `src/components/contacts/ContactsTable.tsx` - Added OutlookSyncButton
+
+### Database Changes
+New columns on `email_accounts`:
+- `contacts_delta_token` - Delta token for incremental Graph sync
+- `contacts_last_sync_at` - Last successful sync timestamp
+- `contacts_sync_error` - Last error message if any
+
+New columns on `contacts`:
+- `source` - Import source: "outlook", "csv", or null (manual)
+- `source_account_id` - FK to email_accounts for Outlook-imported contacts
+- `source_graph_contact_id` - Microsoft Graph contact ID
+- `normalized_phone_digits` - Generated column for dedupe
+- `normalized_name` - Generated column for dedupe
+- `email_domain` - Generated column for dedupe
+
+### How It Works
+1. **User clicks "Outlook Sync"** → POST /api/contacts/outlook/sync
+2. API fetches user's email_account (stored OAuth tokens)
+3. Calls Microsoft Graph `/me/contacts/delta` with paging
+4. For each contact, checks for duplicates:
+   - Same phone (digits-only) → skip
+   - Same email domain (unless public like gmail.com) → skip
+   - Same company name (normalized) → skip
+   - Already imported (Graph ID) → skip
+5. Inserts only new contacts into Supabase
+6. Stores delta token for incremental sync next time
+
+### Admin Feature
+- Admins (m.waltisberg@qero.ch, shtanaj@qero.ch) see "Alle Teams" button
+- POST /api/admin/contacts/outlook/sync-all loops through all connected users
+- Syncs each user's Outlook contacts into their respective team
+
+### OAuth Scope Change
+- Added `https://graph.microsoft.com/Contacts.Read` to Microsoft OAuth scopes
+- **Users who previously connected Outlook for email may need to reconnect** to grant the new Contacts scope
+
+### Testing
+- 158 tests pass including new dedupe tests
+- Build compiles successfully
+
+### Migration Required
+Apply migration before deployment:
+```bash
+supabase db push
+# Or run: supabase/migrations/042_outlook_contact_sync.sql
+```
+
+### Success Criteria Met
+- ✅ Users can sync their own Outlook contacts with one button click
+- ✅ Admins can sync all teams' contacts
+- ✅ Duplicates are skipped (phone, email domain, name)
+- ✅ Delta sync for incremental updates
+- ✅ Source of truth stays in Supabase
+- ✅ No auto-loading on page open
+- ✅ All tests pass
+- ✅ Build compiles

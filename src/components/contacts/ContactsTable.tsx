@@ -15,6 +15,7 @@ import { TeamFilter } from "./TeamFilter";
 import { CantonTag } from "@/components/ui/CantonTag";
 import { cn } from "@/lib/utils/cn";
 import { ContactsImporter } from "./ContactsImporter";
+import { OutlookSyncButton } from "./OutlookSyncButton";
 import { CleanupModal } from "./CleanupModal";
 import { fixContactDisplay } from "@/lib/utils/client-encoding-fix";
 
@@ -22,6 +23,7 @@ interface ContactsTableProps {
   initialContacts: Contact[];
   currentUserTeamId: string | null;
   initialTeamFilter: string | "all";
+  userEmail?: string | null;
 }
 
 const ROW_HEIGHT = 64; // Approximate height of each table row
@@ -90,7 +92,7 @@ const ContactTableRow = memo(function ContactTableRow({
   );
 });
 
-export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamFilter }: ContactsTableProps) {
+export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamFilter, userEmail }: ContactsTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const t = useTranslations("contact");
@@ -236,7 +238,10 @@ export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamF
             currentUserTeamId={currentUserTeamId}
           />
         </div>
-        <ContactsImporter onImportComplete={handleImportComplete} />
+        <div className="flex items-center gap-4">
+          <OutlookSyncButton userEmail={userEmail ?? null} onSyncComplete={handleImportComplete} />
+          <ContactsImporter onImportComplete={handleImportComplete} />
+        </div>
       </div>
 
       {error && (

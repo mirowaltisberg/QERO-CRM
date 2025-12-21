@@ -4,7 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 // Microsoft OAuth endpoints
 const MICROSOFT_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
 
-// Required scopes for Outlook access
+// Required scopes for Outlook access (email + contacts)
 const SCOPES = [
   "openid",
   "profile", 
@@ -13,6 +13,7 @@ const SCOPES = [
   "https://graph.microsoft.com/Mail.Read",
   "https://graph.microsoft.com/Mail.ReadWrite",
   "https://graph.microsoft.com/Mail.Send",
+  "https://graph.microsoft.com/Contacts.Read",
 ].join(" ");
 
 export async function GET(request: NextRequest) {
