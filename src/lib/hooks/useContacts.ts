@@ -190,8 +190,7 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
   }, [contacts, cantonFilter, searchQuery]);
 
   const activeContact = useMemo(() => {
-    if (!activeId) return visibleContacts[0] ?? null;
-    return visibleContacts.find((c) => c.id === activeId) ?? visibleContacts[0] ?? null;
+    return !activeId ? visibleContacts[0] ?? null : visibleContacts.find((c) => c.id === activeId) ?? visibleContacts[0] ?? null;
   }, [activeId, visibleContacts]);
 
   useEffect(() => {
@@ -199,10 +198,12 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
       setActiveId(null);
       return;
     }
-    if (activeContact == null) {
+    // Only auto-select first contact if there's NO activeId at all
+    // Don't override if activeId exists but isn't in visibleContacts (user might have just clicked)
+    if (!activeId) {
       setActiveId(visibleContacts[0].id);
     }
-  }, [visibleContacts, activeContact]);
+  }, [visibleContacts, activeId]);
 
   const refreshContacts = useCallback(async () => {
     setLoading(true);

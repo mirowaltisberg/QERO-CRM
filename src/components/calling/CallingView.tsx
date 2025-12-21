@@ -49,14 +49,14 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
 
   const {
     contacts: originalContacts,
-    activeContact,
+    activeContact: originalActiveContact,
     loading,
     error,
     actionState,
     cantonFilter,
     uniqueCantons,
     searchQuery,
-    selectContact,
+    selectContact: originalSelectContact,
     goToNextContact,
     goToPreviousContact,
     refreshContacts,
@@ -70,6 +70,9 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
     clearCantonFilter,
     setSearchQuery,
   } = useContacts({ initialContacts: fixedInitialContacts });
+
+  // Track active contact ID separately when in candidate mode
+  const [candidateModeActiveId, setCandidateModeActiveId] = useState<string | null>(null);
 
   // Use sorted contacts when in candidate mode, otherwise original contacts
   // Apply distance filter AND search query when in candidate mode
@@ -105,6 +108,26 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
     return filtered;
   }, [sortedContacts, originalContacts, distanceFilter, searchQuery]);
 
+  // When in candidate mode, calculate activeContact from the displayed contacts
+  // Otherwise use the one from useContacts
+  const activeContact = useMemo(() => {
+    if (sortedContacts && candidateModeActiveId) {
+      return contacts.find((c) => c.id === candidateModeActiveId) ?? contacts[0] ?? null;
+    }
+    return originalActiveContact;
+  }, [sortedContacts, candidateModeActiveId, contacts, originalActiveContact]);
+
+  // Wrap selectContact to handle candidate mode separately
+  const selectContact = useCallback((id: string) => {
+    if (sortedContacts) {
+      // In candidate mode, manage our own state
+      setCandidateModeActiveId(id);
+    } else {
+      // Normal mode, use the hook's function
+      originalSelectContact(id);
+    }
+  }, [sortedContacts, originalSelectContact]);
+
   // Mobile detection
   useEffect(() => {
     const checkMobile = () => {
@@ -139,7 +162,12 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
                 return fetch(`/api/contacts/sorted-by-candidate?candidateId=${candidateId}`)
                   .then((res) => res.json())
                   .then((json) => {
-                    setSortedContacts(json.data || []);
+                    const sorted = json.data || [];
+                    setSortedContacts(sorted);
+                    // Initialize active contact to first sorted contact
+                    if (sorted.length > 0) {
+                      setCandidateModeActiveId(sorted[0].id);
+                    }
                   })
                   .finally(() => {
                     setSortingLoading(false);
@@ -197,7 +225,12 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
       const res = await fetch(`/api/contacts/sorted-by-candidate?candidateId=${candidate.id}`);
       if (res.ok) {
         const json = await res.json();
-        setSortedContacts(json.data || []);
+        const sorted = json.data || [];
+        setSortedContacts(sorted);
+        // Initialize active contact to first sorted contact
+        if (sorted.length > 0) {
+          setCandidateModeActiveId(sorted[0].id);
+        }
       } else {
         console.error("Failed to fetch sorted contacts");
       }
@@ -216,6 +249,7 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
     setSelectedCandidate(null);
     setSortedContacts(null);
     setDistanceFilter(null);
+    setCandidateModeActiveId(null);
     localStorage.removeItem(CANDIDATE_STORAGE_KEY);
   }, [CANDIDATE_STORAGE_KEY]);
 

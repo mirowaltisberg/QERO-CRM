@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import type { ContactNote, TmaNote } from "@/lib/types";
 import { QuickVacancyPopup } from "./QuickVacancyPopup";
+import { UserProfileCardPopover } from "@/components/users/UserProfileCardPopover";
+import { usePresence } from "@/lib/hooks/PresenceContext";
 
 type NoteType = ContactNote | TmaNote;
 
@@ -318,6 +320,7 @@ const NoteCard = memo(function NoteCard({
   const [editValue, setEditValue] = useState(note.content);
   const [saving, setSaving] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const { isOnline } = usePresence();
 
   const apiPath =
     entityType === "contact"
@@ -354,29 +357,47 @@ const NoteCard = memo(function NoteCard({
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex items-start gap-3">
         {/* Avatar */}
-        <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
-          {author?.avatar_url ? (
-            <Image
-              src={author.avatar_url}
-              alt={author.full_name || "User"}
-              width={32}
-              height={32}
-              unoptimized
-              className="h-full w-full object-cover"
-            />
-          ) : (
+        {author?.id ? (
+          <UserProfileCardPopover userId={author.id} isOnline={isOnline}>
+            <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 transition-transform hover:scale-105">
+              {author?.avatar_url ? (
+                <Image
+                  src={author.avatar_url}
+                  alt={author.full_name || "User"}
+                  width={32}
+                  height={32}
+                  unoptimized
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-xs font-medium text-gray-500">
+                  {initials}
+                </div>
+              )}
+            </div>
+          </UserProfileCardPopover>
+        ) : (
+          <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
             <div className="flex h-full w-full items-center justify-center text-xs font-medium text-gray-500">
               {initials}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 text-sm">
-            <span className="font-medium text-gray-900">
-              {author?.full_name || "Unknown"}
-            </span>
+            {author?.id ? (
+              <UserProfileCardPopover userId={author.id} isOnline={isOnline}>
+                <span className="font-medium text-gray-900 hover:underline">
+                  {author?.full_name || "Unknown"}
+                </span>
+              </UserProfileCardPopover>
+            ) : (
+              <span className="font-medium text-gray-900">
+                {author?.full_name || "Unknown"}
+              </span>
+            )}
             <span className="text-gray-400">·</span>
             <span className="text-gray-400 text-xs">
               {formatRelativeTime(note.created_at)}

@@ -8,14 +8,17 @@ import { useIdleLogout } from "@/lib/hooks/useIdleLogout";
 
 interface AppShellProps {
   user: {
+    id?: string;
     email?: string;
     user_metadata?: {
       full_name?: string;
     };
   } | null;
   profile: {
+    id?: string;
     full_name?: string;
     avatar_url?: string | null;
+    team_id?: string | null;
   } | null;
   children: React.ReactNode;
 }

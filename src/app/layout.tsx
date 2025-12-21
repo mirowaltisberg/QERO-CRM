@@ -14,7 +14,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "QERO CRM - Cold Calling for Recruiters v1.53.0",
+  title: "QERO CRM - Cold Calling for Recruiters v1.55.0",
   description: "Hyper-focused CRM for recruiters making 100+ calls per day",
   manifest: "/manifest.json",
   appleWebApp: {
@@ -58,7 +58,7 @@ export default async function RootLayout({
     <html lang={locale} suppressHydrationWarning>
       <body className={`${inter.variable} antialiased`} suppressHydrationWarning>
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <Providers>
+          <Providers user={user} profile={profile}>
             <AppShell user={user} profile={profile}>
               {children}
             </AppShell>

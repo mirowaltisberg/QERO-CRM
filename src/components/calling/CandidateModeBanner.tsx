@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import React from "react";
 import type { TmaCandidate } from "@/lib/types";
 
 interface CandidateModeBannerProps {

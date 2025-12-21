@@ -346,6 +346,11 @@ export const ContactList = memo(function ContactList({
             setLocalSearch(e.target.value);
             onSearchChange?.(e.target.value);
           }}
+          onFocus={() => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/72691a08-187f-4988-be02-ed969364e6bb',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ContactList.tsx:349',message:'Search input focused',data:{searchValue:localSearch},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+          }}
           placeholder="Suche nach Firma, Name, E-Mail..."
           className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />

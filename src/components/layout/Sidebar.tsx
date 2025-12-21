@@ -6,17 +6,21 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils/cn";
+import { usePresence } from "@/lib/hooks/PresenceContext";
 
 interface SidebarProps {
   user?: {
+    id?: string;
     email?: string;
     user_metadata?: {
       full_name?: string;
     };
   } | null;
   profile?: {
+    id?: string;
     full_name?: string;
     avatar_url?: string | null;
+    team_id?: string | null;
   } | null;
 }
 
@@ -39,6 +43,9 @@ export function Sidebar({ user, profile }: SidebarProps) {
   const [mounted, setMounted] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+
+  // Use presence context (initialized in Providers)
+  const { onlineUsers, onlineCount, isConnected } = usePresence();
 
   // Detect mobile
   useEffect(() => {
@@ -193,6 +200,103 @@ export function Sidebar({ user, profile }: SidebarProps) {
         </ul>
       </nav>
 
+      {/* Team Online widget */}
+      {mounted && user && profile?.team_id && (
+        <div className="border-t border-border p-2">
+          {isCollapsed ? (
+            // Collapsed mode: just show count with green dot
+            <div
+              className="flex flex-col items-center gap-1 py-2"
+              title={`${onlineCount} online`}
+            >
+              <div className="relative">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50">
+                  <span
+                    className={cn(
+                      "h-2.5 w-2.5 rounded-full",
+                      isConnected && onlineCount > 0 ? "bg-green-500 animate-pulse" : "bg-gray-300"
+                    )}
+                  />
+                </div>
+                {onlineCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-green-500 px-1 text-[10px] font-medium text-white">
+                    {onlineCount}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            // Expanded mode: show avatars list
+            <div className="px-2 py-2">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Team Online
+                </span>
+                <span
+                  className={cn(
+                    "flex items-center gap-1 text-xs",
+                    isConnected && onlineCount > 0 ? "text-green-600" : "text-gray-400"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      isConnected && onlineCount > 0 ? "bg-green-500" : "bg-gray-300"
+                    )}
+                  />
+                  {onlineCount}
+                </span>
+              </div>
+              {onlineUsers.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {onlineUsers.slice(0, 6).map((onlineUser) => (
+                    <div
+                      key={onlineUser.user_id}
+                      className="relative group"
+                      title={onlineUser.full_name}
+                    >
+                      <div className="h-7 w-7 overflow-hidden rounded-full bg-gray-200 ring-2 ring-green-400 ring-offset-1">
+                        {onlineUser.avatar_url ? (
+                          <Image
+                            src={onlineUser.avatar_url}
+                            alt={onlineUser.full_name}
+                            width={28}
+                            height={28}
+                            unoptimized
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-gray-500">
+                            {onlineUser.full_name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()
+                              .slice(0, 2)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {onlineUsers.length > 6 && (
+                    <div
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-[10px] font-medium text-gray-500"
+                      title={`+${onlineUsers.length - 6} more`}
+                    >
+                      +{onlineUsers.length - 6}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400">
+                  {isConnected ? "Niemand online" : "Verbinden..."}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* User section */}
       {user && (
         <div className="border-t border-border p-2">
@@ -246,13 +350,13 @@ export function Sidebar({ user, profile }: SidebarProps) {
               <kbd className="kbd">Q</kbd>
             </div>
             <div className="flex items-center justify-between pt-1">
-              <span className="text-gray-300">v1.54.4</span>
+              <span className="text-gray-300">v1.55.0</span>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1 text-xs text-gray-400">
             <kbd className="kbd">Q</kbd>
-            <span className="text-[10px] text-gray-300">v1.54.4</span>
+            <span className="text-[10px] text-gray-300">v1.55.0</span>
           </div>
         )}
       </div>

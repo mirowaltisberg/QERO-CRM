@@ -3,6 +3,8 @@
 import { memo, useMemo } from "react";
 import Image from "next/image";
 import type { ChatMessage, ChatMember } from "@/lib/types";
+import { UserProfileCardPopover } from "@/components/users/UserProfileCardPopover";
+import { usePresence } from "@/lib/hooks/PresenceContext";
 
 // Special display for CEO
 const getDisplayRole = (name?: string, team?: { name: string; color: string } | null) => {
@@ -75,6 +77,7 @@ const MessageCard = memo(function MessageCard({
 }) {
   const sender = message.sender;
   const initials = sender?.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "??";
+  const { isOnline } = usePresence();
 
   const parsedContent = useMemo(() => {
     if (!message.content) return null;
@@ -152,16 +155,30 @@ const MessageCard = memo(function MessageCard({
         }
       `}</style>
       <div className="flex items-start gap-3">
-        <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 transition-transform hover:scale-105">
-          {sender?.avatar_url ? (
-            <Image src={sender.avatar_url} alt={sender.full_name || "User"} width={36} height={36} className="h-full w-full object-cover" unoptimized />
-          ) : (
+        {sender?.id ? (
+          <UserProfileCardPopover userId={sender.id} isOnline={isOnline}>
+            <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 transition-transform hover:scale-105">
+              {sender?.avatar_url ? (
+                <Image src={sender.avatar_url} alt={sender.full_name || "User"} width={36} height={36} className="h-full w-full object-cover" unoptimized />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-xs font-medium text-gray-600">{initials}</div>
+              )}
+            </div>
+          </UserProfileCardPopover>
+        ) : (
+          <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-full bg-gray-200">
             <div className="flex h-full w-full items-center justify-center text-xs font-medium text-gray-600">{initials}</div>
-          )}
-        </div>
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-gray-900">{sender?.full_name || "Unbekannt"}</span>
+            {sender?.id ? (
+              <UserProfileCardPopover userId={sender.id} isOnline={isOnline}>
+                <span className="font-medium text-gray-900 hover:underline">{sender?.full_name || "Unbekannt"}</span>
+              </UserProfileCardPopover>
+            ) : (
+              <span className="font-medium text-gray-900">{sender?.full_name || "Unbekannt"}</span>
+            )}
             {role && (
               <span 
                 className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors" 
