@@ -26,19 +26,28 @@ export default function AuthConfirmPage() {
         console.log("[Auth Confirm] Hash:", window.location.hash);
         console.log("[Auth Confirm] Search:", window.location.search);
 
-        // Get session from URL (handles both hash and query params)
+        // Wait a bit for Supabase to process any pending auth state
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Get session - for invite flows, Supabase should have already set the session via cookies
         const { data, error } = await supabase.auth.getSession();
         
-        console.log("[Auth Confirm] Initial session check:", { hasSession: !!data.session, error });
+        console.log("[Auth Confirm] Session check:", { hasSession: !!data.session, error });
 
         if (!data.session) {
-          // No existing session - try to extract from URL
-          console.log("[Auth Confirm] No session found, attempting URL extraction...");
-          
-          // For invite flows, Supabase puts tokens in the URL
-          // Call exchangeCodeForSession if there's a code parameter
+          // No session yet - check if there's a code or hash token to process
           const urlParams = new URLSearchParams(window.location.search);
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          
           const code = urlParams.get("code");
+          const accessToken = hashParams.get("access_token") || urlParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token") || urlParams.get("refresh_token");
+          
+          console.log("[Auth Confirm] Checking URL params:", { 
+            hasCode: !!code, 
+            hasAccessToken: !!accessToken,
+            hasRefreshToken: !!refreshToken
+          });
           
           if (code) {
             console.log("[Auth Confirm] Found code param, exchanging for session...");
@@ -50,23 +59,32 @@ export default function AuthConfirmPage() {
             }
             
             console.log("[Auth Confirm] Session established via code exchange");
-          } else {
-            // Check if there are tokens in the hash
-            const hashParams = new URLSearchParams(window.location.hash.substring(1));
-            const accessToken = hashParams.get("access_token");
+          } else if (accessToken && refreshToken) {
+            console.log("[Auth Confirm] Found tokens, setting session...");
+            const { error: setSessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
             
-            if (accessToken) {
-              console.log("[Auth Confirm] Found access_token in hash, waiting for Supabase to process...");
-              // Give Supabase client time to auto-detect and establish session
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              
-              // Re-check session
-              const { data: retryData } = await supabase.auth.getSession();
-              if (!retryData.session) {
-                throw new Error("Failed to establish session from URL tokens");
+            if (setSessionError) {
+              console.error("[Auth Confirm] Set session failed:", setSessionError);
+              throw new Error(setSessionError.message || "Failed to establish session");
+            }
+            
+            console.log("[Auth Confirm] Session established via tokens");
+          } else {
+            // For invite flows from Supabase, session should be automatically set via cookies
+            // Wait a bit more and retry
+            console.log("[Auth Confirm] No tokens found, waiting for cookie-based session...");
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            const { data: retryData } = await supabase.auth.getSession();
+            if (!retryData.session) {
+              // One more attempt using refreshSession
+              const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+              if (refreshError || !refreshData.session) {
+                throw new Error("No authentication session found. The invite link may have expired. Please request a new invitation.");
               }
-            } else {
-              throw new Error("No authentication tokens found in URL");
             }
           }
         }
