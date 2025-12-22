@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Team } from "@/lib/types";
+import { SPECIALIZATION_OPTIONS, type Specialization } from "@/lib/utils/outlook-specialization";
 
 interface TmaCreateModalProps {
   open: boolean;
@@ -16,6 +17,7 @@ interface TmaCreateModalProps {
     email?: string | null;
     phone?: string | null;
     team_id?: string | null;
+    specialization?: string | null;
   }) => Promise<void>;
   teams: Team[];
   defaultTeamId: string | null;
@@ -36,8 +38,17 @@ export function TmaCreateModal({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [teamId, setTeamId] = useState<string | null>(defaultTeamId);
+  const [specialization, setSpecialization] = useState<Specialization>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-set specialization when team changes (Team Holz = holzbau)
+  const TEAM_HOLZ = "00000000-0000-0000-0000-000000000011";
+  useEffect(() => {
+    if (teamId === TEAM_HOLZ && !specialization) {
+      setSpecialization("holzbau");
+    }
+  }, [teamId, specialization]);
 
   const resetForm = () => {
     setFirstName("");
@@ -45,6 +56,7 @@ export function TmaCreateModal({
     setEmail("");
     setPhone("");
     setTeamId(defaultTeamId);
+    setSpecialization(null);
     setError(null);
   };
 
@@ -70,6 +82,7 @@ export function TmaCreateModal({
         email: email.trim() || null,
         phone: phone.trim() || null,
         team_id: teamId || null,
+        specialization: specialization || null,
       };
       await onCreateCandidate(payload);
       handleClose();
@@ -150,26 +163,44 @@ export function TmaCreateModal({
           </div>
         </div>
 
-        {/* Team selection */}
-        {teams.length > 0 && (
+        {/* Team and Specialization */}
+        <div className="grid grid-cols-2 gap-3">
+          {teams.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                {tCommon("team")}
+              </label>
+              <select
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-gray-400 focus:outline-none"
+                value={teamId || ""}
+                onChange={(e) => setTeamId(e.target.value || null)}
+              >
+                <option value="">{tCommon("none")}</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-700">
-              {tCommon("team")}
+              Branche
             </label>
             <select
               className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-gray-400 focus:outline-none"
-              value={teamId || ""}
-              onChange={(e) => setTeamId(e.target.value || null)}
+              value={specialization || ""}
+              onChange={(e) => setSpecialization((e.target.value || null) as Specialization)}
             >
-              <option value="">{tCommon("none")}</option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
+              {SPECIALIZATION_OPTIONS.map((opt) => (
+                <option key={opt.value ?? "none"} value={opt.value ?? ""}>
+                  {opt.label}
                 </option>
               ))}
             </select>
           </div>
-        )}
+        </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2">

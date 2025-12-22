@@ -3,9 +3,14 @@
  */
 
 /**
+ * Specialization type
+ */
+export type Specialization = "holzbau" | "dachdecker" | null;
+
+/**
  * Derive specialization from folder name based on keywords
  */
-export function deriveSpecializationFromFolderName(folderName: string): string | null {
+export function deriveSpecializationFromFolderName(folderName: string): Specialization {
   const lowerName = folderName.toLowerCase();
   
   if (lowerName.includes("dach") || lowerName.includes("spengler")) {

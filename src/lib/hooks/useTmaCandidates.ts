@@ -63,6 +63,7 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
   const [activityFilter, setActivityFilter] = useState<TmaActivity | "all">("all");
   const [teamFilter, setTeamFilter] = useState<string | null>(defaultTeamFilter);
   const [experienceFilter, setExperienceFilter] = useState<ExperienceLevel | null>(null);
+  const [specializationFilter, setSpecializationFilter] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<"recent" | "oldest" | "name" | "activity" | "distance">("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const [locationSearch, setLocationSearch] = useState<LocationSearchState>({
@@ -192,6 +193,7 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
       if (cantonFilter && candidate.canton !== cantonFilter) return false;
       if (teamFilter && candidate.team_id !== teamFilter) return false;
       if (experienceFilter && candidate.experience_level !== experienceFilter) return false;
+      if (specializationFilter && candidate.specialization !== specializationFilter) return false;
       
       // Search filter - matches any part of name, email, phone, position, or canton
       if (searchQuery.trim()) {
@@ -222,7 +224,7 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
       
       return true;
     });
-  }, [candidates, cantonFilter, statusFilter, activityFilter, teamFilter, experienceFilter, searchQuery]);
+  }, [candidates, cantonFilter, statusFilter, activityFilter, teamFilter, experienceFilter, specializationFilter, searchQuery]);
 
   const availableCantons = useMemo(() => {
     return Array.from(
@@ -230,6 +232,16 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
         candidates
           .map((candidate) => candidate.canton)
           .filter((canton): canton is string => Boolean(canton))
+      )
+    ).sort();
+  }, [candidates]);
+
+  const availableSpecializations = useMemo(() => {
+    return Array.from(
+      new Set(
+        candidates
+          .map((candidate) => candidate.specialization)
+          .filter((spec): spec is string => Boolean(spec))
       )
     ).sort();
   }, [candidates]);
@@ -879,6 +891,9 @@ export function useTmaCandidates({ initialCandidates = [], defaultTeamFilter = n
     setActivityFilter,
     setSearchQuery,
     availableCantons,
+    specializationFilter,
+    setSpecializationFilter,
+    availableSpecializations,
     roles,
     rolesLoading,
     createRole,

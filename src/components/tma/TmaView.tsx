@@ -68,6 +68,9 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
     cantonFilter,
     experienceFilter,
     setExperienceFilter,
+    specializationFilter,
+    setSpecializationFilter,
+    availableSpecializations,
     sortOption,
     setSortOption,
     searchQuery,
@@ -308,6 +311,15 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
                   <option value="less_than_1">{"< 1 Jahr"}</option>
                   <option value="more_than_1">{"> 1 Jahr"}</option>
                   <option value="more_than_3">{"> 3 Jahre"}</option>
+                </select>
+                <select
+                  className="shrink-0 rounded-full border-0 bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600"
+                  value={specializationFilter ?? ""}
+                  onChange={(e) => setSpecializationFilter(e.target.value || null)}
+                >
+                  <option value="">Alle Branchen</option>
+                  <option value="holzbau">Holzbau</option>
+                  <option value="dachdecker">Dachdecker</option>
                 </select>
               </div>
             </header>
@@ -630,6 +642,27 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
             </label>
             {experienceFilter && (
               <Button variant="ghost" size="sm" onClick={() => setExperienceFilter(null)}>
+                Clear
+              </Button>
+            )}
+            <div className="mx-1 h-4 w-px bg-gray-200" />
+            <label className="flex items-center gap-2">
+              <span className="text-gray-500">Branche</span>
+              <select
+                className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
+                value={specializationFilter ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSpecializationFilter(value || null);
+                }}
+              >
+                <option value="">Alle</option>
+                <option value="holzbau">Holzbau</option>
+                <option value="dachdecker">Dachdecker</option>
+              </select>
+            </label>
+            {specializationFilter && (
+              <Button variant="ghost" size="sm" onClick={() => setSpecializationFilter(null)}>
                 Clear
               </Button>
             )}
