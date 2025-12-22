@@ -62,7 +62,7 @@ export default async function RootLayout({
             __html: `
               console.log('%c╔══════════════════════════════════════════════════════════╗', 'color: #3b82f6; font-weight: bold;');
               console.log('%c║                                                          ║', 'color: #3b82f6; font-weight: bold;');
-              console.log('%c║  🚀  QERO CRM - Cold Calling Platform                   ║', 'color: #3b82f6; font-weight: bold;');
+              console.log('%c║  🚀  QERO Momentum                 ║', 'color: #3b82f6; font-weight: bold;');
               console.log('%c║                                                          ║', 'color: #3b82f6; font-weight: bold;');
               console.log('%c║  Made with ❤️  by Miró Waltisberg                       ║', 'color: #3b82f6; font-weight: bold;');
               console.log('%c║  📞 +41 76 703 77 00                                    ║', 'color: #3b82f6; font-weight: bold;');
