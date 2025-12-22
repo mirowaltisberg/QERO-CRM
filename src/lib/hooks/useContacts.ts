@@ -23,6 +23,7 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
   const [actionState, setActionState] = useState<ActionState>({ type: null });
   const [error, setError] = useState<string | null>(null);
   const [cantonFilter, setCantonFilter] = useState<string | null>(null);
+  const [specializationFilter, setSpecializationFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [personalSettingsLoaded, setPersonalSettingsLoaded] = useState(false);
   
@@ -162,12 +163,29 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
     [contacts]
   );
 
+  const uniqueSpecializations = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          contacts
+            .map((c) => c.specialization)
+            .filter((spec): spec is string => Boolean(spec))
+        )
+      ).sort(),
+    [contacts]
+  );
+
   const visibleContacts = useMemo(() => {
     let filtered = contacts;
     
     // Filter by canton
     if (cantonFilter) {
       filtered = filtered.filter((c) => c.canton === cantonFilter);
+    }
+    
+    // Filter by specialization
+    if (specializationFilter) {
+      filtered = filtered.filter((c) => c.specialization === specializationFilter);
     }
     
     // Filter by search query
@@ -187,7 +205,7 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
     }
     
     return filtered;
-  }, [contacts, cantonFilter, searchQuery]);
+  }, [contacts, cantonFilter, specializationFilter, searchQuery]);
 
   const activeContact = useMemo(() => {
     return !activeId ? visibleContacts[0] ?? null : visibleContacts.find((c) => c.id === activeId) ?? visibleContacts[0] ?? null;
@@ -451,6 +469,8 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
     actionState,
     cantonFilter,
     uniqueCantons,
+    specializationFilter,
+    uniqueSpecializations,
     searchQuery,
     selectContact,
     goToNextContact,
@@ -464,6 +484,8 @@ export function useContacts({ initialContacts = [] }: UseContactsOptions) {
     clearStatus,
     setCantonFilter,
     clearCantonFilter: () => setCantonFilter(null),
+    setSpecializationFilter,
+    clearSpecializationFilter: () => setSpecializationFilter(null),
     setSearchQuery,
   };
 }

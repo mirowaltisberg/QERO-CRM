@@ -7,6 +7,7 @@ import type { Contact, ContactCallLog, Vacancy } from "@/lib/types";
 import { memo, useCallback, useRef, useState, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils/cn";
+import { getSpecializationLabel } from "@/lib/utils/outlook-specialization";
 
 interface ContactListProps {
   contacts: Contact[];
@@ -23,11 +24,21 @@ interface ContactListProps {
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   isMobile?: boolean;
+  // Specialization filter
+  onFilterBySpecialization?: (spec: string | null) => void;
+  activeSpecializationFilter?: string | null;
+  availableSpecializations?: string[];
 }
 
-// Get background styles based on status, vacancy, and active state
-function getItemStyles(status: string | null, hasVacancy: boolean, isActive: boolean, hasFollowUp: boolean): string {
-  // Priority: vacancy > hot > follow_up > working > default
+// Get background styles based on status, vacancy, specialization, and active state
+function getItemStyles(
+  status: string | null, 
+  hasVacancy: boolean, 
+  isActive: boolean, 
+  hasFollowUp: boolean,
+  specialization: string | null
+): string {
+  // Priority: vacancy > hot > follow_up > working > specialization > default
   if (hasVacancy) {
     return isActive 
       ? "bg-purple-50 border-purple-200 shadow-sm"
@@ -47,6 +58,17 @@ function getItemStyles(status: string | null, hasVacancy: boolean, isActive: boo
     return isActive
       ? "bg-slate-50 border-slate-200 shadow-sm"
       : "bg-slate-50/60 border-slate-100 hover:bg-slate-50";
+  }
+  // Specialization-based coloring (subtle background)
+  if (specialization === "holzbau") {
+    return isActive
+      ? "bg-amber-50/80 border-amber-200 shadow-sm"
+      : "bg-amber-50/40 border-amber-100/60 hover:bg-amber-50/60";
+  }
+  if (specialization === "dachdecker") {
+    return isActive
+      ? "bg-stone-100/80 border-stone-200 shadow-sm"
+      : "bg-stone-50/50 border-stone-100/60 hover:bg-stone-100/60";
   }
   return isActive
     ? "bg-white border-gray-200 shadow-sm"
@@ -114,6 +136,29 @@ const DistanceBadge = memo(function DistanceBadge({ distance }: { distance: numb
   );
 });
 
+// Specialization badge component
+const SpecializationBadge = memo(function SpecializationBadge({ 
+  specialization 
+}: { 
+  specialization: string | null 
+}) {
+  if (!specialization) return null;
+  
+  const label = getSpecializationLabel(specialization);
+  const colorClass = specialization === "holzbau" 
+    ? "bg-amber-100 text-amber-800" 
+    : "bg-stone-200 text-stone-700";
+  
+  return (
+    <span className={cn(
+      "inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium",
+      colorClass
+    )}>
+      {label.split(" / ")[0]}
+    </span>
+  );
+});
+
 // Memoized list item to prevent re-renders
 const ContactListItem = memo(function ContactListItem({
   contact,
@@ -150,7 +195,7 @@ const ContactListItem = memo(function ContactListItem({
   );
 
   const hasFollowUp = !!contact.follow_up_at;
-  const itemStyles = getItemStyles(contact.status, !!hasVacancy, isActive, hasFollowUp);
+  const itemStyles = getItemStyles(contact.status, !!hasVacancy, isActive, hasFollowUp, contact.specialization);
 
   return (
     <button
@@ -168,6 +213,7 @@ const ContactListItem = memo(function ContactListItem({
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           <DistanceBadge distance={contact.distance_km} />
+          <SpecializationBadge specialization={contact.specialization} />
           {hasVacancy && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-100 text-purple-700">
               <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
@@ -265,10 +311,14 @@ export const ContactList = memo(function ContactList({
   searchQuery = "",
   onSearchChange,
   isMobile = false,
+  onFilterBySpecialization,
+  activeSpecializationFilter,
+  availableSpecializations = [],
 }: ContactListProps) {
   const t = useTranslations("calling");
   const tCommon = useTranslations("common");
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [isSpecPickerOpen, setIsSpecPickerOpen] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery ?? "");
   
   // Sync local search with external searchQuery
@@ -318,13 +368,29 @@ export const ContactList = memo(function ContactList({
           )}
         </div>
         <div className="flex gap-2">
+          {availableSpecializations.length > 0 && (
+            <Button
+              size="sm"
+              variant={activeSpecializationFilter ? "primary" : "secondary"}
+              onClick={() => setIsSpecPickerOpen((prev) => !prev)}
+              className={cn(
+                "text-xs",
+                activeSpecializationFilter === "holzbau" && "bg-amber-100 text-amber-800 hover:bg-amber-200",
+                activeSpecializationFilter === "dachdecker" && "bg-stone-200 text-stone-700 hover:bg-stone-300"
+              )}
+            >
+              {activeSpecializationFilter 
+                ? getSpecializationLabel(activeSpecializationFilter).split(" / ")[0] 
+                : "Branche"}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="secondary"
             onClick={() => setIsPickerOpen((prev) => !prev)}
             className="text-xs text-gray-600"
           >
-            {activeCantonFilter ? `Canton: ${activeCantonFilter}` : "Filter Canton"}
+            {activeCantonFilter ? `Kt: ${activeCantonFilter}` : "Kanton"}
           </Button>
           <Button
             size="sm"
@@ -355,6 +421,42 @@ export const ContactList = memo(function ContactList({
           className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
       </div>
+      {/* Specialization filter picker */}
+      {isSpecPickerOpen && (
+        <div className="border-b border-gray-200 px-4 py-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant={activeSpecializationFilter ? "secondary" : "primary"}
+              onClick={() => {
+                onFilterBySpecialization?.(null);
+                setIsSpecPickerOpen(false);
+              }}
+            >
+              Alle Branchen
+            </Button>
+            {availableSpecializations.map((spec) => (
+              <Button
+                key={spec}
+                size="sm"
+                variant={activeSpecializationFilter === spec ? "primary" : "secondary"}
+                className={cn(
+                  "text-xs",
+                  spec === "holzbau" && "bg-amber-100 text-amber-800 hover:bg-amber-200",
+                  spec === "dachdecker" && "bg-stone-200 text-stone-700 hover:bg-stone-300"
+                )}
+                onClick={() => {
+                  onFilterBySpecialization?.(spec);
+                  setIsSpecPickerOpen(false);
+                }}
+              >
+                {getSpecializationLabel(spec).split(" / ")[0]}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Canton filter picker */}
       {isPickerOpen && (
         <div className="border-b border-gray-200 px-4 py-2">
           <div className="flex flex-wrap gap-2">
@@ -363,7 +465,7 @@ export const ContactList = memo(function ContactList({
               variant={activeCantonFilter ? "secondary" : "primary"}
               onClick={handleClearFilter}
             >
-              All Cantons
+              Alle Kantone
             </Button>
             {availableCantons.map((canton) => (
               <CantonTag

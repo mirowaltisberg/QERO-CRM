@@ -18,6 +18,7 @@ import { ContactsImporter } from "./ContactsImporter";
 import { OutlookSyncButton } from "./OutlookSyncButton";
 import { CleanupModal } from "./CleanupModal";
 import { fixContactDisplay } from "@/lib/utils/client-encoding-fix";
+import { getSpecializationLabel } from "@/lib/utils/outlook-specialization";
 
 interface ContactsTableProps {
   initialContacts: Contact[];
@@ -28,17 +29,59 @@ interface ContactsTableProps {
 
 const ROW_HEIGHT = 64; // Approximate height of each table row
 
+// Get row background based on specialization
+function getRowBackground(specialization: string | null, isSelected: boolean): string {
+  if (isSelected) return "bg-gray-100";
+  if (specialization === "holzbau") return "bg-amber-50/50";
+  if (specialization === "dachdecker") return "bg-stone-50/50";
+  return "";
+}
+
+// Specialization badge component
+const SpecializationBadge = memo(function SpecializationBadge({ 
+  specialization,
+  onClick,
+}: { 
+  specialization: string | null;
+  onClick?: (spec: string) => void;
+}) {
+  if (!specialization) return <span className="text-gray-300">—</span>;
+  
+  const label = getSpecializationLabel(specialization).split(" / ")[0];
+  const colorClass = specialization === "holzbau" 
+    ? "bg-amber-100 text-amber-800 hover:bg-amber-200" 
+    : "bg-stone-200 text-stone-700 hover:bg-stone-300";
+  
+  const handleClick = useCallback(() => {
+    onClick?.(specialization);
+  }, [onClick, specialization]);
+  
+  return (
+    <button
+      onClick={handleClick}
+      className={cn(
+        "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer",
+        colorClass
+      )}
+    >
+      {label}
+    </button>
+  );
+});
+
 // Memoized table row to prevent re-renders
 const ContactTableRow = memo(function ContactTableRow({
   contact,
   isSelected,
   onToggleSelection,
   onFilterByCanton,
+  onFilterBySpecialization,
 }: {
   contact: Contact;
   isSelected: boolean;
   onToggleSelection: (id: string) => void;
   onFilterByCanton: (canton: string) => void;
+  onFilterBySpecialization?: (spec: string) => void;
 }) {
   const handleCheckboxChange = useCallback(() => {
     onToggleSelection(contact.id);
@@ -51,8 +94,17 @@ const ContactTableRow = memo(function ContactTableRow({
     [onFilterByCanton]
   );
 
+  const handleSpecializationClick = useCallback(
+    (value: string) => {
+      onFilterBySpecialization?.(value);
+    },
+    [onFilterBySpecialization]
+  );
+
+  const rowBackground = getRowBackground(contact.specialization, isSelected);
+
   return (
-    <tr className={cn(isSelected ? "bg-gray-50" : "", "hover:bg-gray-50/50")}>
+    <tr className={cn(rowBackground, "hover:bg-gray-50/50")}>
       <td className="px-4 py-3 w-10">
         <input
           type="checkbox"
@@ -62,6 +114,12 @@ const ContactTableRow = memo(function ContactTableRow({
       </td>
       <td className="px-4 py-3 font-medium text-gray-900">{contact.company_name}</td>
       <td className="px-4 py-3">{contact.contact_name ?? "Hiring Team"}</td>
+      <td className="px-4 py-3">
+        <SpecializationBadge 
+          specialization={contact.specialization} 
+          onClick={handleSpecializationClick}
+        />
+      </td>
       <td className="px-4 py-3">
         <CantonTag canton={contact.canton} onClick={handleCantonClick} />
       </td>
@@ -140,13 +198,6 @@ export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamF
     runBulkAction,
   } = useContactsTable({ contacts: clientContacts, lists: [] });
 
-  const virtualizer = useVirtualizer({
-    count: contacts.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 10,
-  });
-
   const availableCantons = useMemo(
     () =>
       Array.from(
@@ -159,10 +210,45 @@ export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamF
     [clientContacts]
   );
 
+  const availableSpecializations = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          clientContacts
+            .map((c) => c.specialization)
+            .filter((spec): spec is string => Boolean(spec))
+        )
+      ).sort(),
+    [clientContacts]
+  );
+
+  // Specialization filter state
+  const [specializationFilter, setSpecializationFilter] = useState<string | null>(null);
+
+  // Filter contacts by specialization
+  const filteredContacts = useMemo(() => {
+    if (!specializationFilter) return contacts;
+    return contacts.filter((c) => c.specialization === specializationFilter);
+  }, [contacts, specializationFilter]);
+
+  const virtualizer = useVirtualizer({
+    count: filteredContacts.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  });
+
+  const handleFilterBySpecialization = useCallback(
+    (spec: string) => {
+      setSpecializationFilter((prev) => (prev === spec ? null : spec));
+    },
+    []
+  );
+
   const allSelected = useMemo(() => {
-    if (contacts.length === 0) return false;
-    return contacts.every((contact) => selectedIds.includes(contact.id));
-  }, [contacts, selectedIds]);
+    if (filteredContacts.length === 0) return false;
+    return filteredContacts.every((contact) => selectedIds.includes(contact.id));
+  }, [filteredContacts, selectedIds]);
 
   const handleBulkStatus = useCallback(
     async (status: ContactStatus) => {
@@ -237,6 +323,34 @@ export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamF
             onChange={handleTeamFilterChange}
             currentUserTeamId={currentUserTeamId}
           />
+          {/* Specialization Filter */}
+          {availableSpecializations.length > 0 && (
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant={!specializationFilter ? "primary" : "secondary"}
+                onClick={() => setSpecializationFilter(null)}
+                className="text-xs"
+              >
+                Alle
+              </Button>
+              {availableSpecializations.map((spec) => (
+                <Button
+                  key={spec}
+                  size="sm"
+                  variant={specializationFilter === spec ? "primary" : "secondary"}
+                  onClick={() => handleFilterBySpecialization(spec)}
+                  className={cn(
+                    "text-xs",
+                    spec === "holzbau" && specializationFilter === spec && "bg-amber-100 text-amber-800",
+                    spec === "dachdecker" && specializationFilter === spec && "bg-stone-200 text-stone-700"
+                  )}
+                >
+                  {getSpecializationLabel(spec).split(" / ")[0]}
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <OutlookSyncButton userEmail={userEmail ?? null} onSyncComplete={handleImportComplete} />
@@ -271,6 +385,20 @@ export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamF
                 sortDirection={sortDirection}
                 onSort={applySort}
               />
+              <th className="px-4 py-2">
+                <div className="flex items-center gap-1">
+                  Branche
+                  {specializationFilter && (
+                    <button
+                      onClick={() => setSpecializationFilter(null)}
+                      className="ml-1 text-blue-500 hover:text-blue-700"
+                      title="Filter aufheben"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </th>
               <SortableHeader
                 label={t("canton")}
                 column="canton"
@@ -293,16 +421,16 @@ export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamF
           <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
             {groupByCanton ? (
               // Non-virtualized when grouping by canton (for section headers)
-              contacts.map((contact, index) => {
+              filteredContacts.map((contact, index) => {
                 const isSelected = selectedIds.includes(contact.id);
                 const currentCanton = contact.canton ?? "Unknown Canton";
-                const previousCanton = index > 0 ? contacts[index - 1].canton ?? "Unknown Canton" : null;
+                const previousCanton = index > 0 ? filteredContacts[index - 1].canton ?? "Unknown Canton" : null;
                 const showHeader = index === 0 || previousCanton !== currentCanton;
                 return (
                   <Fragment key={contact.id}>
                     {showHeader && (
                       <tr className="bg-gray-50">
-                        <td colSpan={8} className="px-4 py-2 text-xs font-semibold text-gray-500">
+                        <td colSpan={9} className="px-4 py-2 text-xs font-semibold text-gray-500">
                           {currentCanton}
                         </td>
                       </tr>
@@ -312,6 +440,7 @@ export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamF
                       isSelected={isSelected}
                       onToggleSelection={toggleSelection}
                       onFilterByCanton={handleFilterByCanton}
+                      onFilterBySpecialization={handleFilterBySpecialization}
                     />
                   </Fragment>
                 );
@@ -330,11 +459,11 @@ export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamF
                     <>
                       {paddingTop > 0 && (
                         <tr>
-                          <td colSpan={8} style={{ height: `${paddingTop}px` }} />
+                          <td colSpan={9} style={{ height: `${paddingTop}px` }} />
                         </tr>
                       )}
                       {virtualRows.map((virtualRow) => {
-                        const contact = contacts[virtualRow.index];
+                        const contact = filteredContacts[virtualRow.index];
                         const isSelected = selectedIds.includes(contact.id);
                         return (
                           <ContactTableRow
@@ -343,12 +472,13 @@ export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamF
                             isSelected={isSelected}
                             onToggleSelection={toggleSelection}
                             onFilterByCanton={handleFilterByCanton}
+                            onFilterBySpecialization={handleFilterBySpecialization}
                           />
                         );
                       })}
                       {paddingBottom > 0 && (
                         <tr>
-                          <td colSpan={8} style={{ height: `${paddingBottom}px` }} />
+                          <td colSpan={9} style={{ height: `${paddingBottom}px` }} />
                         </tr>
                       )}
                     </>
@@ -359,10 +489,13 @@ export function ContactsTable({ initialContacts, currentUserTeamId, initialTeamF
           </tbody>
         </table>
 
-        {contacts.length === 0 && (
+        {filteredContacts.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-gray-500">
             <p>No companies found. Import a CSV to get started!</p>
-            <Button variant="secondary" onClick={() => applyFilters({ search: "", status: "all", canton: "all" })}>
+            <Button variant="secondary" onClick={() => {
+              applyFilters({ search: "", status: "all", canton: "all" });
+              setSpecializationFilter(null);
+            }}>
               Clear filters
             </Button>
           </div>

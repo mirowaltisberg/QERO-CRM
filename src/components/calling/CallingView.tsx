@@ -55,6 +55,8 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
     actionState,
     cantonFilter,
     uniqueCantons,
+    specializationFilter,
+    uniqueSpecializations,
     searchQuery,
     selectContact: originalSelectContact,
     goToNextContact,
@@ -68,6 +70,7 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
     clearStatus,
     setCantonFilter,
     clearCantonFilter,
+    setSpecializationFilter,
     setSearchQuery,
   } = useContacts({ initialContacts: fixedInitialContacts });
 
@@ -604,6 +607,9 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
             onClearCantonFilter={clearCantonFilter}
             activeCantonFilter={cantonFilter}
             availableCantons={uniqueCantons}
+            onFilterBySpecialization={setSpecializationFilter}
+            activeSpecializationFilter={specializationFilter}
+            availableSpecializations={uniqueSpecializations}
             callLogs={callLogs}
             contactVacancies={contactVacancies}
             searchQuery={searchQuery}
@@ -722,6 +728,9 @@ export function CallingView({ initialContacts, currentUserTeamId, initialTeamFil
           onClearCantonFilter={clearCantonFilter}
           activeCantonFilter={cantonFilter}
           availableCantons={uniqueCantons}
+          onFilterBySpecialization={setSpecializationFilter}
+          activeSpecializationFilter={specializationFilter}
+          availableSpecializations={uniqueSpecializations}
           callLogs={callLogs}
           contactVacancies={contactVacancies}
           searchQuery={searchQuery}
