@@ -17,6 +17,8 @@ import type { EmailAccount } from "@/lib/types";
 import type { Locale } from "@/i18n/config";
 import { Changelog } from "./Changelog";
 import { MfaSetupModal } from "./MfaSetupModal";
+import { InviteUserModal } from "./InviteUserModal";
+import { isCleanupAllowed } from "@/lib/utils/cleanup-auth";
 
 interface Profile {
   id: string;
@@ -73,6 +75,11 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
   const [disablingMfa, setDisablingMfa] = useState(false);
   const [resettingMfa, setResettingMfa] = useState(false);
 
+  // Admin invite state
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [teams, setTeams] = useState<Array<{ id: string; name: string; color: string | null }>>([]);
+  const isAdmin = isCleanupAllowed(user.email);
+
   const supabase = createClient();
 
   // Fetch email account status on mount
@@ -92,6 +99,23 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
     }
     fetchEmailAccount();
   }, []);
+
+  // Fetch teams for admin invite (only for admins)
+  useEffect(() => {
+    if (!isAdmin) return;
+    async function fetchTeams() {
+      try {
+        const response = await fetch("/api/teams");
+        const json = await response.json();
+        if (response.ok && json.data) {
+          setTeams(json.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch teams:", err);
+      }
+    }
+    fetchTeams();
+  }, [isAdmin]);
 
   // Fetch signature on mount
   useEffect(() => {
@@ -793,6 +817,41 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
         </div>
       </Panel>
 
+      {/* Admin Section - Only visible to admins */}
+      {isAdmin && (
+        <Panel title={t("adminSection")} description={t("teamManagement")}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900">{t("inviteUser")}</p>
+                <p className="text-xs text-gray-500">
+                  Senden Sie eine Einladung per Magic Link
+                </p>
+              </div>
+              <Button
+                onClick={() => setInviteModalOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                  />
+                </svg>
+                {t("inviteUser")}
+              </Button>
+            </div>
+          </div>
+        </Panel>
+      )}
+
       {/* Changelog */}
       <Changelog />
 
@@ -820,6 +879,14 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
         onClose={() => setMfaSetupOpen(false)}
         onSuccess={handleMfaSetupSuccess}
       />
+
+      {isAdmin && (
+        <InviteUserModal
+          isOpen={inviteModalOpen}
+          onClose={() => setInviteModalOpen(false)}
+          teams={teams}
+        />
+      )}
     </div>
   );
 }

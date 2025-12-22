@@ -419,7 +419,18 @@
     "emailSignature": "E-Mail-Signatur",
     "saveSettings": "Einstellungen speichern",
     "fullName": "Vollständiger Name",
-    "avatarUrl": "Avatar-URL"
+    "avatarUrl": "Avatar-URL",
+    "phone": "Telefon",
+    "inviteUser": "Benutzer einladen",
+    "invitationSent": "Einladung gesendet!",
+    "invitationSentDescription": "Eine Einladung wurde an {email} gesendet.",
+    "inviteInfo": "Der eingeladene Benutzer muss:",
+    "inviteInfoPassword": "Ein sicheres Passwort festlegen",
+    "inviteInfo2FA": "Zwei-Faktor-Authentifizierung aktivieren",
+    "sendInvitation": "Einladung senden",
+    "sending": "Wird gesendet...",
+    "adminSection": "Admin-Bereich",
+    "teamManagement": "Team-Verwaltung"
   },
   "filter": {
     "all": "Alle",

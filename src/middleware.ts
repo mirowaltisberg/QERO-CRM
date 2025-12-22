@@ -42,15 +42,25 @@ export async function middleware(request: NextRequest) {
   const publicRoutes = ["/login", "/register", "/auth/callback", "/auth/confirm"];
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
 
+  // Setup route - requires auth but allows users needing setup
+  const isSetupRoute = pathname === "/setup-account";
+
   // If user is not logged in and trying to access protected route
-  if (!user && !isPublicRoute) {
+  if (!user && !isPublicRoute && !isSetupRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  // If user is not logged in but trying to access setup page, redirect to login
+  if (!user && isSetupRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
   // If MFA is pending, block all protected routes and redirect to login with mfa flag
-  if (user && mfaPending && !isPublicRoute) {
+  if (user && mfaPending && !isPublicRoute && !isSetupRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("mfa", "1");
