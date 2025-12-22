@@ -31,10 +31,41 @@ export default function LoginPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   // Check if user is already authenticated (e.g., from magic link invite)
+  // Also handle hash fragments from Supabase magic links
   useEffect(() => {
     async function checkExistingAuth() {
       try {
         const supabase = createClient();
+        
+        // Check for hash fragment (Supabase sometimes puts auth data there)
+        const hash = window.location.hash;
+        if (hash && hash.includes("access_token")) {
+          console.log("[Login] Found access_token in hash, letting Supabase handle it...");
+          // Supabase client should auto-detect and establish session
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        // Check for URL params that might indicate invite flow
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenHash = urlParams.get("token_hash");
+        const authType = urlParams.get("type");
+        
+        if (tokenHash && authType === "invite") {
+          console.log("[Login] Found invite token_hash, verifying OTP...");
+          const { data, error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: "invite",
+          });
+          
+          if (!error && data.user) {
+            console.log("[Login] OTP verified, redirecting to setup...");
+            window.location.href = "/setup-account";
+            return;
+          } else {
+            console.error("[Login] OTP verification failed:", error);
+          }
+        }
+
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
@@ -56,6 +87,8 @@ export default function LoginPage() {
           console.log("[Login] User fully authenticated, redirecting to app...");
           window.location.href = "/calling";
           return;
+        } else {
+          console.log("[Login] No authenticated user found");
         }
       } catch (err) {
         console.error("[Login] Error checking auth:", err);
