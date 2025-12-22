@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     // Send invitation email using Supabase's inviteUserByEmail
     // This creates a user in "invited" state and sends a magic link
-    // Using /login as redirect so our login page can detect and redirect to setup
+    // Redirect to /auth/confirm which will handle session creation and routing
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://qero.international";
     console.log("[Invite] Using site URL:", siteUrl);
     
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
           must_change_password: true,
           must_setup_2fa: true,
         },
-        redirectTo: `${siteUrl}/login`,
+        redirectTo: `${siteUrl}/auth/confirm`,
       }
     );
     

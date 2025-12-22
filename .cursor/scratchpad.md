@@ -9,8 +9,87 @@
 - **NEW: Task 25 - Complete Mobile UI Revamp** - Make the app feel native on iPhone 16 Pro/Pro Max ✅ ✅
 - **NEW: Improve Email client** - full email bodies (no cut off), correct recipients (no \"An Unbekannt\"), and conversation-based Inbox/Sent behavior
 - **NEW: Task 26 - Two-Factor Authentication (2FA) with Google Authenticator** - Add TOTP-based 2FA for enhanced security
+- **NEW: Task 37 - Admin Magic-Link Invitations (Onboarding)** - Admin creates invite link for a user; user clicks link and is taken directly into **password setup → 2FA setup** (no manual login/register).
 
 ---
+
+# Task 37: Admin Magic-Link Invitations (Onboarding) (PLANNING)
+
+## Problem (Current Behavior)
+- Admin can send an invite email via Supabase Auth, but when the invited user clicks the link they land on `https://qero.international` (or `/login`) and see the **normal login UI**.
+- The invite link looks like:
+  - `https://<project>.supabase.co/auth/v1/verify?token=...&type=invite&redirect_to=https://qero.international`
+- This means the user is **not getting a usable app session** before we decide where to route them.
+
+## Key Challenges and Analysis
+- Supabase `/auth/v1/verify` invite flow often redirects back to the site using **hash-based tokens** (e.g. `#access_token=...`) or other params.
+- Our app currently checks `getUser()` on `/login`, but **does not reliably consume the auth redirect** and **store the session**.
+- Also, the observed email link uses `redirect_to=https://qero.international` (root) rather than a dedicated auth landing page, which makes this harder to handle consistently.
+
+## Proposed Fix (Robust + Deterministic)
+### Strategy
+Create a dedicated client-side landing page that **always** consumes Supabase redirect params and stores the session, then routes:
+- `/setup-account` if user must set password or setup 2FA
+- `/calling` otherwise
+
+### Why this works
+`supabase-js` provides a dedicated function to parse redirect params and persist session (`getSessionFromUrl({ storeSession: true })`). This is the canonical way to handle hash-based auth redirects.
+
+## High-level Task Breakdown
+
+### 37.1 Create `/auth/confirm` page that consumes the invite redirect
+**File**: `src/app/auth/confirm/page.tsx` (client component)
+**Behavior**:
+- Call `supabase.auth.getSessionFromUrl({ storeSession: true })`
+- After session is stored, fetch user + profile flags (`profiles.must_change_password`, `profiles.must_setup_2fa`)
+- Redirect to:
+  - `/setup-account` if either flag is true
+  - `/calling` otherwise
+**Success criteria**:
+- Clicking invite link results in a valid session in browser storage/cookies and immediately routes away from Login UI.
+
+### 37.2 Ensure middleware allows `/auth/confirm`
+**File**: `src/middleware.ts`
+**Change**: include `/auth/confirm` in public routes (or allow it explicitly).
+**Success criteria**:
+- Invited user can reach `/auth/confirm` without being bounced to `/login`.
+
+### 37.3 Update invite creation to use redirectTo=`/auth/confirm`
+**File**: `src/app/api/admin/users/invite/route.ts`
+**Change**: Set invite redirect target to:
+- `https://qero.international/auth/confirm`
+**Success criteria**:
+- Newly generated invite emails include `redirect_to=https://qero.international/auth/confirm` (not root).
+
+### 37.4 Supabase dashboard configuration (manual step)
+**Where**: Supabase → Authentication → URL Configuration
+**Ensure**:
+- **Site URL**: `https://qero.international`
+- **Redirect URLs** include:
+  - `https://qero.international/auth/confirm`
+  - `https://qero.international/setup-account`
+  - (optional) `https://qero.international/login`
+**Success criteria**:
+- Supabase accepts the redirect target; does not downgrade to root URL.
+
+### 37.5 (Optional hardening) Login fallback
+**File**: `src/app/login/page.tsx`
+**Change**: If we ever land on `/login` with hash tokens, call `getSessionFromUrl({ storeSession: true })` rather than “sleep and hope”.
+**Success criteria**:
+- Even if redirect_to lands on `/login`, user is still routed to `/setup-account`.
+
+### 37.6 Version bump + deploy
+**Success criteria**:
+- Production invite flow works end-to-end for a fresh invite.
+
+## Test Checklist (Production)
+1. Admin sends a **fresh** invite.
+2. Email link contains `redirect_to=https://qero.international/auth/confirm`.
+3. Invited user clicks link in a private/incognito window:
+   - Should NOT see register/login.
+   - Should land on setup: password → 2FA.
+4. After completing setup, user is redirected to `/calling`.
+
 
 # Task 25: Mobile UI Revamp (Native iOS Feel) ✅ COMPLETED
 
