@@ -34,6 +34,7 @@ export function sanitizeContactPayload(payload: ContactCreateInput) {
     last_call: payload.last_call ?? null,
     notes: fixedNotes,
     team_id: payload.team_id ?? null,
+    specialization: null, // Set via Outlook folder import
   };
 }
 

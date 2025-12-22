@@ -217,7 +217,7 @@ export function OutlookSyncButton({ userEmail, onSyncComplete }: OutlookSyncButt
         <div className="flex gap-2">
           {/* Folder-based import (primary) */}
           <Button
-            variant="default"
+            variant="primary"
             size="sm"
             onClick={() => setShowFolderPicker(true)}
             disabled={isDisabled}
