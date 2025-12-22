@@ -33,6 +33,8 @@ export default function LoginPage() {
   // Check if user is already authenticated (e.g., from magic link invite)
   // Also handle hash fragments from Supabase magic links
   useEffect(() => {
+    let mounted = true;
+
     async function checkExistingAuth() {
       try {
         const supabase = createClient();
@@ -57,7 +59,7 @@ export default function LoginPage() {
             type: "invite",
           });
           
-          if (!error && data.user) {
+          if (!error && data.user && mounted) {
             console.log("[Login] OTP verified, redirecting to setup...");
             window.location.href = "/setup-account";
             return;
@@ -68,36 +70,51 @@ export default function LoginPage() {
 
         const { data: { user } } = await supabase.auth.getUser();
 
-        if (user) {
+        if (user && mounted) {
           console.log("[Login] User already authenticated:", user.email);
-          console.log("[Login] User metadata:", JSON.stringify(user.user_metadata));
 
-          // Check if this is an invited user that needs setup
+          // Check profile to determine setup status
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("must_change_password, must_setup_2fa")
+            .eq("id", user.id)
+            .single();
+
+          console.log("[Login] Profile check:", profile);
+
+          // Check if user needs setup
           const needsSetup = 
-            user.user_metadata?.must_change_password === true ||
-            user.user_metadata?.must_setup_2fa === true;
+            profile?.must_change_password === true ||
+            profile?.must_setup_2fa === true;
+
+          console.log("[Login] Needs setup:", needsSetup);
 
           if (needsSetup) {
-            console.log("[Login] Invited user needs setup, redirecting...");
+            console.log("[Login] Redirecting to setup...");
             window.location.href = "/setup-account";
-            return;
+          } else {
+            console.log("[Login] Redirecting to app...");
+            window.location.href = "/calling";
           }
-
-          // User is fully set up, redirect to app
-          console.log("[Login] User fully authenticated, redirecting to app...");
-          window.location.href = "/calling";
-          return;
         } else {
           console.log("[Login] No authenticated user found");
+          if (mounted) {
+            setCheckingAuth(false);
+          }
         }
       } catch (err) {
         console.error("[Login] Error checking auth:", err);
-      } finally {
-        setCheckingAuth(false);
+        if (mounted) {
+          setCheckingAuth(false);
+        }
       }
     }
 
     checkExistingAuth();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Resume MFA step if redirected back with ?mfa=1 (e.g., after page refresh during MFA)
