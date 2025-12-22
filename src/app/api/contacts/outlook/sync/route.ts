@@ -115,9 +115,31 @@ async function fetchContactsDelta(
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error("[Outlook Sync] Graph API error:", error);
-      throw new Error(`Failed to fetch contacts from Graph API: ${response.status}`);
+      const errorText = await response.text();
+      console.error("[Outlook Sync] Graph API error response:");
+      console.error("[Outlook Sync] Status:", response.status);
+      console.error("[Outlook Sync] Status Text:", response.statusText);
+      console.error("[Outlook Sync] Error body:", errorText);
+      console.error("[Outlook Sync] Request URL:", url);
+      
+      let errorMessage = `Failed to fetch contacts from Graph API: ${response.status}`;
+      
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error?.message) {
+          errorMessage += ` - ${errorJson.error.message}`;
+        }
+        if (errorJson.error?.code) {
+          errorMessage += ` (Code: ${errorJson.error.code})`;
+        }
+      } catch {
+        // Not JSON, use raw text
+        if (errorText) {
+          errorMessage += ` - ${errorText.substring(0, 200)}`;
+        }
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data: GraphContactsResponse = await response.json();
