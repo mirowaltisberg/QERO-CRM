@@ -8,7 +8,7 @@ const InviteSchema = z.object({
   email: z.string().email("Invalid email address"),
   fullName: z.string().min(2, "Full name is required"),
   phone: z.string().optional(),
-  teamId: z.string().uuid("Invalid team ID"),
+  teamId: z.string().min(1, "Team is required"),
 });
 
 /**
@@ -35,17 +35,36 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json();
+    console.log("[Invite] Request body:", JSON.stringify(body));
+    
     const parsed = InviteSchema.safeParse(body);
 
     if (!parsed.success) {
+      console.log("[Invite] Validation failed:", JSON.stringify(parsed.error.issues));
       const errorMessage = parsed.error.issues[0]?.message || "Invalid input";
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
     const { email, fullName, phone, teamId } = parsed.data;
 
-    // Check if user already exists
     const adminClient = createAdminClient();
+
+    // Verify team exists
+    const { data: team, error: teamError } = await adminClient
+      .from("teams")
+      .select("id, name")
+      .eq("id", teamId)
+      .single();
+
+    if (teamError || !team) {
+      console.log("[Invite] Team not found:", teamId, teamError);
+      return NextResponse.json(
+        { error: `Team not found: ${teamId}` },
+        { status: 400 }
+      );
+    }
+
+    // Check if user already exists
     const { data: existingUsers } = await adminClient.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(u => u.email === email);
 
