@@ -40,11 +40,21 @@ export const InviteUserModal = memo(function InviteUserModal({
       setEmail("");
       setFullName("");
       setPhone("");
-      setTeamId(teams[0]?.id || "");
+      // Set teamId only if teams are available
+      if (teams.length > 0) {
+        setTeamId(teams[0].id);
+      }
       setError(null);
       setSuccess(false);
     }
   }, [isOpen, teams]);
+
+  // Update teamId when teams load (in case modal opened before teams loaded)
+  useEffect(() => {
+    if (teams.length > 0 && !teamId) {
+      setTeamId(teams[0].id);
+    }
+  }, [teams, teamId]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +104,12 @@ export const InviteUserModal = memo(function InviteUserModal({
       onClose={onClose}
       title={t("inviteUser")}
     >
-      {success ? (
+      {teams.length === 0 ? (
+        <div className="py-8 text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          <p className="text-sm text-gray-500">Teams werden geladen...</p>
+        </div>
+      ) : success ? (
         <div className="py-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
             <svg
