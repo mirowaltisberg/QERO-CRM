@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { OutlookFolderPickerModal } from "./OutlookFolderPickerModal";
 
 // Admin emails - keep in sync with cleanup-auth.ts
 const ADMIN_EMAILS = ["shtanaj@qero.ch", "m.waltisberg@qero.ch"];
@@ -15,6 +16,7 @@ interface OutlookSyncButtonProps {
 interface SyncResult {
   imported: number;
   skipped: number;
+  updated?: number;
   errors: string[];
   duplicateReasons?: {
     phone: number;
@@ -45,10 +47,71 @@ export function OutlookSyncButton({ userEmail, onSyncComplete }: OutlookSyncButt
   const [adminSyncing, setAdminSyncing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "success" | "error" | "warning">("idle");
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
   
   const isAdmin = userEmail ? ADMIN_EMAILS.includes(userEmail.toLowerCase().trim()) : false;
 
-  const handleSync = useCallback(async () => {
+  // Handle folder-based import
+  const handleFolderImport = useCallback(async (folders: Array<{ folderId: string; specialization: string | null }>) => {
+    setSyncing(true);
+    setMessage("Importiere aus ausgewählten Ordnern…");
+    setStatus("idle");
+
+    try {
+      const response = await fetch("/api/contacts/outlook/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folders }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        setStatus("error");
+        if (response.status === 401) {
+          setMessage("Outlook-Verbindung abgelaufen. Bitte in Einstellungen neu verbinden.");
+        } else if (response.status === 400) {
+          setMessage("Kein Outlook-Konto verbunden. Bitte in Einstellungen verbinden.");
+        } else {
+          setMessage(json.error || "Import fehlgeschlagen");
+        }
+        throw new Error(json.error || "Import failed");
+      }
+
+      const result: SyncResult = json.data;
+      
+      if (result.errors && result.errors.length > 0) {
+        setStatus("warning");
+        setMessage(
+          `${result.imported} importiert, ${result.updated || 0} aktualisiert, ${result.skipped} übersprungen (${result.errors.length} Fehler)`
+        );
+      } else if (result.imported === 0 && (result.updated || 0) === 0) {
+        setStatus("success");
+        setMessage(`Keine neuen Kontakte (${result.skipped} bereits vorhanden)`);
+      } else {
+        setStatus("success");
+        const parts = [];
+        if (result.imported > 0) parts.push(`${result.imported} importiert`);
+        if ((result.updated || 0) > 0) parts.push(`${result.updated} aktualisiert`);
+        setMessage(`✓ ${parts.join(", ")}`);
+      }
+
+      onSyncComplete?.();
+      router.refresh();
+    } catch (error) {
+      console.error("Outlook folder import error:", error);
+      if (status === "idle") {
+        setStatus("error");
+        setMessage("Verbindungsfehler. Bitte erneut versuchen.");
+      }
+      throw error;
+    } finally {
+      setSyncing(false);
+    }
+  }, [onSyncComplete, router, status]);
+
+  // Legacy sync (all contacts via delta)
+  const handleLegacySync = useCallback(async () => {
     setSyncing(true);
     setMessage("Synchronisiere Outlook-Kontakte…");
     setStatus("idle");
@@ -99,6 +162,7 @@ export function OutlookSyncButton({ userEmail, onSyncComplete }: OutlookSyncButt
     }
   }, [onSyncComplete, router]);
 
+  // Admin sync all teams
   const handleAdminSync = useCallback(async () => {
     if (!isAdmin) return;
     
@@ -148,50 +212,70 @@ export function OutlookSyncButton({ userEmail, onSyncComplete }: OutlookSyncButt
   const isDisabled = syncing || adminSyncing;
 
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={handleSync}
-          disabled={isDisabled}
-          title="Kontakte aus meinem Outlook importieren"
-        >
-          {syncing ? "Synchronisiere…" : "Outlook Sync"}
-        </Button>
-        
-        {isAdmin && (
+    <>
+      <div className="flex flex-col items-end gap-2">
+        <div className="flex gap-2">
+          {/* Folder-based import (primary) */}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setShowFolderPicker(true)}
+            disabled={isDisabled}
+            title="Kontakte aus Outlook-Ordnern importieren"
+          >
+            {syncing ? "Importiere…" : "Outlook Import"}
+          </Button>
+
+          {/* Legacy delta sync (secondary) */}
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleAdminSync}
+            onClick={handleLegacySync}
             disabled={isDisabled}
-            title="Alle Teams synchronisieren (Admin)"
-            className="bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200"
+            title="Alle neuen Outlook-Kontakte synchronisieren (Delta)"
           >
-            {adminSyncing ? "Synchronisiere alle…" : "Alle Teams"}
+            {syncing ? "Sync…" : "Quick Sync"}
           </Button>
+          
+          {isAdmin && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleAdminSync}
+              disabled={isDisabled}
+              title="Alle Teams synchronisieren (Admin)"
+              className="bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200"
+            >
+              {adminSyncing ? "Synchronisiere alle…" : "Alle Teams"}
+            </Button>
+          )}
+        </div>
+
+        {message && (
+          <p
+            className="text-xs font-medium max-w-[280px] text-right"
+            style={{
+              color:
+                status === "error"
+                  ? "#dc2626"
+                  : status === "warning"
+                  ? "#d97706"
+                  : status === "success"
+                  ? "#16a34a"
+                  : "#6b7280",
+            }}
+          >
+            {message}
+          </p>
         )}
       </div>
 
-      {message && (
-        <p
-          className="text-xs font-medium max-w-[280px] text-right"
-          style={{
-            color:
-              status === "error"
-                ? "#dc2626"
-                : status === "warning"
-                ? "#d97706"
-                : status === "success"
-                ? "#16a34a"
-                : "#6b7280",
-          }}
-        >
-          {message}
-        </p>
-      )}
-    </div>
+      {/* Folder picker modal */}
+      <OutlookFolderPickerModal
+        isOpen={showFolderPicker}
+        onClose={() => setShowFolderPicker(false)}
+        onImport={handleFolderImport}
+      />
+    </>
   );
 }
-

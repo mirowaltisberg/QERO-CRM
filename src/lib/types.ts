@@ -46,6 +46,7 @@ export interface Contact {
   last_call: string | null; // ISO timestamp
   notes: string | null;
   team_id: string | null; // Which industry vertical this contact belongs to
+  specialization: string | null; // Industry specialization (e.g., "holzbau", "dachdecker") - from Outlook folder
   created_at: string; // ISO timestamp
   // Computed distance (only present in radius search results)
   distance_km?: number;
@@ -105,6 +106,7 @@ export interface TmaCandidate {
   id_url: string | null;
   bank_url: string | null;
   team_id: string | null; // Which industry vertical this candidate belongs to
+  specialization: string | null; // Industry specialization (e.g., "holzbau", "dachdecker") for matching
   created_at: string;
   claimed_by: string | null;
   // Coordinates for location search

@@ -317,6 +317,8 @@ user_tma_settings (
   - Removed auto-clear logic that interfered with independent status/follow-up
   - Created migration application guide in `supabase/migrations/APPLY_MIGRATIONS.md`
 
+- Console credits banner: fixed alignment and added email (`miromw@icloud.com`) in `src/app/layout.tsx`.
+
 **✅ Migration 022 Successfully Applied to Production**
 
 Migration `022_personal_followups_fix.sql` has been applied to production Supabase via `supabase db push`.

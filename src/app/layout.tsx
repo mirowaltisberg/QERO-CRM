@@ -60,15 +60,18 @@ export default async function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              console.log('%c╔══════════════════════════════════════════════════════════╗', 'color: #3b82f6; font-weight: bold;');
-              console.log('%c║                                                          ║', 'color: #3b82f6; font-weight: bold;');
-              console.log('%c║  🚀  QERO Momentum                 ║', 'color: #3b82f6; font-weight: bold;');
-              console.log('%c║                                                          ║', 'color: #3b82f6; font-weight: bold;');
-              console.log('%c║  Made with ❤️  by Miró Waltisberg                       ║', 'color: #3b82f6; font-weight: bold;');
-              console.log('%c║  📞 +41 76 703 77 00                                    ║', 'color: #3b82f6; font-weight: bold;');
-              console.log('%c║  🏢 QERO AG                                             ║', 'color: #3b82f6; font-weight: bold;');
-              console.log('%c║                                                          ║', 'color: #3b82f6; font-weight: bold;');
-              console.log('%c╚══════════════════════════════════════════════════════════╝', 'color: #3b82f6; font-weight: bold;');
+              console.log(
+                "%c╔══════════════════════════════════════════════════════════╗\\n" +
+                  "║                                                          ║\\n" +
+                  "║  🚀  QERO Momentum                                       ║\\n" +
+                  "║                                                          ║\\n" +
+                  "║  Made by Miró Waltisberg for QERO AG                     ║\\n" +
+                  "║  📧 miromw@icloud.com                                    ║\\n" +
+                  "║  📞 +41 76 703 77 00                                     ║\\n" +
+                  "║                                                          ║\\n" +
+                  "╚══════════════════════════════════════════════════════════╝",
+                "color: #3b82f6; font-weight: bold;"
+              );
             `,
           }}
         />

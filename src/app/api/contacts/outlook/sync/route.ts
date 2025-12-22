@@ -2,9 +2,14 @@
  * POST /api/contacts/outlook/sync
  * 
  * Sync Outlook contacts from Microsoft Graph into Supabase.
- * - Uses delta queries for incremental sync
+ * 
+ * Two modes:
+ * 1. **Legacy mode** (no body): Uses delta queries for incremental sync from all contacts
+ * 2. **Folder mode** (with folders in body): Imports from specific folders with specialization tagging
+ * 
  * - Skips duplicates based on phone, email domain, and name
- * - Only inserts new contacts, never updates existing ones
+ * - Only inserts new contacts, never updates CRM fields
+ * - May update specialization on existing contacts if it's currently NULL
  */
 
 import { NextRequest } from "next/server";
@@ -17,31 +22,21 @@ import { geocodeByPostalOrCity } from "@/lib/geo";
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
 
 // Public email domains to ignore for domain-based deduplication
-// (matching against these would skip too many contacts)
 const PUBLIC_EMAIL_DOMAINS = new Set([
-  "gmail.com",
-  "googlemail.com",
-  "outlook.com",
-  "outlook.ch",
-  "hotmail.com",
-  "hotmail.ch",
-  "yahoo.com",
-  "yahoo.ch",
-  "icloud.com",
-  "me.com",
-  "mac.com",
-  "gmx.ch",
-  "gmx.net",
-  "gmx.de",
-  "bluewin.ch",
-  "sunrise.ch",
-  "hispeed.ch",
-  "protonmail.com",
-  "proton.me",
-  "aol.com",
-  "live.com",
-  "msn.com",
+  "gmail.com", "googlemail.com", "outlook.com", "outlook.ch",
+  "hotmail.com", "hotmail.ch", "yahoo.com", "yahoo.ch",
+  "icloud.com", "me.com", "mac.com", "gmx.ch", "gmx.net", "gmx.de",
+  "bluewin.ch", "sunrise.ch", "hispeed.ch", "protonmail.com",
+  "proton.me", "aol.com", "live.com", "msn.com",
 ]);
+
+// Request body for folder-based sync
+interface FolderSyncRequest {
+  folders: Array<{
+    folderId: string;
+    specialization: string | null;
+  }>;
+}
 
 // Graph Contact interface
 interface GraphContact {
@@ -79,6 +74,7 @@ interface GraphContactsResponse {
 interface SyncResult {
   imported: number;
   skipped: number;
+  updated: number; // For specialization updates on existing contacts
   errors: string[];
   duplicateReasons: {
     phone: number;
@@ -89,28 +85,15 @@ interface SyncResult {
 }
 
 /**
- * Fetch contacts from Microsoft Graph with delta support
+ * Fetch contacts from a specific folder (non-delta)
  */
-async function fetchContactsDelta(
+async function fetchContactsFromFolder(
   accessToken: string,
-  deltaToken: string | null
-): Promise<{ contacts: GraphContact[]; nextDeltaToken: string }> {
+  folderId: string
+): Promise<GraphContact[]> {
   const contacts: GraphContact[] = [];
+  let url: string | null = `${GRAPH_BASE_URL}/me/contactFolders/${folderId}/contacts?$top=200`;
 
-  // Build initial URL
-  let url: string;
-  if (deltaToken) {
-    url = deltaToken;
-  } else {
-    // Initial sync - get all contacts
-    // Note: Delta queries don't support $select, $top, $filter, etc.
-    // All fields are returned by default
-    url = `${GRAPH_BASE_URL}/me/contacts/delta`;
-  }
-
-  let nextDeltaToken = "";
-
-  // Follow pagination
   while (url) {
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -118,27 +101,59 @@ async function fetchContactsDelta(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[Outlook Sync] Graph API error response:");
-      console.error("[Outlook Sync] Status:", response.status);
-      console.error("[Outlook Sync] Status Text:", response.statusText);
-      console.error("[Outlook Sync] Error body:", errorText);
-      console.error("[Outlook Sync] Request URL:", url);
+      console.error("[Outlook Sync] Graph API error fetching folder contacts:", response.status, errorText);
+      throw new Error(`Failed to fetch contacts from folder: ${response.status}`);
+    }
+
+    const data: GraphContactsResponse = await response.json();
+    contacts.push(...data.value);
+
+    url = data["@odata.nextLink"] || null;
+
+    // Safety limit
+    if (contacts.length > 5000) {
+      console.warn("[Outlook Sync] Reached 5000 contacts limit for folder");
+      break;
+    }
+  }
+
+  return contacts;
+}
+
+/**
+ * Fetch contacts from Microsoft Graph with delta support (legacy mode)
+ */
+async function fetchContactsDelta(
+  accessToken: string,
+  deltaToken: string | null
+): Promise<{ contacts: GraphContact[]; nextDeltaToken: string }> {
+  const contacts: GraphContact[] = [];
+  let url: string;
+  
+  if (deltaToken) {
+    url = deltaToken;
+  } else {
+    url = `${GRAPH_BASE_URL}/me/contacts/delta`;
+  }
+
+  let nextDeltaToken = "";
+
+  while (url) {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Outlook Sync] Graph API error:", response.status, errorText);
       
       let errorMessage = `Failed to fetch contacts from Graph API: ${response.status}`;
-      
       try {
         const errorJson = JSON.parse(errorText);
-        if (errorJson.error?.message) {
-          errorMessage += ` - ${errorJson.error.message}`;
-        }
-        if (errorJson.error?.code) {
-          errorMessage += ` (Code: ${errorJson.error.code})`;
-        }
+        if (errorJson.error?.message) errorMessage += ` - ${errorJson.error.message}`;
+        if (errorJson.error?.code) errorMessage += ` (Code: ${errorJson.error.code})`;
       } catch {
-        // Not JSON, use raw text
-        if (errorText) {
-          errorMessage += ` - ${errorText.substring(0, 200)}`;
-        }
+        if (errorText) errorMessage += ` - ${errorText.substring(0, 200)}`;
       }
       
       throw new Error(errorMessage);
@@ -156,9 +171,8 @@ async function fetchContactsDelta(
       break;
     }
 
-    // Safety limit - process in batches if more than 5000
     if (contacts.length > 5000) {
-      console.warn("[Outlook Sync] Reached 5000 contacts limit, stopping pagination");
+      console.warn("[Outlook Sync] Reached 5000 contacts limit");
       break;
     }
   }
@@ -166,41 +180,28 @@ async function fetchContactsDelta(
   return { contacts, nextDeltaToken };
 }
 
-/**
- * Normalize phone number for comparison (digits only)
- */
 function normalizePhoneDigits(phone: string | null | undefined): string | null {
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
-  // Must have at least 6 digits to be considered valid
   return digits.length >= 6 ? digits : null;
 }
 
-/**
- * Extract email domain (lowercase)
- */
 function extractEmailDomain(email: string | null | undefined): string | null {
   if (!email || !email.includes("@")) return null;
-  const domain = email.split("@")[1]?.toLowerCase();
-  return domain || null;
+  return email.split("@")[1]?.toLowerCase() || null;
 }
 
-/**
- * Normalize name for comparison (lowercase, trimmed, collapsed whitespace)
- */
 function normalizeName(name: string | null | undefined): string | null {
   if (!name) return null;
   const normalized = name.replace(/\s+/g, " ").trim().toLowerCase();
   return normalized.length >= 2 ? normalized : null;
 }
 
-/**
- * Map Graph contact to CRM contact payload
- */
 function mapGraphContactToPayload(
   contact: GraphContact,
   teamId: string | null,
-  sourceAccountId: string
+  sourceAccountId: string,
+  specialization: string | null
 ): {
   company_name: string;
   contact_name: string;
@@ -213,46 +214,36 @@ function mapGraphContactToPayload(
   latitude: number | null;
   longitude: number | null;
   team_id: string | null;
+  specialization: string | null;
   source: string;
   source_account_id: string;
   source_graph_contact_id: string;
 } | null {
-  // Determine company name - use companyName if available, else derive from email domain
   let companyName = contact.companyName;
   const email = contact.emailAddresses?.[0]?.address || null;
   
   if (!companyName && email) {
     const domain = extractEmailDomain(email);
     if (domain && !PUBLIC_EMAIL_DOMAINS.has(domain)) {
-      // Use domain as company name (capitalize first letter)
       const domainParts = domain.split(".");
       companyName = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
     }
   }
   
-  // Skip if no company name
-  if (!companyName) {
-    return null;
-  }
+  if (!companyName) return null;
 
-  // Determine contact name
   const contactName = contact.displayName || 
     [contact.givenName, contact.surname].filter(Boolean).join(" ") || 
     "Unbekannt";
 
-  // Get phone - prefer mobile, then business
   const phone = contact.mobilePhone || contact.businessPhones?.[0] || contact.homePhones?.[0] || null;
-
-  // Get address - prefer business
   const address = contact.businessAddress || contact.homeAddress;
   const street = address?.street || null;
   const city = address?.city || null;
   const postalCode = address?.postalCode || null;
 
-  // Geocode if we have postal code or city
   let latitude: number | null = null;
   let longitude: number | null = null;
-  const canton: string | null = null; // Canton not returned by geocodeByPostalOrCity
   
   if (postalCode || city) {
     const coords = geocodeByPostalOrCity(postalCode, city);
@@ -270,10 +261,11 @@ function mapGraphContactToPayload(
     street,
     city,
     postal_code: postalCode,
-    canton,
+    canton: null,
     latitude,
     longitude,
     team_id: teamId,
+    specialization,
     source: "outlook",
     source_account_id: sourceAccountId,
     source_graph_contact_id: contact.id,
@@ -291,7 +283,21 @@ export async function POST(request: NextRequest) {
       return respondError("Unauthorized", 401);
     }
 
-    // Get user's email account (Microsoft OAuth)
+    // Parse request body (optional)
+    let folderRequest: FolderSyncRequest | null = null;
+    try {
+      const body = await request.json();
+      if (body && Array.isArray(body.folders) && body.folders.length > 0) {
+        folderRequest = body as FolderSyncRequest;
+      }
+    } catch {
+      // No body or invalid JSON - use legacy mode
+    }
+
+    const isFolderMode = folderRequest !== null;
+    console.log("[Outlook Sync] Mode:", isFolderMode ? "Folder" : "Legacy (Delta)");
+
+    // Get user's email account
     const { data: emailAccount, error: accountError } = await adminClient
       .from("email_accounts")
       .select("id, user_id, mailbox, access_token, refresh_token, token_expires_at, contacts_delta_token")
@@ -306,10 +312,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure we have valid tokens (refresh if needed)
+    // Ensure valid tokens
     let accessToken: string;
     try {
-      // Adapt to EmailAccount interface (which expects delta_token, not contacts_delta_token)
       const emailAccountAdapter = {
         ...emailAccount,
         delta_token: emailAccount.contacts_delta_token,
@@ -334,21 +339,41 @@ export async function POST(request: NextRequest) {
 
     console.log("[Outlook Sync] Starting sync for user:", user.id, "team:", teamId);
 
-    // Fetch contacts from Graph
-    const { contacts: graphContacts, nextDeltaToken } = await fetchContactsDelta(
-      accessToken,
-      emailAccount.contacts_delta_token
-    );
+    // Fetch contacts based on mode
+    const graphContactsWithSpec: Array<{ contact: GraphContact; specialization: string | null }> = [];
+    let nextDeltaToken = "";
 
-    console.log("[Outlook Sync] Fetched", graphContacts.length, "contacts from Graph");
+    if (isFolderMode && folderRequest) {
+      // Folder mode: fetch from each specified folder
+      for (const folder of folderRequest.folders) {
+        console.log(`[Outlook Sync] Fetching folder ${folder.folderId} with spec: ${folder.specialization}`);
+        const folderContacts = await fetchContactsFromFolder(accessToken, folder.folderId);
+        console.log(`[Outlook Sync] Got ${folderContacts.length} contacts from folder`);
+        
+        for (const contact of folderContacts) {
+          graphContactsWithSpec.push({ contact, specialization: folder.specialization });
+        }
+      }
+    } else {
+      // Legacy mode: delta query
+      const { contacts, nextDeltaToken: token } = await fetchContactsDelta(
+        accessToken,
+        emailAccount.contacts_delta_token
+      );
+      nextDeltaToken = token;
+      
+      for (const contact of contacts) {
+        graphContactsWithSpec.push({ contact, specialization: null });
+      }
+    }
+
+    console.log("[Outlook Sync] Fetched", graphContactsWithSpec.length, "contacts total");
 
     // Load existing contacts for deduplication
-    // We need: normalized_phone_digits, normalized_name, email_domain, source_graph_contact_id
     let existingContactsQuery = adminClient
       .from("contacts")
-      .select("id, normalized_phone_digits, normalized_name, email_domain, source_graph_contact_id");
+      .select("id, normalized_phone_digits, normalized_name, email_domain, source_graph_contact_id, specialization");
 
-    // Scope to team if user has one (prevents cross-team duplicates)
     if (teamId) {
       existingContactsQuery = existingContactsQuery.eq("team_id", teamId);
     }
@@ -360,24 +385,23 @@ export async function POST(request: NextRequest) {
       return respondError("Failed to check for duplicates", 500);
     }
 
-    // Build lookup sets for fast deduplication
+    // Build lookup sets
     const existingPhones = new Set<string>();
     const existingNames = new Set<string>();
     const existingDomains = new Set<string>();
-    const existingGraphIds = new Set<string>();
+    const existingGraphIds = new Map<string, { id: string; specialization: string | null }>();
 
     for (const contact of existingContacts || []) {
-      if (contact.normalized_phone_digits) {
-        existingPhones.add(contact.normalized_phone_digits);
-      }
-      if (contact.normalized_name) {
-        existingNames.add(contact.normalized_name);
-      }
+      if (contact.normalized_phone_digits) existingPhones.add(contact.normalized_phone_digits);
+      if (contact.normalized_name) existingNames.add(contact.normalized_name);
       if (contact.email_domain && !PUBLIC_EMAIL_DOMAINS.has(contact.email_domain)) {
         existingDomains.add(contact.email_domain);
       }
       if (contact.source_graph_contact_id) {
-        existingGraphIds.add(contact.source_graph_contact_id);
+        existingGraphIds.set(contact.source_graph_contact_id, {
+          id: contact.id,
+          specialization: contact.specialization,
+        });
       }
     }
 
@@ -385,6 +409,7 @@ export async function POST(request: NextRequest) {
     const result: SyncResult = {
       imported: 0,
       skipped: 0,
+      updated: 0,
       errors: [],
       duplicateReasons: {
         phone: 0,
@@ -395,19 +420,24 @@ export async function POST(request: NextRequest) {
     };
 
     const contactsToInsert: ReturnType<typeof mapGraphContactToPayload>[] = [];
+    const contactsToUpdateSpec: Array<{ id: string; specialization: string }> = [];
 
-    for (const graphContact of graphContacts) {
-      // Skip if already imported from this Graph contact
-      if (existingGraphIds.has(graphContact.id)) {
+    for (const { contact: graphContact, specialization } of graphContactsWithSpec) {
+      // Check if already imported
+      const existing = existingGraphIds.get(graphContact.id);
+      if (existing) {
+        // Already exists - but maybe update specialization if it's NULL
+        if (specialization && !existing.specialization) {
+          contactsToUpdateSpec.push({ id: existing.id, specialization });
+        }
         result.skipped++;
         result.duplicateReasons.already_imported++;
         continue;
       }
 
       // Map to CRM payload
-      const payload = mapGraphContactToPayload(graphContact, teamId, emailAccount.id);
+      const payload = mapGraphContactToPayload(graphContact, teamId, emailAccount.id, specialization);
       if (!payload) {
-        // No valid company name
         result.skipped++;
         continue;
       }
@@ -417,45 +447,41 @@ export async function POST(request: NextRequest) {
       const normalizedName = normalizeName(payload.company_name);
       const emailDomain = extractEmailDomain(payload.email);
 
-      // Same phone → skip
       if (normalizedPhone && existingPhones.has(normalizedPhone)) {
         result.skipped++;
         result.duplicateReasons.phone++;
         continue;
       }
 
-      // Same email domain → skip (unless public domain)
       if (emailDomain && !PUBLIC_EMAIL_DOMAINS.has(emailDomain) && existingDomains.has(emailDomain)) {
         result.skipped++;
         result.duplicateReasons.email_domain++;
         continue;
       }
 
-      // Same name → skip
       if (normalizedName && existingNames.has(normalizedName)) {
         result.skipped++;
         result.duplicateReasons.name++;
         continue;
       }
 
-      // Add to insert list and update lookup sets to prevent duplicates within this batch
+      // Add to insert list
       contactsToInsert.push(payload);
       if (normalizedPhone) existingPhones.add(normalizedPhone);
       if (normalizedName) existingNames.add(normalizedName);
       if (emailDomain && !PUBLIC_EMAIL_DOMAINS.has(emailDomain)) existingDomains.add(emailDomain);
-      existingGraphIds.add(graphContact.id);
+      existingGraphIds.set(graphContact.id, { id: "", specialization: null }); // Mark as seen
     }
 
     console.log("[Outlook Sync] Contacts to insert:", contactsToInsert.length);
+    console.log("[Outlook Sync] Contacts to update specialization:", contactsToUpdateSpec.length);
 
-    // Batch insert contacts
+    // Batch insert new contacts
     if (contactsToInsert.length > 0) {
       const BATCH_SIZE = 100;
       for (let i = 0; i < contactsToInsert.length; i += BATCH_SIZE) {
         const batch = contactsToInsert.slice(i, i + BATCH_SIZE);
-        const { error: insertError } = await adminClient
-          .from("contacts")
-          .insert(batch);
+        const { error: insertError } = await adminClient.from("contacts").insert(batch);
 
         if (insertError) {
           console.error("[Outlook Sync] Batch insert error:", insertError);
@@ -466,19 +492,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update delta token for next sync
-    const { error: updateError } = await adminClient
-      .from("email_accounts")
-      .update({
-        contacts_delta_token: nextDeltaToken,
-        contacts_last_sync_at: new Date().toISOString(),
-        contacts_sync_error: result.errors.length > 0 ? result.errors.join("; ") : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", emailAccount.id);
+    // Batch update specialization for existing contacts
+    if (contactsToUpdateSpec.length > 0) {
+      for (const update of contactsToUpdateSpec) {
+        const { error: updateError } = await adminClient
+          .from("contacts")
+          .update({ specialization: update.specialization })
+          .eq("id", update.id)
+          .is("specialization", null); // Only update if currently NULL
 
-    if (updateError) {
-      console.error("[Outlook Sync] Failed to update delta token:", updateError);
+        if (!updateError) {
+          result.updated++;
+        }
+      }
+    }
+
+    // Update delta token (only in legacy mode)
+    if (!isFolderMode && nextDeltaToken) {
+      const { error: updateError } = await adminClient
+        .from("email_accounts")
+        .update({
+          contacts_delta_token: nextDeltaToken,
+          contacts_last_sync_at: new Date().toISOString(),
+          contacts_sync_error: result.errors.length > 0 ? result.errors.join("; ") : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", emailAccount.id);
+
+      if (updateError) {
+        console.error("[Outlook Sync] Failed to update delta token:", updateError);
+      }
     }
 
     console.log("[Outlook Sync] Complete:", result);
@@ -486,9 +529,10 @@ export async function POST(request: NextRequest) {
     return respondSuccess({
       imported: result.imported,
       skipped: result.skipped,
+      updated: result.updated,
       errors: result.errors,
       duplicateReasons: result.duplicateReasons,
-      totalFromGraph: graphContacts.length,
+      totalFromGraph: graphContactsWithSpec.length,
     });
   } catch (error) {
     console.error("[Outlook Sync] Unexpected error:", error);
@@ -498,4 +542,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
