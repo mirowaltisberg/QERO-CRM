@@ -10,6 +10,7 @@ import { TmaDetail } from "./TmaDetail";
 import { TmaImporter } from "./TmaImporter";
 import { TmaLocationSearch } from "./TmaLocationSearch";
 import { TmaCreateModal } from "./TmaCreateModal";
+import { TmaOutlookSyncButton } from "./TmaOutlookSyncButton";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 
@@ -417,6 +418,9 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
                 >
                   Import CSV
                 </button>
+                <div className="px-2 py-1">
+                  <TmaOutlookSyncButton onSyncComplete={refreshCandidates} />
+                </div>
                 <button
                   onClick={() => {
                     setMenuOpen(false);
@@ -669,6 +673,9 @@ export function TmaView({ initialCandidates, teams, userTeamId }: Props) {
                   >
                     Import CSV
                   </button>
+                  <div className="px-2 py-1">
+                    <TmaOutlookSyncButton onSyncComplete={refreshCandidates} />
+                  </div>
                   {activeCandidate && (
                     <button
                       onClick={() => {
