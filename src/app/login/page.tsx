@@ -73,9 +73,26 @@ export default function LoginPage() {
         if (user && mounted) {
           console.log("[Login] User already authenticated:", user.email);
 
-          // Check MFA AAL level - if aal2, user has completed MFA
+          // Check MFA AAL level
           const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
           console.log("[Login] AAL check:", aalData);
+
+          // If user needs to complete MFA (has enrolled factor but not verified in this session)
+          if (aalData?.currentLevel === "aal1" && aalData?.nextLevel === "aal2") {
+            console.log("[Login] User needs to complete MFA verification");
+            
+            // Get the MFA factor to show the MFA step
+            const { data: factorsData } = await supabase.auth.mfa.listFactors();
+            const totpFactor = factorsData?.totp?.find((f) => f.status === "verified");
+            
+            if (totpFactor) {
+              console.log("[Login] Found TOTP factor, showing MFA step");
+              setMfaFactorId(totpFactor.id);
+              setStep("mfa");
+              setCheckingAuth(false);
+              return; // Don't redirect, show MFA form
+            }
+          }
 
           // If user has completed MFA (aal2) or doesn't need MFA (aal1 with no enrolled factors)
           if (aalData?.currentLevel === "aal2" || 

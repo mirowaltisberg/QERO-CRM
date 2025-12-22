@@ -60,24 +60,29 @@ export async function middleware(request: NextRequest) {
   }
 
   // For authenticated users, check AAL to determine if MFA is really needed
-  if (user && mfaPending && !isPublicRoute && !isSetupRoute) {
+  if (user && !isPublicRoute && !isSetupRoute) {
     // Check actual AAL level from Supabase
     const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     
-    // If user has aal2 (completed MFA) or doesn't need MFA, allow through
-    // The cookie will be cleared by the login page or API
-    if (aalData?.currentLevel === "aal2" || 
-        (aalData?.currentLevel === "aal1" && aalData?.nextLevel === "aal1")) {
-      // User is fully authenticated, let the request through
-      // The MFA pending cookie should be cleared elsewhere
-      return supabaseResponse;
+    // If user needs MFA (has enrolled factor at aal2 but currently at aal1)
+    if (aalData?.currentLevel === "aal1" && aalData?.nextLevel === "aal2") {
+      // MFA is required but not completed - redirect to login with mfa flag
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("mfa", "1");
+      return NextResponse.redirect(url);
     }
     
-    // MFA is genuinely pending - redirect to login with mfa flag
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("mfa", "1");
-    return NextResponse.redirect(url);
+    // If user has aal2 (completed MFA) or doesn't need MFA (nextLevel is also aal1)
+    // Clear the MFA pending cookie via response header and allow through
+    if (mfaPending && (aalData?.currentLevel === "aal2" || 
+        (aalData?.currentLevel === "aal1" && aalData?.nextLevel === "aal1"))) {
+      // Delete the stale MFA pending cookie
+      supabaseResponse.cookies.set("qero_mfa_pending", "", { 
+        maxAge: 0, 
+        path: "/" 
+      });
+    }
   }
 
   // If user is logged in (and MFA not pending) and trying to access auth pages, redirect to app
