@@ -73,6 +73,18 @@ export default function LoginPage() {
         if (user && mounted) {
           console.log("[Login] User already authenticated:", user.email);
 
+          // Check MFA AAL level - if aal2, user has completed MFA
+          const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          console.log("[Login] AAL check:", aalData);
+
+          // If user has completed MFA (aal2) or doesn't need MFA (aal1 with no enrolled factors)
+          if (aalData?.currentLevel === "aal2" || 
+              (aalData?.currentLevel === "aal1" && aalData?.nextLevel === "aal1")) {
+            // Clear the MFA pending cookie since user is fully authenticated
+            await fetch("/api/auth/mfa/clear-pending", { method: "POST" });
+            console.log("[Login] Cleared MFA pending cookie");
+          }
+
           // Check profile to determine setup status
           const { data: profile } = await supabase
             .from("profiles")
