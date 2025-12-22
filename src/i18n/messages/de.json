@@ -149,7 +149,10 @@
     "emailSent": "E-Mail gesendet!",
     "emailSentDescription": "Die E-Mail wurde erfolgreich versendet.",
     "emailGenerationError": "E-Mail konnte nicht generiert werden",
-    "emailSendError": "E-Mail konnte nicht gesendet werden"
+    "emailSendError": "E-Mail konnte nicht gesendet werden",
+    "created": "Vakanz erstellt",
+    "matchingCandidates": "{count} passende Kandidaten gefunden",
+    "noMatchingCandidates": "Keine passenden Kandidaten"
   },
   "vacancyStatus": {
     "open": "Offen",

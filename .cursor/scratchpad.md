@@ -1729,3 +1729,172 @@ supabase db push
 - ✅ No auto-loading on page open
 - ✅ All tests pass
 - ✅ Build compiles
+
+---
+
+# Task 36: Vacancy Auto-Match Notifications (PLANNING)
+
+## Goal
+When a new vacancy is created:
+1. **Automatically run the matching algorithm** - no manual trigger needed
+2. **Show in-app notification**: "X matching candidates found for [Vacancy Title]"
+3. **Push notification for high-urgency vacancies** (urgency ≥2) - notify team members
+
+## Background
+- Vacancy creation happens in:
+  - `/api/vacancies` POST - main endpoint
+  - `QuickVacancyPopup` (from Calling page) - calls above endpoint
+  - `VacancyForm` (from Vakanzen page) - calls above endpoint
+- Matching algorithm exists at `/api/vacancies/[id]/candidates` GET endpoint
+- Push notifications work via `sendPushToUsers()` from `src/lib/push/send-notification.ts`
+
+## High-level Task Breakdown
+
+### 36.1 Extract Matching Logic into Reusable Function
+**Files**: Create `src/lib/vacancy/match-candidates.ts`
+
+**Change**: Extract the scoring/matching algorithm from `/api/vacancies/[id]/candidates/route.ts` into a reusable function:
+```typescript
+export async function findMatchingCandidates(
+  supabase: SupabaseClient,
+  vacancy: Vacancy,
+  limit?: number
+): Promise<{ candidates: MatchedCandidate[]; count: number }>
+```
+
+**Why**: Reuse in both GET candidates endpoint and POST vacancy creation
+
+**Success criteria**:
+- Function exported and callable
+- Same matching results as existing endpoint
+- No changes to existing API behavior
+
+### 36.2 Update POST /api/vacancies to Return Match Count
+**Files**: `src/app/api/vacancies/route.ts`
+
+**Change**:
+- After inserting vacancy, call `findMatchingCandidates()`
+- Add `match_count` to response:
+```typescript
+return NextResponse.json({
+  ...vacancy,
+  match_count: matchResult.count,
+  top_matches: matchResult.candidates.slice(0, 3) // Preview
+}, { status: 201 });
+```
+
+**Success criteria**:
+- POST /api/vacancies returns `match_count` field
+- Count matches the number from GET /api/vacancies/[id]/candidates
+- No performance regression (matching should be fast)
+
+### 36.3 Update QuickVacancyPopup Success Message
+**Files**: `src/components/calling/QuickVacancyPopup.tsx`
+
+**Change**:
+- On success, display match count in the success overlay
+- Change message from "Vakanz erstellt!" to "Vakanz erstellt! X passende Kandidaten gefunden"
+- Add click action: navigate to Vakanzen page with vacancy highlighted
+
+**Success criteria**:
+- Success message shows match count
+- User knows immediately if there are matches
+- Click navigates to vacancy detail
+
+### 36.4 Update VakanzenView Success Toast
+**Files**: `src/components/vakanzen/VakanzenView.tsx`
+
+**Change**:
+- After creating vacancy, show toast with match count
+- Use existing toast/notification system (or add simple one)
+
+**Success criteria**:
+- Toast appears after vacancy creation
+- Shows "X passende Kandidaten gefunden für [Title]"
+
+### 36.5 Push Notification for High-Urgency Vacancies
+**Files**: 
+- `src/app/api/vacancies/route.ts` (or create webhook/background job)
+- `src/lib/push/send-notification.ts`
+
+**Change**:
+- After vacancy creation, check urgency level
+- If urgency ≥ 2, send push notification to team members
+- Payload:
+```typescript
+{
+  title: "Neue dringende Vakanz",
+  body: `${vacancy.title} - ${matchCount} passende Kandidaten`,
+  url: `/vakanzen?id=${vacancy.id}`,
+  tag: `vacancy-${vacancy.id}` // Prevent duplicate notifications
+}
+```
+
+**Who receives**:
+- All users in the same team as the contact's team_id
+- Query: `SELECT id FROM profiles WHERE team_id = contact.team_id`
+
+**Success criteria**:
+- Push notification sent for urgency ≥2 vacancies
+- Only team members receive it
+- Clicking notification opens Vakanzen page
+- No notification for urgency 1 vacancies
+
+### 36.6 Add i18n Translations
+**Files**: `src/i18n/messages/de.json`, `src/i18n/messages/en.json`
+
+**Change**: Add keys
+```json
+{
+  "vacancy.matchingCandidates": "{count} passende Kandidaten gefunden",
+  "vacancy.newUrgentVacancy": "Neue dringende Vakanz",
+  "vacancy.createdWithMatches": "Vakanz erstellt! {count} passende Kandidaten"
+}
+```
+
+### 36.7 Version Bump and Deploy
+- Bump version to v1.57.0
+- Add changelog entry
+
+## Technical Notes
+
+### Performance Considerations
+- Matching algorithm runs on vacancy creation (synchronous)
+- For large TMA datasets, this could take 100-500ms
+- Consider: Run in background if slow (but user wants immediate feedback)
+- Alternative: Return estimated count based on role match only (faster), full count async
+
+### Push Notification Rate Limiting
+- Don't spam users if they create multiple vacancies
+- Use `tag` field to collapse notifications for same vacancy
+- Consider: Daily digest instead of individual notifications (enhancement)
+
+### Match Algorithm Reuse
+The existing algorithm in `/api/vacancies/[id]/candidates` scores on:
+- Role match (required if specified)
+- Location distance (haversine)
+- Quality rating (A/B/C)
+- Activity status (active preferred)
+- Driving license
+- Experience level
+
+All these fields are already in the vacancy at creation time.
+
+## Success Criteria (Overall)
+- [ ] Vacancy creation returns match count immediately
+- [ ] QuickVacancyPopup shows "X passende Kandidaten" in success message
+- [ ] VakanzenView shows toast with match count
+- [ ] High-urgency vacancies trigger push notifications to team
+- [ ] Push notification opens Vakanzen page
+- [ ] No significant performance regression
+- [ ] All tests pass
+- [ ] Build compiles
+
+## Project Status Board
+- [ ] **36.1** Extract matching logic into reusable function
+- [ ] **36.2** Update POST /api/vacancies to return match count
+- [ ] **36.3** Update QuickVacancyPopup success message
+- [ ] **36.4** Update VakanzenView success toast
+- [ ] **36.5** Push notification for high-urgency vacancies
+- [ ] **36.6** Add i18n translations
+- [ ] **36.7** Version bump and deploy

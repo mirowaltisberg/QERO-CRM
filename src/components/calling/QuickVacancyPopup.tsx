@@ -41,6 +41,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
   const [success, setSuccess] = useState(false);
   const [roles, setRoles] = useState<TmaRole[]>([]);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const [matchCount, setMatchCount] = useState<number | null>(null);
   
   const titleInputRef = useRef<HTMLInputElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -70,6 +71,7 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
       setDrivingLicense(null);
       setMinExperience(null);
       setSuccess(false);
+      setMatchCount(null);
       // Focus title input after animation
       setTimeout(() => titleInputRef.current?.focus(), 100);
     }
@@ -125,8 +127,10 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create vacancy");
 
+      // Store match count for success message
+      setMatchCount(data.match_count ?? 0);
       setSuccess(true);
-      onCreated?.(data.data);
+      onCreated?.(data);
       
       // Close after success animation completes
       setTimeout(() => {
@@ -231,7 +235,13 @@ export const QuickVacancyPopup = memo(function QuickVacancyPopup({
                 </svg>
               </div>
               <p className="text-base font-semibold text-gray-900">Vakanz erstellt!</p>
-              <p className="text-sm text-gray-500">Sichtbar in Vakanzen</p>
+              {matchCount !== null && matchCount > 0 ? (
+                <p className="text-sm text-emerald-600 font-medium">
+                  {matchCount} passende Kandidaten gefunden
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500">Sichtbar in Vakanzen</p>
+              )}
             </div>
           </div>
         )}

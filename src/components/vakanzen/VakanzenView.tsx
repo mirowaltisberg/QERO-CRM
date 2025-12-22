@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
+import { useNotifications } from "@/lib/notifications/NotificationContext";
 import type { Vacancy, VacancyCandidate, TmaCandidate, TmaRole, Team } from "@/lib/types";
 import type { VacancyStatus } from "@/lib/utils/constants";
 import { VacancyList } from "./VacancyList";
@@ -41,6 +42,8 @@ interface CandidateData {
 }
 
 export function VakanzenView({ initialVacancies, contacts, roles, teams, currentUserTeamId }: Props) {
+  const { addNotification } = useNotifications();
+  
   // State
   const [vacancies, setVacancies] = useState<Vacancy[]>(initialVacancies);
   const [activeVacancy, setActiveVacancy] = useState<Vacancy | null>(null);
@@ -215,11 +218,25 @@ export function VakanzenView({ initialVacancies, contacts, roles, teams, current
         setActiveVacancy(newVacancy);
         setFormOpen(false);
         if (isMobile) setMobileView("detail");
+        
+        // Show notification with match count
+        const matchCount = newVacancy.match_count ?? 0;
+        addNotification({
+          type: "vacancy",
+          title: "Vakanz erstellt",
+          message: matchCount > 0 
+            ? `${newVacancy.title} - ${matchCount} passende Kandidaten gefunden`
+            : `${newVacancy.title} - Keine passenden Kandidaten`,
+          onClick: () => {
+            setActiveVacancy(newVacancy);
+            loadCandidates(newVacancy.id);
+          },
+        });
       }
     } catch (error) {
       console.error("Error creating vacancy:", error);
     }
-  }, [isMobile]);
+  }, [isMobile, addNotification, loadCandidates]);
 
   // Update vacancy
   const handleUpdate = useCallback(async (data: Partial<Vacancy>) => {

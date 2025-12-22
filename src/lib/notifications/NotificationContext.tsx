@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
 
-export type NotificationType = "chat" | "followup" | "email";
+export type NotificationType = "chat" | "followup" | "email" | "vacancy";
 
 export interface Notification {
   id: string;
