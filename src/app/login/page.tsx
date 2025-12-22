@@ -28,6 +28,44 @@ export default function LoginPage() {
   const callbackError = searchParams.get("error");
   const mfaRequired = searchParams.get("mfa") === "1";
   const idleReason = searchParams.get("reason") === "idle";
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Check if user is already authenticated (e.g., from magic link invite)
+  useEffect(() => {
+    async function checkExistingAuth() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (user) {
+          console.log("[Login] User already authenticated:", user.email);
+          console.log("[Login] User metadata:", JSON.stringify(user.user_metadata));
+
+          // Check if this is an invited user that needs setup
+          const needsSetup = 
+            user.user_metadata?.must_change_password === true ||
+            user.user_metadata?.must_setup_2fa === true;
+
+          if (needsSetup) {
+            console.log("[Login] Invited user needs setup, redirecting...");
+            window.location.href = "/setup-account";
+            return;
+          }
+
+          // User is fully set up, redirect to app
+          console.log("[Login] User fully authenticated, redirecting to app...");
+          window.location.href = "/calling";
+          return;
+        }
+      } catch (err) {
+        console.error("[Login] Error checking auth:", err);
+      } finally {
+        setCheckingAuth(false);
+      }
+    }
+
+    checkExistingAuth();
+  }, []);
 
   // Resume MFA step if redirected back with ?mfa=1 (e.g., after page refresh during MFA)
   const resumeMfaChallenge = useCallback(async () => {
@@ -168,7 +206,12 @@ export default function LoginPage() {
             </div>
           )}
 
-          {resumingMfa ? (
+          {checkingAuth ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+              <p className="mt-4 text-sm text-gray-500">Checking authentication...</p>
+            </div>
+          ) : resumingMfa ? (
             <div className="flex flex-col items-center justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
               <p className="mt-4 text-sm text-gray-500">Resuming authentication...</p>
