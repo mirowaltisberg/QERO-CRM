@@ -3,6 +3,8 @@
 import { useTranslations } from "next-intl";
 import React from "react";
 import type { TmaCandidate } from "@/lib/types";
+import { getSpecializationLabel } from "@/lib/utils/outlook-specialization";
+import { cn } from "@/lib/utils/cn";
 
 interface CandidateModeBannerProps {
   candidate: TmaCandidate;
@@ -49,8 +51,21 @@ export function CandidateModeBanner({
             {candidate.first_name} {candidate.last_name}
           </p>
           <div className="flex items-center gap-2 text-xs text-gray-500">
+            {/* Specialization badge - shows which type of companies are being displayed */}
+            {candidate.specialization && (
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                  candidate.specialization === "holzbau" 
+                    ? "bg-amber-100 text-amber-800" 
+                    : "bg-stone-200 text-stone-700"
+                )}
+              >
+                🎯 {getSpecializationLabel(candidate.specialization).split(" / ")[0]}
+              </span>
+            )}
             {/* Team badge - shows which team's companies are being displayed */}
-            {candidate.team && (
+            {candidate.team && !candidate.specialization && (
               <span
                 className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
                 style={{ backgroundColor: candidate.team.color || "#6B7280" }}

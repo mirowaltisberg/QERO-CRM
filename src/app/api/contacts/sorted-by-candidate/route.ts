@@ -29,10 +29,10 @@ export async function GET(request: NextRequest) {
       return respondError("candidateId is required", 400);
     }
 
-    // Fetch the candidate to get their coordinates and team
+    // Fetch the candidate to get their coordinates, team, and specialization
     const { data: candidate, error: candidateError } = await supabase
       .from("tma_candidates")
-      .select("id, first_name, last_name, latitude, longitude, city, team_id")
+      .select("id, first_name, last_name, latitude, longitude, city, team_id, specialization")
       .eq("id", candidateId)
       .single();
 
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch contacts filtered by candidate's team (if candidate has a team)
+    // Fetch contacts filtered by candidate's specialization or team
     let query = supabase
       .from("contacts")
       .select(`
@@ -57,9 +57,15 @@ export async function GET(request: NextRequest) {
       `)
       .order("company_name", { ascending: true });
 
-    // Filter by candidate's team_id if available
-    if (candidate.team_id) {
+    // Priority: Filter by specialization if available, otherwise by team_id
+    if (candidate.specialization) {
+      // Filter contacts by matching specialization
+      query = query.eq("specialization", candidate.specialization);
+      console.log(`[Sorted Contacts] Filtering by specialization: ${candidate.specialization}`);
+    } else if (candidate.team_id) {
+      // Fallback to team_id if no specialization
       query = query.eq("team_id", candidate.team_id);
+      console.log(`[Sorted Contacts] Filtering by team_id: ${candidate.team_id}`);
     }
 
     const { data: contacts, error: contactsError } = await query;
@@ -78,6 +84,7 @@ export async function GET(request: NextRequest) {
           candidateName: `${candidate.first_name} ${candidate.last_name}`,
           candidateCity: candidate.city,
           candidateTeamId: candidate.team_id,
+          candidateSpecialization: candidate.specialization,
         },
       });
     }
@@ -129,6 +136,7 @@ export async function GET(request: NextRequest) {
         candidateName: `${candidate.first_name} ${candidate.last_name}`,
         candidateCity: candidate.city,
         candidateTeamId: candidate.team_id,
+        candidateSpecialization: candidate.specialization,
       },
     });
   } catch (error) {
