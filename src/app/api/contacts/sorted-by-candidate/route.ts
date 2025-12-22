@@ -29,10 +29,10 @@ export async function GET(request: NextRequest) {
       return respondError("candidateId is required", 400);
     }
 
-    // Fetch the candidate to get their coordinates
+    // Fetch the candidate to get their coordinates and team
     const { data: candidate, error: candidateError } = await supabase
       .from("tma_candidates")
-      .select("id, first_name, last_name, latitude, longitude, city")
+      .select("id, first_name, last_name, latitude, longitude, city, team_id")
       .eq("id", candidateId)
       .single();
 
@@ -48,14 +48,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch all contacts with their team info
-    const { data: contacts, error: contactsError } = await supabase
+    // Fetch contacts filtered by candidate's team (if candidate has a team)
+    let query = supabase
       .from("contacts")
       .select(`
         *,
         team:teams(id, name, color)
       `)
       .order("company_name", { ascending: true });
+
+    // Filter by candidate's team_id if available
+    if (candidate.team_id) {
+      query = query.eq("team_id", candidate.team_id);
+    }
+
+    const { data: contacts, error: contactsError } = await query;
 
     if (contactsError) {
       console.error("[Sorted Contacts] Error fetching contacts:", contactsError);
@@ -70,6 +77,7 @@ export async function GET(request: NextRequest) {
           candidateId,
           candidateName: `${candidate.first_name} ${candidate.last_name}`,
           candidateCity: candidate.city,
+          candidateTeamId: candidate.team_id,
         },
       });
     }
@@ -120,6 +128,7 @@ export async function GET(request: NextRequest) {
         candidateId,
         candidateName: `${candidate.first_name} ${candidate.last_name}`,
         candidateCity: candidate.city,
+        candidateTeamId: candidate.team_id,
       },
     });
   } catch (error) {

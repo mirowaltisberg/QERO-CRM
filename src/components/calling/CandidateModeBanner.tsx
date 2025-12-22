@@ -49,6 +49,15 @@ export function CandidateModeBanner({
             {candidate.first_name} {candidate.last_name}
           </p>
           <div className="flex items-center gap-2 text-xs text-gray-500">
+            {/* Team badge - shows which team's companies are being displayed */}
+            {candidate.team && (
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                style={{ backgroundColor: candidate.team.color || "#6B7280" }}
+              >
+                {candidate.team.name}
+              </span>
+            )}
             {candidate.position_title && (
               <span className="truncate">{candidate.position_title}</span>
             )}

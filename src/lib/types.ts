@@ -132,6 +132,12 @@ export interface TmaCandidate {
     full_name: string;
     avatar_url: string | null;
   } | null;
+  // Team info (for filtering in candidate mode)
+  team?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
 }
 
 export interface TmaRole {

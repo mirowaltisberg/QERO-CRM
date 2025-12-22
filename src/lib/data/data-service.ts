@@ -603,7 +603,8 @@ export const tmaService = {
       .select(`
         *,
         claimer:profiles!claimed_by(id, full_name, avatar_url),
-        address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url)
+        address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url),
+        team:teams(id, name, color)
       `)
       .order("created_at", { ascending: false });
 
@@ -643,7 +644,8 @@ export const tmaService = {
       .select(`
         *,
         claimer:profiles!claimed_by(id, full_name, avatar_url),
-        address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url)
+        address_updated_by_profile:profiles!address_updated_by(id, full_name, avatar_url),
+        team:teams(id, name, color)
       `)
       .eq("id", id)
       .single();
