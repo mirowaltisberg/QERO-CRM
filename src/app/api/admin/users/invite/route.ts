@@ -177,7 +177,11 @@ export async function POST(request: NextRequest) {
     // This creates a user in "invited" state and sends a magic link
     // Redirect to /auth/confirm which will handle session creation and routing
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://qero.international";
-    console.log("[Invite] Using site URL:", siteUrl);
+    const redirectUrl = `${siteUrl}/auth/confirm`;
+    
+    console.log("[Invite] Site URL:", siteUrl);
+    console.log("[Invite] Redirect URL:", redirectUrl);
+    console.log("[Invite] Calling inviteUserByEmail with email:", email);
     
     const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
       email,
@@ -190,11 +194,15 @@ export async function POST(request: NextRequest) {
           must_change_password: true,
           must_setup_2fa: true,
         },
-        redirectTo: `${siteUrl}/auth/confirm`,
+        redirectTo: redirectUrl,
       }
     );
     
-    console.log("[Invite] Invite result:", { inviteData, inviteError });
+    console.log("[Invite] inviteUserByEmail result:", { 
+      success: !inviteError,
+      error: inviteError?.message,
+      data: inviteData 
+    });
 
     if (inviteError) {
       console.error("[Invite] Error sending invitation:", inviteError);
