@@ -11,6 +11,8 @@ import {
   type TmaStatus,
   type TmaActivity
 } from "@/lib/utils/constants";
+import { getSpecializationLabel } from "@/lib/utils/outlook-specialization";
+import { cn } from "@/lib/utils/cn";
 
 interface Props {
   candidates: TmaCandidate[];
@@ -161,6 +163,18 @@ export const TmaList = memo(function TmaList({
                         }}
                       >
                         {tActivity(candidate.activity as TmaActivity)}
+                      </span>
+                    )}
+                    {candidate.specialization && (
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                          candidate.specialization === "holzbau" 
+                            ? "bg-amber-100 text-amber-800" 
+                            : "bg-stone-200 text-stone-700"
+                        )}
+                      >
+                        {getSpecializationLabel(candidate.specialization).split(" / ")[0]}
                       </span>
                     )}
                   </div>

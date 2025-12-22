@@ -670,9 +670,13 @@ export const tmaService = {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { status: _s, status_tags: _st, follow_up_at: _fa, follow_up_note: _fn, ...tmaData } = data;
     
+    // Auto-set specialization based on team_id
+    const TEAM_HOLZ = "00000000-0000-0000-0000-000000000011";
+    const autoSpecialization = tmaData.team_id === TEAM_HOLZ ? "holzbau" : null;
+    
     const { data: created, error } = await supabase
       .from("tma_candidates")
-      .insert(tmaData)
+      .insert({ ...tmaData, specialization: autoSpecialization })
       .select(`
         *,
         claimer:profiles!claimed_by(id, full_name, avatar_url),

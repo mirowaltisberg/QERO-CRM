@@ -71,10 +71,15 @@ export async function POST(request: NextRequest) {
 
     // Default to Elektro team if user has no team assigned
     const DEFAULT_ELEKTRO_TEAM = "00000000-0000-0000-0000-000000000010";
+    const TEAM_HOLZ = "00000000-0000-0000-0000-000000000011";
     const activeTeamId = profile?.team_id && profile.team_id.length === 36 
       ? profile.team_id 
       : DEFAULT_ELEKTRO_TEAM;
     console.log("[TMA Import] Using team_id:", activeTeamId);
+    
+    // Auto-set specialization based on team
+    const autoSpecialization = activeTeamId === TEAM_HOLZ ? "holzbau" : null;
+    console.log("[TMA Import] Auto specialization:", autoSpecialization);
 
     const body = await request.json().catch(() => null);
     if (!body || !Array.isArray(body)) {
@@ -190,6 +195,7 @@ export async function POST(request: NextRequest) {
       const dataToInsert = {
         ...candidateWithoutNotes,
         team_id: activeTeamId,
+        specialization: autoSpecialization, // Auto-set based on team
         is_new: true, // Mark new imports as "NEW" by default
       };
       
