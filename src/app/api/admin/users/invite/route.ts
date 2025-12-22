@@ -9,6 +9,7 @@ const InviteSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
   phone: z.string().optional(),
   teamId: z.string().min(1, "Team is required"),
+  forceResend: z.boolean().optional(), // Delete existing user and resend invitation
 });
 
 /**
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
-    const { email, fullName, phone, teamId } = parsed.data;
+    const { email, fullName, phone, teamId, forceResend } = parsed.data;
 
     const adminClient = createAdminClient();
 
@@ -69,13 +70,40 @@ export async function POST(request: NextRequest) {
     const existingUser = existingUsers?.users?.find(u => u.email === email);
 
     if (existingUser) {
-      return NextResponse.json(
-        { error: "A user with this email already exists" },
-        { status: 409 }
-      );
+      if (forceResend) {
+        // Delete existing user from auth (this will cascade to profiles via trigger or we delete manually)
+        console.log("[Invite] Force resend - deleting existing user:", existingUser.id);
+        
+        // Delete from profiles first
+        await adminClient
+          .from("profiles")
+          .delete()
+          .eq("id", existingUser.id);
+        
+        // Delete from auth
+        const { error: deleteError } = await adminClient.auth.admin.deleteUser(existingUser.id);
+        if (deleteError) {
+          console.error("[Invite] Error deleting existing user:", deleteError);
+          return NextResponse.json(
+            { error: `Failed to delete existing user: ${deleteError.message}` },
+            { status: 500 }
+          );
+        }
+        
+        console.log("[Invite] Successfully deleted existing user");
+      } else {
+        return NextResponse.json(
+          { 
+            error: "A user with this email already exists",
+            existingUser: true,
+            canForceResend: true,
+          },
+          { status: 409 }
+        );
+      }
     }
 
-    // Check if there's a pending invitation
+    // Check if there's a pending invitation (and cancel it if force resend)
     const { data: existingInvitation } = await adminClient
       .from("user_invitations")
       .select("id, status")
@@ -84,10 +112,23 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (existingInvitation) {
-      return NextResponse.json(
-        { error: "An invitation is already pending for this email" },
-        { status: 409 }
-      );
+      if (forceResend) {
+        // Cancel the existing invitation
+        await adminClient
+          .from("user_invitations")
+          .update({ status: "cancelled" })
+          .eq("id", existingInvitation.id);
+        console.log("[Invite] Cancelled existing invitation:", existingInvitation.id);
+      } else {
+        return NextResponse.json(
+          { 
+            error: "An invitation is already pending for this email",
+            pendingInvitation: true,
+            canForceResend: true,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Create invitation record

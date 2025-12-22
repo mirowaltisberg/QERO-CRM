@@ -33,6 +33,7 @@ export const InviteUserModal = memo(function InviteUserModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showForceResend, setShowForceResend] = useState(false);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -46,6 +47,7 @@ export const InviteUserModal = memo(function InviteUserModal({
       }
       setError(null);
       setSuccess(false);
+      setShowForceResend(false);
     }
   }, [isOpen, teams]);
 
@@ -56,9 +58,7 @@ export const InviteUserModal = memo(function InviteUserModal({
     }
   }, [teams, teamId]);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const sendInvitation = useCallback(async (forceResend: boolean = false) => {
     if (!email || !fullName || !teamId) {
       setError("Bitte füllen Sie alle Pflichtfelder aus");
       return;
@@ -66,6 +66,7 @@ export const InviteUserModal = memo(function InviteUserModal({
 
     setLoading(true);
     setError(null);
+    setShowForceResend(false);
 
     try {
       const res = await fetch("/api/admin/users/invite", {
@@ -76,12 +77,19 @@ export const InviteUserModal = memo(function InviteUserModal({
           fullName,
           phone: phone || undefined,
           teamId,
+          forceResend,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
+        // Check if we can offer force resend
+        if (res.status === 409 && data.canForceResend) {
+          setError(data.error);
+          setShowForceResend(true);
+          return;
+        }
         throw new Error(data.error || "Failed to send invitation");
       }
 
@@ -97,6 +105,15 @@ export const InviteUserModal = memo(function InviteUserModal({
       setLoading(false);
     }
   }, [email, fullName, phone, teamId, onClose]);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendInvitation(false);
+  }, [sendInvitation]);
+
+  const handleForceResend = useCallback(async () => {
+    await sendInvitation(true);
+  }, [sendInvitation]);
 
   return (
     <Modal
@@ -136,8 +153,24 @@ export const InviteUserModal = memo(function InviteUserModal({
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
-              {error}
+            <div className="rounded-lg bg-red-50 p-3">
+              <p className="text-sm text-red-600">{error}</p>
+              {showForceResend && (
+                <div className="mt-3 flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    onClick={handleForceResend}
+                    disabled={loading}
+                  >
+                    {loading ? "Wird gelöscht..." : "Trotzdem neu einladen"}
+                  </Button>
+                  <span className="text-xs text-gray-500">
+                    (Löscht den bestehenden Benutzer)
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
