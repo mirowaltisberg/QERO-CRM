@@ -176,11 +176,16 @@ export async function POST(request: NextRequest) {
     // Send invitation email using Supabase's inviteUserByEmail
     // This creates a user in "invited" state and sends a magic link
     // Redirect to /auth/confirm which will handle session creation and routing
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://qero.international";
+    
+    // Use SITE_URL (server-side) or NEXT_PUBLIC_SITE_URL (client-side fallback) or hardcoded default
+    const siteUrl = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://qero.international";
     const redirectUrl = `${siteUrl}/auth/confirm`;
     
-    console.log("[Invite] Site URL:", siteUrl);
-    console.log("[Invite] Redirect URL:", redirectUrl);
+    console.log("[Invite] Environment check:");
+    console.log("[Invite] - SITE_URL:", process.env.SITE_URL);
+    console.log("[Invite] - NEXT_PUBLIC_SITE_URL:", process.env.NEXT_PUBLIC_SITE_URL);
+    console.log("[Invite] - Using siteUrl:", siteUrl);
+    console.log("[Invite] - Final redirectUrl:", redirectUrl);
     console.log("[Invite] Calling inviteUserByEmail with email:", email);
     
     const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
