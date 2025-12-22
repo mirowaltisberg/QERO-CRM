@@ -103,7 +103,9 @@ async function fetchContactsDelta(
     url = deltaToken;
   } else {
     // Initial sync - get all contacts
-    url = `${GRAPH_BASE_URL}/me/contacts/delta?$select=id,displayName,givenName,surname,companyName,emailAddresses,businessPhones,mobilePhone,homePhones,businessAddress,homeAddress&$top=200`;
+    // Note: Delta queries don't support $select, $top, $filter, etc.
+    // All fields are returned by default
+    url = `${GRAPH_BASE_URL}/me/contacts/delta`;
   }
 
   let nextDeltaToken = "";

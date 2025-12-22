@@ -56,6 +56,23 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              console.log('%c╔══════════════════════════════════════════════════════════╗', 'color: #3b82f6; font-weight: bold;');
+              console.log('%c║                                                          ║', 'color: #3b82f6; font-weight: bold;');
+              console.log('%c║  🚀  QERO CRM - Cold Calling Platform                   ║', 'color: #3b82f6; font-weight: bold;');
+              console.log('%c║                                                          ║', 'color: #3b82f6; font-weight: bold;');
+              console.log('%c║  Made with ❤️  by Miró Waltisberg                       ║', 'color: #3b82f6; font-weight: bold;');
+              console.log('%c║  📞 +41 76 703 77 00                                    ║', 'color: #3b82f6; font-weight: bold;');
+              console.log('%c║  🏢 QERO AG                                             ║', 'color: #3b82f6; font-weight: bold;');
+              console.log('%c║                                                          ║', 'color: #3b82f6; font-weight: bold;');
+              console.log('%c╚══════════════════════════════════════════════════════════╝', 'color: #3b82f6; font-weight: bold;');
+            `,
+          }}
+        />
+      </head>
       <body className={`${inter.variable} antialiased`} suppressHydrationWarning>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Providers user={user} profile={profile}>
