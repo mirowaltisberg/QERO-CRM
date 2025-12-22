@@ -59,6 +59,8 @@ export const InviteUserModal = memo(function InviteUserModal({
   }, [teams, teamId]);
 
   const sendInvitation = useCallback(async (forceResend: boolean = false) => {
+    console.log("[InviteModal] sendInvitation called with forceResend:", forceResend);
+    
     if (!email || !fullName || !teamId) {
       setError("Bitte füllen Sie alle Pflichtfelder aus");
       return;
@@ -69,6 +71,8 @@ export const InviteUserModal = memo(function InviteUserModal({
     setShowForceResend(false);
 
     try {
+      console.log("[InviteModal] Sending request with:", { email, fullName, teamId, forceResend });
+      
       const res = await fetch("/api/admin/users/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -82,10 +86,12 @@ export const InviteUserModal = memo(function InviteUserModal({
       });
 
       const data = await res.json();
+      console.log("[InviteModal] Response:", { status: res.status, data });
 
       if (!res.ok) {
         // Check if we can offer force resend
         if (res.status === 409 && data.canForceResend) {
+          console.log("[InviteModal] Showing force resend button");
           setError(data.error);
           setShowForceResend(true);
           return;
@@ -93,6 +99,7 @@ export const InviteUserModal = memo(function InviteUserModal({
         throw new Error(data.error || "Failed to send invitation");
       }
 
+      console.log("[InviteModal] Invitation sent successfully!");
       setSuccess(true);
       
       // Close modal after showing success
@@ -100,6 +107,7 @@ export const InviteUserModal = memo(function InviteUserModal({
         onClose();
       }, 2000);
     } catch (err) {
+      console.error("[InviteModal] Error:", err);
       setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten");
     } finally {
       setLoading(false);

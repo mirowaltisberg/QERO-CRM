@@ -70,28 +70,49 @@ export async function POST(request: NextRequest) {
     const existingUser = existingUsers?.users?.find(u => u.email === email);
 
     if (existingUser) {
+      console.log("[Invite] User already exists:", existingUser.id, existingUser.email);
+      
       if (forceResend) {
-        // Delete existing user from auth (this will cascade to profiles via trigger or we delete manually)
-        console.log("[Invite] Force resend - deleting existing user:", existingUser.id);
+        console.log("[Invite] Force resend requested - deleting existing user and profile");
         
         // Delete from profiles first
-        await adminClient
+        const { error: profileDeleteError } = await adminClient
           .from("profiles")
           .delete()
           .eq("id", existingUser.id);
         
+        if (profileDeleteError) {
+          console.error("[Invite] Error deleting profile:", profileDeleteError);
+        } else {
+          console.log("[Invite] Profile deleted successfully");
+        }
+        
         // Delete from auth
         const { error: deleteError } = await adminClient.auth.admin.deleteUser(existingUser.id);
         if (deleteError) {
-          console.error("[Invite] Error deleting existing user:", deleteError);
+          console.error("[Invite] Error deleting existing user from auth:", deleteError);
           return NextResponse.json(
             { error: `Failed to delete existing user: ${deleteError.message}` },
             { status: 500 }
           );
         }
         
-        console.log("[Invite] Successfully deleted existing user");
+        console.log("[Invite] User deleted from auth successfully");
+        
+        // Also cancel any pending invitations
+        const { error: inviteCancelError } = await adminClient
+          .from("user_invitations")
+          .update({ status: "cancelled" })
+          .eq("email", email)
+          .eq("status", "pending");
+        
+        if (inviteCancelError) {
+          console.error("[Invite] Error cancelling existing invitation:", inviteCancelError);
+        } else {
+          console.log("[Invite] Existing invitations cancelled");
+        }
       } else {
+        console.log("[Invite] Not force resend - returning 409");
         return NextResponse.json(
           { 
             error: "A user with this email already exists",
