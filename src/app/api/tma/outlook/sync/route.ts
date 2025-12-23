@@ -36,6 +36,7 @@ interface GraphContact {
     countryOrRegion?: string;
   };
   jobTitle?: string;
+  personalNotes?: string;
 }
 
 interface GraphContactsResponse {
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
       console.log(`[TMA Outlook Sync] Processing folder ${folder.folderId} with specialization ${folder.specialization}`);
 
       // Fetch contacts from this folder
-      let url = `${GRAPH_BASE_URL}/me/contactFolders/${folder.folderId}/contacts?$top=999`;
+      let url = `${GRAPH_BASE_URL}/me/contactFolders/${folder.folderId}/contacts?$select=id,displayName,givenName,surname,emailAddresses,businessPhones,mobilePhone,homePhones,businessAddress,homeAddress,jobTitle,personalNotes&$top=999`;
       
       while (url) {
         const response = await fetch(url, {
@@ -206,20 +207,33 @@ async function processGraphContactAsTma(
   // Check for existing TMA by name (case-insensitive)
   const { data: existing } = await adminClient
     .from("tma_candidates")
-    .select("id, specialization")
+    .select("id, specialization, notes")
     .ilike("first_name", finalFirstName)
     .ilike("last_name", finalLastName || "")
     .limit(1);
 
   if (existing && existing.length > 0) {
+    const existingCandidate = existing[0];
+    const updates: Record<string, any> = {};
+
     // Update specialization if not set
-    if (!existing[0].specialization && specialization) {
+    if (!existingCandidate.specialization && specialization) {
+      updates.specialization = specialization;
+    }
+
+    // Update notes if not set and Outlook has notes
+    if (!existingCandidate.notes && graphContact.personalNotes?.trim()) {
+      updates.notes = graphContact.personalNotes.trim();
+    }
+
+    if (Object.keys(updates).length > 0) {
       await adminClient
         .from("tma_candidates")
-        .update({ specialization })
-        .eq("id", existing[0].id);
-      console.log(`[TMA Outlook Sync] Updated specialization for ${finalFirstName} ${finalLastName}`);
+        .update(updates)
+        .eq("id", existingCandidate.id);
+      console.log(`[TMA Outlook Sync] Updated fields for ${finalFirstName} ${finalLastName}:`, Object.keys(updates));
     }
+
     return "skipped";
   }
 
@@ -259,6 +273,7 @@ async function processGraphContactAsTma(
       longitude: coords?.lng || null,
       is_new: true,
       source_graph_contact_id: graphContact.id,
+      notes: graphContact.personalNotes || null,
     });
 
   if (insertError) {

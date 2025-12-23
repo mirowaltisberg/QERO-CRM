@@ -269,53 +269,53 @@ export const VacancyRoleDropdown = memo(function VacancyRoleDropdown({
               }
 
               return (
-                <div key={team.id}>
-                  {/* Team header */}
+              <div key={team.id}>
+                {/* Team header */}
                   <div className="sticky top-0 bg-gray-50 px-3 py-1.5 border-b border-gray-100 flex items-center gap-2">
-                    <span
-                      className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded text-white"
-                      style={{ backgroundColor: team.color || "#9CA3AF" }}
-                    >
-                      {team.name}
-                    </span>
+                  <span
+                    className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded text-white"
+                    style={{ backgroundColor: team.color || "#9CA3AF" }}
+                  >
+                    {team.name}
+                  </span>
                     {team.id === currentUserTeamId && (
                       <span className="text-[10px] text-gray-400">(Mein Team)</span>
                     )}
-                  </div>
-                  
-                  {/* Roles in team */}
+                </div>
+                
+                {/* Roles in team */}
                   {teamRoles.map((role, idx) => {
                     const globalIndex = startIndex + idx;
                     const isHighlighted = globalIndex === highlightedIndex;
                     
                     return (
-                      <button
-                        key={role.id}
-                        type="button"
+                  <button
+                    key={role.id}
+                    type="button"
                         data-index={globalIndex}
                         onClick={() => selectRole(role.name)}
                         onMouseEnter={() => setHighlightedIndex(globalIndex)}
-                        className={cn(
+                    className={cn(
                           "flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors",
                           isHighlighted && "bg-blue-50",
                           selectedRole?.id === role.id && "font-medium",
                           !isHighlighted && "hover:bg-gray-50"
-                        )}
-                      >
-                        <span
-                          className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: role.color }}
-                        />
-                        <span className="flex-1 text-gray-900 truncate">{role.name}</span>
+                    )}
+                  >
+                    <span
+                      className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: role.color }}
+                    />
+                    <span className="flex-1 text-gray-900 truncate">{role.name}</span>
                         {selectedRole?.id === role.id && (
                           <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                         )}
-                      </button>
+                  </button>
                     );
                   })}
-                </div>
+              </div>
               );
             })}
           </div>

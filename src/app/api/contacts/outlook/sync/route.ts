@@ -63,6 +63,7 @@ interface GraphContact {
     state: string | null;
     countryOrRegion: string | null;
   } | null;
+  personalNotes: string | null;
 }
 
 interface GraphContactsResponse {
@@ -92,7 +93,7 @@ async function fetchContactsFromFolder(
   folderId: string
 ): Promise<GraphContact[]> {
   const contacts: GraphContact[] = [];
-  let url: string | null = `${GRAPH_BASE_URL}/me/contactFolders/${folderId}/contacts?$top=200`;
+  let url: string | null = `${GRAPH_BASE_URL}/me/contactFolders/${folderId}/contacts?$select=id,displayName,givenName,surname,companyName,emailAddresses,businessPhones,mobilePhone,homePhones,businessAddress,homeAddress,personalNotes&$top=200`;
 
   while (url) {
     const response = await fetch(url, {
@@ -133,7 +134,7 @@ async function fetchContactsDelta(
   if (deltaToken) {
     url = deltaToken;
   } else {
-    url = `${GRAPH_BASE_URL}/me/contacts/delta`;
+    url = `${GRAPH_BASE_URL}/me/contacts/delta?$select=id,displayName,givenName,surname,companyName,emailAddresses,businessPhones,mobilePhone,homePhones,businessAddress,homeAddress,personalNotes`;
   }
 
   let nextDeltaToken = "";
@@ -218,6 +219,7 @@ function mapGraphContactToPayload(
   source: string;
   source_account_id: string;
   source_graph_contact_id: string;
+  notes: string | null;
 } | null {
   let companyName = contact.companyName;
   const email = contact.emailAddresses?.[0]?.address || null;
@@ -269,6 +271,7 @@ function mapGraphContactToPayload(
     source: "outlook",
     source_account_id: sourceAccountId,
     source_graph_contact_id: contact.id,
+    notes: contact.personalNotes || null,
   };
 }
 
@@ -372,7 +375,7 @@ export async function POST(request: NextRequest) {
     // Load existing contacts for deduplication
     let existingContactsQuery = adminClient
       .from("contacts")
-      .select("id, normalized_phone_digits, normalized_name, email_domain, source_graph_contact_id, specialization");
+      .select("id, normalized_phone_digits, normalized_name, email_domain, source_graph_contact_id, specialization, notes");
 
     if (teamId) {
       existingContactsQuery = existingContactsQuery.eq("team_id", teamId);
@@ -389,7 +392,7 @@ export async function POST(request: NextRequest) {
     const existingPhones = new Set<string>();
     const existingNames = new Set<string>();
     const existingDomains = new Set<string>();
-    const existingGraphIds = new Map<string, { id: string; specialization: string | null }>();
+    const existingGraphIds = new Map<string, { id: string; specialization: string | null; notes: string | null }>();
 
     for (const contact of existingContacts || []) {
       if (contact.normalized_phone_digits) existingPhones.add(contact.normalized_phone_digits);
@@ -401,6 +404,7 @@ export async function POST(request: NextRequest) {
         existingGraphIds.set(contact.source_graph_contact_id, {
           id: contact.id,
           specialization: contact.specialization,
+          notes: contact.notes,
         });
       }
     }
@@ -420,16 +424,29 @@ export async function POST(request: NextRequest) {
     };
 
     const contactsToInsert: ReturnType<typeof mapGraphContactToPayload>[] = [];
-    const contactsToUpdateSpec: Array<{ id: string; specialization: string }> = [];
+    const contactsToUpdateFields: Array<{ id: string; updates: Record<string, any> }> = [];
 
     for (const { contact: graphContact, specialization } of graphContactsWithSpec) {
       // Check if already imported
       const existing = existingGraphIds.get(graphContact.id);
       if (existing) {
-        // Already exists - but maybe update specialization if it's NULL
+        // Already exists - check if we need to update any fields
+        const updates: Record<string, any> = {};
+
+        // Update specialization if not set
         if (specialization && !existing.specialization) {
-          contactsToUpdateSpec.push({ id: existing.id, specialization });
+          updates.specialization = specialization;
         }
+
+        // Update notes if not set and Outlook has notes
+        if (!existing.notes && graphContact.personalNotes?.trim()) {
+          updates.notes = graphContact.personalNotes.trim();
+        }
+
+        if (Object.keys(updates).length > 0) {
+          contactsToUpdateFields.push({ id: existing.id, updates });
+        }
+
         result.skipped++;
         result.duplicateReasons.already_imported++;
         continue;
@@ -470,11 +487,11 @@ export async function POST(request: NextRequest) {
       if (normalizedPhone) existingPhones.add(normalizedPhone);
       if (normalizedName) existingNames.add(normalizedName);
       if (emailDomain && !PUBLIC_EMAIL_DOMAINS.has(emailDomain)) existingDomains.add(emailDomain);
-      existingGraphIds.set(graphContact.id, { id: "", specialization: null }); // Mark as seen
+      existingGraphIds.set(graphContact.id, { id: "", specialization: null, notes: null }); // Mark as seen
     }
 
     console.log("[Outlook Sync] Contacts to insert:", contactsToInsert.length);
-    console.log("[Outlook Sync] Contacts to update specialization:", contactsToUpdateSpec.length);
+    console.log("[Outlook Sync] Contacts to update fields:", contactsToUpdateFields.length);
 
     // Batch insert new contacts
     if (contactsToInsert.length > 0) {
@@ -492,16 +509,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Batch update specialization for existing contacts
-    if (contactsToUpdateSpec.length > 0) {
-      for (const update of contactsToUpdateSpec) {
+    // Batch update fields for existing contacts
+    if (contactsToUpdateFields.length > 0) {
+      for (const update of contactsToUpdateFields) {
         const { error: updateError } = await adminClient
           .from("contacts")
-          .update({ specialization: update.specialization })
-          .eq("id", update.id)
-          .is("specialization", null); // Only update if currently NULL
+          .update(update.updates)
+          .eq("id", update.id);
 
-        if (!updateError) {
+        if (updateError) {
+          console.error("[Outlook Sync] Update error:", updateError);
+          result.errors.push(`Update ${update.id}: ${updateError.message}`);
+        } else {
           result.updated++;
         }
       }
