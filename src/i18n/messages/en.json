@@ -296,7 +296,9 @@
       "label": "Team",
       "myTeam": "My Team",
       "allTeams": "All Teams"
-    }
+    },
+    "teamCandidatesTitle": "Show available candidates from team",
+    "selectCandidateFirst": "Please select a candidate first"
   },
   "calling": {
     "title": "Calling",
@@ -573,5 +575,12 @@
     "candidatesFound": "candidates found",
     "noProfile": "No short profile",
     "pointsLabel": "Points"
+  },
+  "teamCandidates": {
+    "title": "Available Candidates",
+    "description": "Candidates from the same team, sorted by proximity",
+    "descriptionFor": "Candidates from the same team for {company}, sorted by proximity",
+    "noResults": "No available candidates in this team",
+    "candidatesFound": "candidates found"
   }
 }

@@ -14,6 +14,20 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.62.0",
+    date: "2025-12-26",
+    type: "minor",
+    changes: [
+      "Calling: 'Kandidaten' button now shows all available candidates from same team",
+      "Candidates filtered by team roles (matching position_title)",
+      "Only shows active candidates with Kurzprofil uploaded",
+      "Sorted by distance (nearest first) to the current company",
+      "Each row displays: Role (color), A/B/C quality, Name, City, Distance",
+      "Click row to open candidate's Kurzprofil PDF",
+      "Button disabled when no candidate is selected (with helper text)",
+    ],
+  },
+  {
     version: "1.50.0",
     date: "2025-12-18",
     type: "minor",

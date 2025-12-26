@@ -18,6 +18,7 @@ type EmailSentState = { status: "success" | "warning" | "error"; message: string
 import { VacancyQuickView } from "./VacancyQuickView";
 import { CandidatePickerModal } from "./CandidatePickerModal";
 import { CandidateMatchModal } from "./CandidateMatchModal";
+import { TeamCandidatesModal } from "./TeamCandidatesModal";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import type { Contact, Vacancy, TmaCandidate, ContactPerson } from "@/lib/types";
 import type { ContactStatus } from "@/lib/utils/constants";
@@ -144,6 +145,7 @@ export const ContactDetail = memo(function ContactDetail({
   const [editableBody, setEditableBody] = useState("");
   const [showCandidatePicker, setShowCandidatePicker] = useState(false);
   const [showCandidateMatch, setShowCandidateMatch] = useState(false);
+  const [showTeamCandidates, setShowTeamCandidates] = useState(false);
   const [generatingAi, setGeneratingAi] = useState<"standard" | "best" | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [activeDraftType, setActiveDraftType] = useState<"standard" | "best">("standard");
@@ -815,14 +817,15 @@ export const ContactDetail = memo(function ContactDetail({
                   {loadingPreview ? "Laden..." : "E-Mail"}
                 </Button>
                 <Button 
-                  onClick={() => setShowCandidateMatch(true)} 
+                  onClick={() => selectedCandidate ? setShowTeamCandidates(true) : undefined} 
                   variant="secondary"
                   size="md"
                   className="shadow-sm"
-                  title="Alternative Kandidaten finden"
+                  disabled={!selectedCandidate}
+                  title={selectedCandidate ? t("teamCandidatesTitle") : t("selectCandidateFirst")}
                 >
                   <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                   Kandidaten
                 </Button>
@@ -1224,6 +1227,17 @@ export const ContactDetail = memo(function ContactDetail({
           onClose={() => setShowCandidateMatch(false)}
           contact={contact}
         />
+
+        {/* Team Candidates Modal - shows available candidates from same team */}
+        {contact && selectedCandidate && (
+          <TeamCandidatesModal
+            open={showTeamCandidates}
+            onClose={() => setShowTeamCandidates(false)}
+            contactId={contact.id}
+            selectedCandidateId={selectedCandidate.id}
+            contactName={contact.company_name}
+          />
+        )}
 
         {/* Vacancy Quick View Popup */}
         <VacancyQuickView

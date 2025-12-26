@@ -296,7 +296,9 @@
       "label": "Team",
       "myTeam": "Mein Team",
       "allTeams": "Alle Teams"
-    }
+    },
+    "teamCandidatesTitle": "Verfügbare Kandidaten aus Team anzeigen",
+    "selectCandidateFirst": "Bitte zuerst einen Kandidaten auswählen"
   },
   "calling": {
     "title": "Calling",
@@ -569,5 +571,12 @@
     "candidatesFound": "Kandidaten gefunden",
     "noProfile": "Kein Kurzprofil",
     "pointsLabel": "Punkte"
+  },
+  "teamCandidates": {
+    "title": "Verfügbare Kandidaten",
+    "description": "Kandidaten aus demselben Team, sortiert nach Nähe",
+    "descriptionFor": "Kandidaten aus demselben Team für {company}, sortiert nach Nähe",
+    "noResults": "Keine verfügbaren Kandidaten in diesem Team",
+    "candidatesFound": "Kandidaten gefunden"
   }
 }

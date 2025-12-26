@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { respondError, respondSuccess } from "@/lib/utils/api-response";
 import { haversineDistance } from "@/lib/geo/haversine";
+import { rolesMatch } from "@/lib/tma/role-match";
 import OpenAI from "openai";
 
 // Quality ranking for A/B/C tags
@@ -59,34 +60,6 @@ interface ScoredCandidate {
   // For AI mode
   ai_score?: number;
   match_reason?: string;
-}
-
-// Common suffixes/prefixes to ignore when matching roles
-const IGNORE_WORDS = new Set(["efz", "eba", "hf", "bp", "dipl", "ing", "bsc", "msc"]);
-
-/**
- * Extract the core role name by removing common suffixes like EFZ, EBA, etc.
- */
-function getCoreRoleName(role: string): string {
-  return role
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(word => !IGNORE_WORDS.has(word))
-    .join(" ")
-    .trim();
-}
-
-/**
- * Check if two roles match (strict matching on core role name)
- */
-function rolesMatch(positionTitle: string, searchedRole: string): boolean {
-  const corePosition = getCoreRoleName(positionTitle);
-  const coreSearched = getCoreRoleName(searchedRole);
-  
-  if (!corePosition || !coreSearched) return false;
-  
-  // Exact match or one contains the other
-  return corePosition.includes(coreSearched) || coreSearched.includes(corePosition);
 }
 
 /**
@@ -418,5 +391,8 @@ Bewerte jeden Kandidaten mit Score und kurzer Begründung.`;
 
   return results;
 }
+
+
+
 
 
