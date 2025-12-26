@@ -1,9 +1,16 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { createPortal } from "react-dom";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils/cn";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet";
 
 interface TeamCandidateRow {
   id: string;
@@ -37,17 +44,11 @@ export function TeamCandidatesModal({
   contactName,
 }: TeamCandidatesModalProps) {
   const t = useTranslations("teamCandidates");
-  const tCommon = useTranslations("common");
-  const [mounted, setMounted] = useState(false);
   const [candidates, setCandidates] = useState<TeamCandidateRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Fetch candidates when modal opens
+  // Fetch candidates when sheet opens
   useEffect(() => {
     if (!open) return;
 
@@ -76,91 +77,22 @@ export function TeamCandidatesModal({
     fetchCandidates();
   }, [open, contactId, selectedCandidateId]);
 
-  // Handle escape key
-  useEffect(() => {
-    if (!open) {
-      document.body.style.overflow = "";
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [open, onClose]);
-
   const handleRowClick = useCallback((candidate: TeamCandidateRow) => {
     window.open(candidate.short_profile_url, "_blank");
   }, []);
 
-  if (!open || !mounted) return null;
-
-  const portalRoot = typeof window !== "undefined" ? document.body : null;
-  if (!portalRoot) return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      role="presentation"
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="team-candidates-title"
-        className="flex w-full max-w-2xl flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl"
-        style={{
-          animation: "modalIn 280ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
-          maxHeight: "85vh",
-        }}
-      >
-        {/* Header */}
-        <header className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <div>
-            <h2
-              id="team-candidates-title"
-              className="text-lg font-semibold text-gray-900"
-            >
-              {t("title")}
-            </h2>
-            <p className="text-sm text-gray-500">
-              {contactName ? t("descriptionFor", { company: contactName }) : t("description")}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </header>
+  return (
+    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
+        <SheetHeader>
+          <SheetTitle>{t("title")}</SheetTitle>
+          <SheetDescription>
+            {contactName ? t("descriptionFor", { company: contactName }) : t("description")}
+          </SheetDescription>
+        </SheetHeader>
 
         {/* Candidates List */}
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex-1 overflow-y-auto px-5 py-3 -mx-5">
           {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
@@ -168,7 +100,7 @@ export function TeamCandidatesModal({
           )}
 
           {error && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
               <div className="mb-2 text-red-500">
                 <svg
                   className="h-8 w-8"
@@ -189,7 +121,7 @@ export function TeamCandidatesModal({
           )}
 
           {!loading && !error && candidates.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
               <div className="mb-2 text-gray-400">
                 <svg
                   className="h-8 w-8"
@@ -210,7 +142,7 @@ export function TeamCandidatesModal({
           )}
 
           {!loading && !error && candidates.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 px-5">
               {candidates.map((candidate) => (
                 <button
                   key={candidate.id}
@@ -311,22 +243,12 @@ export function TeamCandidatesModal({
         </div>
 
         {/* Footer */}
-        <footer className="border-t border-gray-100 px-6 py-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">
-              {candidates.length} {t("candidatesFound")}
-            </p>
-            <button
-              onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100"
-            >
-              {tCommon("close")}
-            </button>
-          </div>
-        </footer>
-      </div>
-    </div>,
-    portalRoot
+        <SheetFooter>
+          <p className="text-xs text-gray-400">
+            {candidates.length} {t("candidatesFound")}
+          </p>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
-
