@@ -14,6 +14,14 @@ interface ChangelogEntry {
 // Changelog data - newest first
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.62.1",
+    date: "2025-12-26",
+    type: "patch",
+    changes: [
+      "Kandidaten panel now slides in from right as sidebar (instead of popup modal)",
+    ],
+  },
+  {
     version: "1.62.0",
     date: "2025-12-26",
     type: "minor",
